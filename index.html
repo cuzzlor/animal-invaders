@@ -44,13 +44,24 @@
   }
   canvas {
     background: #000;
-    border: 2px solid #333;
-    /* Grow to fill the height of the window, keeping the right shape.
-       This is what makes the game BIG instead of a tiny box. */
-    height: 94vh;
+    /* Fill the FULL height of the window, keeping the right shape. The
+       game sits as a tall band centred in the middle of the screen. */
+    display: block;
+    height: 100vh;
     width: auto;
   }
-  p { color: #888; font-size: 14px; }
+  /* Controls line, pinned to the bottom so it doesn't shrink the game. */
+  p {
+    color: #888;
+    font-size: 14px;
+    position: fixed;
+    bottom: 6px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    margin: 0;
+    pointer-events: none;
+  }
 </style>
 </head>
 <body>
