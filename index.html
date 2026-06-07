@@ -21,7 +21,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Animal Invaders</title>
 <style>
   /* Simple retro look. Black space background, white pixel-y text. */
@@ -46,12 +46,14 @@
     height: 100%;
   }
   #game {
-    /* Fill the FULL height of the window, keeping the right shape. The
-       game sits as a tall band centred in the middle of the screen.
+    /* Fit the game inside the screen on ANY device, keeping its shape.
+       91.67vh = 100vh × (880 ÷ 960) — the canvas's width-to-height ratio.
+       So on wide screens it fills the height, and on narrow phones it
+       shrinks to fit the width instead — never squashed, never cut off.
        Transparent background so the moving stars show through behind it. */
     display: block;
-    height: 100vh;
-    width: auto;
+    width: min(100vw, 91.67vh);
+    height: auto;
     background: transparent;
   }
   /* The starfield sits behind EVERYTHING, filling the whole window. */
@@ -76,6 +78,33 @@
     margin: 0;
     pointer-events: none;
   }
+  /* On-screen buttons for phones/tablets. Hidden on mouse computers;
+     shown only on touch screens (where the pointer is "coarse"). */
+  #touch { display: none; }
+  #touch button {
+    position: fixed;
+    bottom: 22px;
+    width: 88px;
+    height: 88px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    font-size: 34px;
+    font-family: inherit;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: none; /* stops scrolling/zooming when you press a button */
+  }
+  #touch button:active { background: rgba(255, 255, 255, 0.3); }
+  #btn-left  { left: 22px; }
+  #btn-right { left: 122px; }
+  #btn-fire  { right: 22px; width: 120px; border-radius: 18px; font-size: 22px; }
+  @media (pointer: coarse) {
+    #touch { display: block; }
+    p { display: none; } /* keyboard hints don't help on a touch screen */
+  }
 </style>
 </head>
 <body>
@@ -84,6 +113,13 @@
 <div id="wrap">
   <canvas id="game" width="880" height="960"></canvas>
   <p>Move: ← →  (or A / D) &nbsp;•&nbsp; Shoot: Space &nbsp;•&nbsp; Restart: Enter</p>
+</div>
+
+<!-- Touch controls — only visible on phones/tablets (see the CSS above). -->
+<div id="touch">
+  <button id="btn-left" aria-label="Move left">◀</button>
+  <button id="btn-right" aria-label="Move right">▶</button>
+  <button id="btn-fire" aria-label="Shoot">FIRE</button>
 </div>
 
 <script>
@@ -123,6 +159,11 @@ const PLAYER_BULLET_SPEED = 5; // how fast your shots fly up
 const SHOT_SPEED    = 2; // how fast the animals' shots fall down
 const STARTING_LIVES = 3;  // how many tries you get
 const SAFE_TIME     = 90;  // frames you flash & can't be hit after losing a life
+
+// --- Stages: clear the herd without dying and a new, faster wave begins ---
+const STAGE_SPEEDUP = 0.12; // each stage everything gets this much faster (0.12 = 12%)
+const STAGE_BONUS   = 100;  // bonus points for clearing a stage
+const BANNER_TIME   = 100;  // frames the big "STAGE N" banner shows for
 
 // --- The bases (shields) you can hide behind ---
 const BASE_COUNT   = 3;    // how many bases there are
@@ -217,8 +258,10 @@ let particles;     // explosion bits: array of {x, y, vx, vy, life, maxLife, col
 let invaderDir;    // +1 moving right, -1 moving left
 let score;
 let lives;
-let state;         // "playing", "won", or "lost"
+let state;         // "playing" or "lost"
 let invuln;        // frames left of "just got hit, can't be hit again yet"
+let stage;         // which wave you're on (1, 2, 3, ...) — everything speeds up
+let stageBanner;   // frames left to show the "STAGE N" banner
 
 // Remember which keys are currently held down.
 const keys = {};
@@ -228,12 +271,10 @@ const keys = {};
 let shotTimer = 0;
 
 // ---------------------------------------------------------------------
-// setup(): build a fresh game. Called at the start and on restart.
+// buildLevel(): lay out a fresh wave of animals and brand-new bases, and
+// clear anything left flying around. Used at the start of every stage.
 // ---------------------------------------------------------------------
-function setup() {
-  // Put the player near the bottom, in the middle.
-  player = { x: W / 2, y: H - CELL - 20 };
-
+function buildLevel() {
   // Build the grid of animals, centred across the screen.
   invaders = [];
   const gapX = 70;     // space between animals across
@@ -256,7 +297,8 @@ function setup() {
 
   // Build the bases (shields) you can hide behind. Each base is a little
   // grid of blocks; shots eat away one block at a time, so they slowly
-  // crumble — from both the animals' shots AND your own bullets.
+  // crumble — from both the animals' shots AND your own bullets. You get
+  // fresh bases at the start of each stage.
   bases = [];
   const baseW = BASE_BLOCKS_W * BASE_BLOCK;
   const baseGap = (W - BASE_COUNT * baseW) / (BASE_COUNT + 1); // even spacing
@@ -277,15 +319,37 @@ function setup() {
     bases.push({ blocks });
   }
 
+  // Re-centre the player and clear the air.
+  player.x = W / 2;
   bullets = [];
   shots = [];
   particles = [];
   invaderDir = 1;
-  score = 0;
-  lives = STARTING_LIVES;
-  state = "playing";
   shotTimer = 0;
   invuln = 0;
+  stageBanner = BANNER_TIME;
+}
+
+// ---------------------------------------------------------------------
+// setup(): start a brand-new game (called at the start and on restart).
+// ---------------------------------------------------------------------
+function setup() {
+  player = { x: W / 2, y: H - CELL - 20 };
+  score = 0;
+  lives = STARTING_LIVES;
+  stage = 1;
+  state = "playing";
+  buildLevel();
+}
+
+// ---------------------------------------------------------------------
+// nextStage(): you cleared the herd! Keep your score and lives, bump the
+// stage (which speeds everything up), and lay out a fresh, faster wave.
+// ---------------------------------------------------------------------
+function nextStage() {
+  score += STAGE_BONUS * stage; // reward for clearing the wave
+  stage++;
+  buildLevel();
 }
 
 // ---------------------------------------------------------------------
@@ -312,13 +376,49 @@ document.addEventListener("keyup", (e) => {
   keys[e.key] = false;
 });
 
+// ---------------------------------------------------------------------
+// TOUCH CONTROLS — wire the on-screen buttons (phones/tablets) to the
+// same controls the keyboard uses. We use "pointer" events so they work
+// for a finger or a mouse. Holding ◀ / ▶ moves; each tap of FIRE shoots.
+// ---------------------------------------------------------------------
+function fireShot() {
+  if (state === "playing") {
+    bullets.push({ x: player.x, y: player.y - CELL / 2 });
+  } else {
+    setup(); // tap FIRE to start a new game after game over
+  }
+}
+
+// A move button holds a direction down while you're pressing it.
+function holdButton(id, key) {
+  const el = document.getElementById(id);
+  const press   = (e) => { e.preventDefault(); keys[key] = true; };
+  const release = (e) => { e.preventDefault(); keys[key] = false; };
+  el.addEventListener("pointerdown", press);
+  el.addEventListener("pointerup", release);
+  el.addEventListener("pointercancel", release);
+  el.addEventListener("pointerleave", release);
+}
+holdButton("btn-left", "ArrowLeft");
+holdButton("btn-right", "ArrowRight");
+document.getElementById("btn-fire").addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  fireShot();
+});
+
 
 // ---------------------------------------------------------------------
 // update(): the "thinking" half of the game loop. Runs ~60 times a
 // second. It moves everything and checks for collisions.
 // ---------------------------------------------------------------------
 function update() {
-  if (state !== "playing") return; // frozen on win/lose screens
+  if (state !== "playing") return; // frozen on the game-over screen
+
+  // Each stage speeds the animals up a little. speedScale is 1 on stage 1,
+  // 1.12 on stage 2, and so on. shotSpeed is how fast their shots fall now.
+  const speedScale = 1 + (stage - 1) * STAGE_SPEEDUP;
+  const shotSpeed = SHOT_SPEED * speedScale;
+  if (stageBanner > 0) stageBanner--; // count down the "STAGE N" banner
 
   // --- Move the player ---
   if (keys["ArrowLeft"] || keys["a"] || keys["A"])  player.x -= PLAYER_SPEED;
@@ -338,7 +438,7 @@ function update() {
   const totalCount = ROWS * COLS;
   // Speed grows from 1x up to about 4x as the herd is wiped out.
   const speedMult = 1 + (1 - aliveCount / totalCount) * 3;
-  const step = INVADER_SPEED * speedMult;
+  const step = INVADER_SPEED * speedMult * speedScale;
 
   // Move them sideways. If any hits an edge, the whole herd drops and
   // reverses direction.
@@ -372,7 +472,7 @@ function update() {
         // AIMED shot: work out the sideways drift needed to land where the
         // player is right now (how far across ÷ how long it takes to fall),
         // then cap it so the shot can't fly almost sideways.
-        const fallTime = Math.max(1, (player.y - startY) / SHOT_SPEED);
+        const fallTime = Math.max(1, (player.y - startY) / shotSpeed);
         vx = (player.x - shooter.x) / fallTime;
         vx = Math.max(-AIM_MAX, Math.min(AIM_MAX, vx));
       } else {
@@ -380,13 +480,13 @@ function update() {
         vx = Math.random() < 0.5 ? 0 : (Math.random() * 2 - 1) * SHOT_ANGLE;
       }
       shots.push({ x: shooter.x, y: startY, emoji: shooter.shot, vx: vx });
-      // Reload a bit faster as the herd thins out (keeps the tension).
-      shotTimer = Math.round(SHOT_RELOAD * (0.4 + 0.6 * aliveCount / totalCount));
+      // Reload a bit faster as the herd thins out — and faster each stage.
+      shotTimer = Math.round(SHOT_RELOAD / speedScale * (0.4 + 0.6 * aliveCount / totalCount));
     }
   }
   // Move shots down (and sideways for angled ones); drop ones that leave the screen.
   for (const m of shots) {
-    m.y += SHOT_SPEED;
+    m.y += shotSpeed;
     m.x += m.vx;
   }
   shots = shots.filter((m) => m.y < H + 20 && m.x > -20 && m.x < W + 20);
@@ -440,8 +540,9 @@ function update() {
   // If ANY base is completely wiped out, it's game over — protect them all!
   if (bases.some((base) => base.blocks.every((blk) => !blk.alive))) state = "lost";
 
-  // --- Did you win? ---
-  if (invaders.every((inv) => !inv.alive)) state = "won";
+  // --- Cleared the herd? On to the next (faster) stage! ---
+  // Only if you're still alive, of course.
+  if (state === "playing" && invaders.every((inv) => !inv.alive)) nextStage();
 }
 
 // ---------------------------------------------------------------------
@@ -530,12 +631,14 @@ function draw() {
   // so the moving starfield behind the game shows through.
   ctx.clearRect(0, 0, W, H);
 
-  // The HUD: score and lives at the top.
+  // The HUD: score (left), stage (centre), lives (right) at the top.
   ctx.fillStyle = "#fff";
   ctx.font = "20px 'Courier New', monospace";
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
   ctx.fillText("SCORE: " + score, 12, 28);
+  ctx.textAlign = "center";
+  ctx.fillText("STAGE " + stage, W / 2, 28);
   ctx.textAlign = "right";
   ctx.fillText("LIVES: " + "❤️".repeat(lives), W - 12, 28);
 
@@ -588,17 +691,29 @@ function draw() {
   }
   ctx.globalAlpha = 1;
 
-  // Win / lose messages.
-  if (state !== "playing") {
+  // "STAGE N" banner at the start of each wave (fades out, game keeps going).
+  if (state === "playing" && stageBanner > 0) {
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, stageBanner / 30); // fade out near the end
+    ctx.fillStyle = "#fff";
+    ctx.textAlign = "center";
+    ctx.font = "44px 'Courier New', monospace";
+    ctx.fillText("STAGE " + stage, W / 2, H / 2);
+    ctx.restore();
+  }
+
+  // Game-over screen.
+  if (state === "lost") {
     ctx.fillStyle = "rgba(0,0,0,0.7)";
     ctx.fillRect(0, 0, W, H);
     ctx.fillStyle = "#fff";
     ctx.textAlign = "center";
     ctx.font = "48px 'Courier New', monospace";
-    ctx.fillText(state === "won" ? "YOU WIN! 🎉" : "GAME OVER", W / 2, H / 2 - 20);
+    ctx.fillText("GAME OVER", W / 2, H / 2 - 35);
     ctx.font = "22px 'Courier New', monospace";
-    ctx.fillText("Score: " + score, W / 2, H / 2 + 25);
-    ctx.fillText("Press Enter to play again", W / 2, H / 2 + 60);
+    ctx.fillText("Reached stage " + stage, W / 2, H / 2 + 10);
+    ctx.fillText("Score: " + score, W / 2, H / 2 + 45);
+    ctx.fillText("Press Enter to play again", W / 2, H / 2 + 80);
   }
 }
 
