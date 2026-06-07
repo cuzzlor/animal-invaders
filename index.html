@@ -115,12 +115,21 @@ const COLS        = 8;     // how many animals in each row
 const INVADER_SPEED = 0.6; // how fast the herd slides sideways (bigger = faster)
 const MAX_SHOTS     = 3;   // most shots falling at ONCE (the real Space Invaders only allows 3!)
 const SHOT_RELOAD   = 45;  // frames to wait between shots (smaller = they shoot more often)
-const SHOT_ANGLE    = 1.2; // how far sideways an angled shot drifts (0 = all straight down)
+const SHOT_ANGLE    = 1.2; // how far sideways a stray (un-aimed) shot drifts
+const AIM_CHANCE    = 0.6; // chance (0–1) a shot is AIMED at you — bigger = sharper shooters
+const AIM_MAX       = 2.5; // how sharply an aimed shot can angle toward you
 const PLAYER_SPEED  = 4;   // how fast your ship moves (bigger = faster)
 const PLAYER_BULLET_SPEED = 5; // how fast your shots fly up
 const SHOT_SPEED    = 2; // how fast the animals' shots fall down
 const STARTING_LIVES = 3;  // how many tries you get
 const SAFE_TIME     = 90;  // frames you flash & can't be hit after losing a life
+
+// --- The bases (shields) you can hide behind ---
+const BASE_COUNT   = 3;    // how many bases there are
+const BASE_COLOR   = "#5fd66f"; // their colour — try "#7ec8ff" or "#ffd34d"
+const BASE_BLOCKS_W = 9;   // how many little blocks wide each base is
+const BASE_BLOCKS_H = 5;   // how many little blocks tall each base is
+const BASE_BLOCK   = 12;   // size of one little block, in pixels
 
 // --- Want to use your OWN drawing instead of an emoji? ---
 // Easy! It takes one line.
@@ -194,6 +203,8 @@ let player;        // {x, y}
 let invaders;      // array of {x, y, alive, animal, shot}
 let bullets;       // YOUR shots going up:   array of {x, y}
 let shots;         // animal shots coming down: array of {x, y, emoji}
+let bases;         // the shields: array of { blocks: [{x, y, alive}] }
+let particles;     // explosion bits: array of {x, y, vx, vy, life, maxLife, color}
 let invaderDir;    // +1 moving right, -1 moving left
 let score;
 let lives;
@@ -234,8 +245,31 @@ function setup() {
     }
   }
 
+  // Build the bases (shields) you can hide behind. Each base is a little
+  // grid of blocks; shots eat away one block at a time, so they slowly
+  // crumble — from both the animals' shots AND your own bullets.
+  bases = [];
+  const baseW = BASE_BLOCKS_W * BASE_BLOCK;
+  const baseGap = (W - BASE_COUNT * baseW) / (BASE_COUNT + 1); // even spacing
+  const baseY = player.y - 150; // sit above the player, with room to duck
+  for (let i = 0; i < BASE_COUNT; i++) {
+    const bx = baseGap + i * (baseW + baseGap);
+    const blocks = [];
+    for (let r = 0; r < BASE_BLOCKS_H; r++) {
+      for (let c = 0; c < BASE_BLOCKS_W; c++) {
+        blocks.push({
+          x: bx + c * BASE_BLOCK + BASE_BLOCK / 2,
+          y: baseY + r * BASE_BLOCK + BASE_BLOCK / 2,
+          alive: true,
+        });
+      }
+    }
+    bases.push({ blocks });
+  }
+
   bullets = [];
   shots = [];
+  particles = [];
   invaderDir = 1;
   score = 0;
   lives = STARTING_LIVES;
@@ -322,9 +356,20 @@ function update() {
   if (shotTimer === 0 && shots.length < MAX_SHOTS) {
     const shooter = pickShooter();
     if (shooter) {
-      // Half the shots fall straight down; the rest drift on a slight angle.
-      const vx = Math.random() < 0.5 ? 0 : (Math.random() * 2 - 1) * SHOT_ANGLE;
-      shots.push({ x: shooter.x, y: shooter.y + CELL / 2, emoji: shooter.shot, vx: vx });
+      const startY = shooter.y + CELL / 2;
+      let vx;
+      if (Math.random() < AIM_CHANCE) {
+        // AIMED shot: work out the sideways drift needed to land where the
+        // player is right now (how far across ÷ how long it takes to fall),
+        // then cap it so the shot can't fly almost sideways.
+        const fallTime = Math.max(1, (player.y - startY) / SHOT_SPEED);
+        vx = (player.x - shooter.x) / fallTime;
+        vx = Math.max(-AIM_MAX, Math.min(AIM_MAX, vx));
+      } else {
+        // Stray shot: straight down, or a slight random angle.
+        vx = Math.random() < 0.5 ? 0 : (Math.random() * 2 - 1) * SHOT_ANGLE;
+      }
+      shots.push({ x: shooter.x, y: startY, emoji: shooter.shot, vx: vx });
       // Reload a bit faster as the herd thins out (keeps the tension).
       shotTimer = Math.round(SHOT_RELOAD * (0.4 + 0.6 * aliveCount / totalCount));
     }
@@ -342,13 +387,21 @@ function update() {
   for (const b of bullets) {
     for (const inv of invaders) {
       if (inv.alive && hit(b.x, b.y, inv.x, inv.y, CELL)) {
-        inv.alive = false; // animal destroyed
-        b.y = -999;        // send bullet off-screen so it's cleaned up
-        score += 10;       // points!
+        inv.alive = false;          // animal destroyed
+        spawnExplosion(inv.x, inv.y); // BOOM!
+        b.y = -999;                 // send bullet off-screen so it's cleaned up
+        score += 10;                // points!
       }
     }
+    // Your bullets also chip away at the bases (don't shoot your own cover!).
+    if (b.y > -20 && hitBase(b.x, b.y)) b.y = -999;
   }
   bullets = bullets.filter((b) => b.y > -20);
+
+  // Animal shots crumbling the bases (your cover slowly wears down).
+  for (const m of shots) {
+    if (hitBase(m.x, m.y)) m.y = H + 999;
+  }
 
   // Count down the "safe" flashing time after being hit.
   if (invuln > 0) invuln--;
@@ -364,6 +417,18 @@ function update() {
     }
   }
   shots = shots.filter((m) => m.y < H + 20);
+
+  // --- Move the explosion bits and let them fade out ---
+  for (const p of particles) {
+    p.x += p.vx;
+    p.y += p.vy;
+    p.life++;
+  }
+  particles = particles.filter((p) => p.life < p.maxLife);
+
+  // --- Lose a base, lose the game ---
+  // If ANY base is completely wiped out, it's game over — protect them all!
+  if (bases.some((base) => base.blocks.every((blk) => !blk.alive))) state = "lost";
 
   // --- Did you win? ---
   if (invaders.every((inv) => !inv.alive)) state = "won";
@@ -394,6 +459,42 @@ function pickShooter() {
   return front;
 }
 
+// ---------------------------------------------------------------------
+// hitBase(): did a shot/bullet at (x, y) hit a base block? If so, that
+// block crumbles away and we return true (so the shot is used up).
+// ---------------------------------------------------------------------
+function hitBase(x, y) {
+  for (const base of bases) {
+    for (const blk of base.blocks) {
+      if (blk.alive && hit(x, y, blk.x, blk.y, BASE_BLOCK)) {
+        blk.alive = false; // chip away this block
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+// ---------------------------------------------------------------------
+// EXPLOSIONS — when an animal is shot, throw out a little burst of
+// coloured bits that fly apart and fade away.
+// ---------------------------------------------------------------------
+const BOOM_COLORS = ["#ffffff", "#ffd34d", "#ff8c1a", "#ff4d4d"];
+function spawnExplosion(x, y) {
+  for (let i = 0; i < 16; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 1 + Math.random() * 3.5;
+    particles.push({
+      x: x, y: y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: 0,
+      maxLife: 18 + Math.random() * 16,
+      color: BOOM_COLORS[Math.floor(Math.random() * BOOM_COLORS.length)],
+    });
+  }
+}
+
 
 // ---------------------------------------------------------------------
 // draw(): the "showing" half of the game loop. Paints everything.
@@ -417,6 +518,16 @@ function draw() {
     if (inv.alive) drawThing(inv.animal, inv.x, inv.y);
   }
 
+  // Draw the bases (only the blocks that are still alive).
+  ctx.fillStyle = BASE_COLOR;
+  for (const base of bases) {
+    for (const blk of base.blocks) {
+      if (blk.alive) {
+        ctx.fillRect(blk.x - BASE_BLOCK / 2, blk.y - BASE_BLOCK / 2, BASE_BLOCK, BASE_BLOCK);
+      }
+    }
+  }
+
   // Draw your bullets as glowing vertical streaks (like little lasers).
   ctx.strokeStyle = BULLET_COLOR;
   ctx.lineWidth = 4;
@@ -438,6 +549,17 @@ function draw() {
   // can see you're temporarily protected.
   const blinking = invuln > 0 && Math.floor(invuln / 6) % 2 === 0;
   if (!blinking) drawThing(PLAYER, player.x, player.y);
+
+  // Draw the explosion bits, fading and shrinking as they age.
+  for (const p of particles) {
+    const fade = 1 - p.life / p.maxLife; // 1 → 0 over the particle's life
+    ctx.globalAlpha = fade;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 1 + 3 * fade, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
 
   // Win / lose messages.
   if (state !== "playing") {
