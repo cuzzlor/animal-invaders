@@ -259,7 +259,7 @@ let particles;     // explosion bits: array of {x, y, vx, vy, life, maxLife, col
 let invaderDir;    // +1 moving right, -1 moving left
 let score;
 let lives;
-let state;         // "playing" or "lost"
+let state;         // "start" (waiting), "playing", or "lost"
 let invuln;        // frames left of "just got hit, can't be hit again yet"
 let stage;         // which wave you're on (1, 2, 3, ...) — everything speeds up
 let stageBanner;   // frames left to show the "STAGE N" banner
@@ -332,15 +332,36 @@ function buildLevel() {
 }
 
 // ---------------------------------------------------------------------
-// setup(): start a brand-new game (called at the start and on restart).
+// newGame(): reset the score/lives/stage and lay out a fresh board.
+// startState is "start" (wait on the start screen) or "playing" (go now).
 // ---------------------------------------------------------------------
-function setup() {
+function newGame(startState) {
   player = { x: W / 2, y: H - CELL - 20 };
   score = 0;
   lives = STARTING_LIVES;
   stage = 1;
-  state = "playing";
+  state = startState;
   buildLevel();
+}
+
+// setup(): the very first screen. Build the board but WAIT — the game
+// doesn't move until the player taps/clicks/presses to begin.
+function setup() {
+  newGame("start");
+}
+
+// begin(): leave the start screen and actually start playing.
+function begin() {
+  if (state !== "start") return;
+  state = "playing";
+  stageBanner = BANNER_TIME; // flash "STAGE 1" as we kick off
+}
+
+// startOrRestart(): what a tap / click / Enter does when you're NOT mid-game
+// — begin from the start screen, or play again after game over.
+function startOrRestart() {
+  if (state === "start") begin();
+  else if (state === "lost") newGame("playing");
 }
 
 // ---------------------------------------------------------------------
@@ -358,9 +379,11 @@ function nextStage() {
 // ---------------------------------------------------------------------
 document.addEventListener("keydown", (e) => {
   keys[e.key] = true;
-  // Press Enter to start over once you've won or lost.
-  if (e.key === "Enter" && state !== "playing") {
-    setup();
+  // On the start screen or game-over screen, Enter/Space begins (or restarts).
+  if (state !== "playing" && (e.key === "Enter" || e.key === " " || e.key === "Spacebar")) {
+    startOrRestart();
+    e.preventDefault();
+    return;
   }
   // Shoot on a fresh press of Space — one shot per press. We ignore
   // e.repeat (the machine-gun events the OS sends while a key is HELD),
@@ -383,11 +406,9 @@ document.addEventListener("keyup", (e) => {
 // for a finger or a mouse. Holding ◀ / ▶ moves; each tap of FIRE shoots.
 // ---------------------------------------------------------------------
 function fireShot() {
-  if (state === "playing") {
-    bullets.push({ x: player.x, y: player.y - CELL / 2 });
-  } else {
-    setup(); // tap FIRE to start a new game after game over
-  }
+  // Only the FIRE button shoots, and only while playing. Starting the game
+  // and restarting are handled by the "tap anywhere" listener below.
+  if (state === "playing") bullets.push({ x: player.x, y: player.y - CELL / 2 });
 }
 
 // A move button holds a direction down while you're pressing it.
@@ -405,6 +426,12 @@ holdButton("btn-right", "ArrowRight");
 document.getElementById("btn-fire").addEventListener("pointerdown", (e) => {
   e.preventDefault();
   fireShot();
+});
+
+// Tap or click ANYWHERE to start from the start screen (or to play again
+// after game over). Ignored while you're playing.
+document.addEventListener("pointerdown", () => {
+  if (state !== "playing") startOrRestart();
 });
 
 
@@ -703,6 +730,24 @@ function draw() {
     ctx.restore();
   }
 
+  // Start screen — shown until the player taps/clicks/presses to begin.
+  if (state === "start") {
+    ctx.fillStyle = "rgba(0,0,0,0.65)";
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = "#fff";
+    ctx.textAlign = "center";
+    ctx.font = "52px 'Courier New', monospace";
+    ctx.fillText("ANIMAL INVADERS", W / 2, H / 2 - 70);
+    ctx.font = "40px serif";
+    ctx.fillText("🐮 🐔 🐷 🐵 🐧", W / 2, H / 2 - 5);
+    ctx.fillStyle = "#7ef9ff";
+    ctx.font = "30px 'Courier New', monospace";
+    ctx.fillText("▶  TAP or CLICK to START", W / 2, H / 2 + 65);
+    ctx.fillStyle = "#888";
+    ctx.font = "18px 'Courier New', monospace";
+    ctx.fillText("Move with ← →   •   Shoot with Space", W / 2, H / 2 + 110);
+  }
+
   // Game-over screen.
   if (state === "lost") {
     ctx.fillStyle = "rgba(0,0,0,0.7)";
@@ -714,7 +759,7 @@ function draw() {
     ctx.font = "22px 'Courier New', monospace";
     ctx.fillText("Reached stage " + stage, W / 2, H / 2 + 10);
     ctx.fillText("Score: " + score, W / 2, H / 2 + 45);
-    ctx.fillText("Press Enter to play again", W / 2, H / 2 + 80);
+    ctx.fillText("Tap or press Enter to play again", W / 2, H / 2 + 80);
   }
 }
 
