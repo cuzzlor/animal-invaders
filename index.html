@@ -83,14 +83,14 @@
   #touch { display: none; }
   #touch button {
     position: fixed;
-    bottom: 22px;
-    width: 88px;
-    height: 88px;
+    bottom: 20px;
+    width: 60px;
+    height: 60px;
     border-radius: 50%;
     border: 2px solid rgba(255, 255, 255, 0.4);
     background: rgba(255, 255, 255, 0.12);
     color: #fff;
-    font-size: 34px;
+    font-size: 24px;
     font-family: inherit;
     -webkit-user-select: none;
     user-select: none;
@@ -98,9 +98,10 @@
     touch-action: none; /* stops scrolling/zooming when you press a button */
   }
   #touch button:active { background: rgba(255, 255, 255, 0.3); }
-  #btn-left  { left: 22px; }
-  #btn-right { left: 122px; }
-  #btn-fire  { right: 22px; width: 120px; border-radius: 18px; font-size: 22px; }
+  /* FIRE on the LEFT, the ◀ ▶ arrows on the RIGHT. */
+  #btn-fire  { left: 20px; font-size: 28px; }
+  #btn-right { right: 20px; }
+  #btn-left  { right: 88px; }
   @media (pointer: coarse) {
     #touch { display: block; }
     p { display: none; } /* keyboard hints don't help on a touch screen */
@@ -119,7 +120,7 @@
 <div id="touch">
   <button id="btn-left" aria-label="Move left">◀</button>
   <button id="btn-right" aria-label="Move right">▶</button>
-  <button id="btn-fire" aria-label="Shoot">FIRE</button>
+  <button id="btn-fire" aria-label="Shoot">🔥</button>
 </div>
 
 <script>
