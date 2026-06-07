@@ -45,15 +45,17 @@
   canvas {
     background: #000;
     border: 2px solid #333;
-    /* Crisp edges instead of blurry scaling. */
-    image-rendering: pixelated;
+    /* Grow to fill the height of the window, keeping the right shape.
+       This is what makes the game BIG instead of a tiny box. */
+    height: 94vh;
+    width: auto;
   }
   p { color: #888; font-size: 14px; }
 </style>
 </head>
 <body>
 <div id="wrap">
-  <canvas id="game" width="600" height="700"></canvas>
+  <canvas id="game" width="720" height="960"></canvas>
   <p>Move: ← →  (or A / D) &nbsp;•&nbsp; Shoot: Space &nbsp;•&nbsp; Restart: Enter</p>
 </div>
 
@@ -66,8 +68,16 @@
 // the emoji for different ones, or change the numbers, then save the
 // file and re-open it in your browser to see what happens!
 
-const INVADER    = "🐄";   // the animal that invades — try 🐷 🐔 🐸 🦖 👾
-const PROJECTILE = "🍼";   // what the animals shoot — try 🥛 💧 ⭐ 🔥
+// The animals that invade, and what each one shoots. The herd is built
+// from a RANDOM mix of these, so every game looks different! Add your own
+// pair, or change an emoji — try 🐸 🦖 👾 for animals, ⭐ 🔥 💧 for shots.
+const ANIMALS = [
+  { animal: "🐄", shot: "🍼" }, // cow shoots milk
+  { animal: "🐔", shot: "🥚" }, // chicken shoots eggs
+  { animal: "🐷", shot: "💩" }, // pig shoots mud
+  { animal: "🐵", shot: "🍌" }, // monkey shoots bananas
+  { animal: "🐧", shot: "🧊" }, // penguin shoots ice
+];
 const PLAYER     = "🚀";   // your ship — try 🛸 🐶 😎
 const PLAYER_SHOT = "•";   // what YOU shoot back up at them — try ⚡ ❤️ 🔆
 
@@ -75,23 +85,23 @@ const PLAYER_SHOT = "•";   // what YOU shoot back up at them — try ⚡ ❤�
 const ROWS        = 4;     // how many rows of animals
 const COLS        = 8;     // how many animals in each row
 const INVADER_SPEED = 0.6; // how fast the herd slides sideways (bigger = faster)
-const SHOOT_CHANCE  = 0.004; // how often the animals shoot (bigger = more milk!)
-const PLAYER_SPEED  = 6;   // how fast your ship moves (bigger = faster)
-const PLAYER_BULLET_SPEED = 9; // how fast your shots fly up
-const MILK_SPEED    = 4;   // how fast the animals' shots fall down
+const MAX_SHOTS     = 3;   // most shots falling at ONCE (the real Space Invaders only allows 3!)
+const SHOT_RELOAD   = 45;  // frames to wait between shots (smaller = they shoot more often)
+const PLAYER_SPEED  = 4;   // how fast your ship moves (bigger = faster)
+const PLAYER_BULLET_SPEED = 5; // how fast your shots fly up
+const SHOT_SPEED    = 2; // how fast the animals' shots fall down
 const STARTING_LIVES = 3;  // how many tries you get
+const SAFE_TIME     = 90;  // frames you flash & can't be hit after losing a life
 
 // --- Want to use your OWN drawing instead of an emoji? ---
 // Easy! It takes one line.
 //   1. Make a picture in a sprite tool (like Sprite AI or OpenArt) and
 //      save the PNG next to this file. A "sprites" folder is fine too,
 //      e.g. save it as  sprites/cow.png
-//   2. Comment out the emoji line above (put // in front of it) and
-//      uncomment ONE of the matching lines below by deleting its //.
-//
-// const INVADER    = loadImage("sprites/cow.png");
-// const PROJECTILE = loadImage("sprites/milk.png");
-// const PLAYER     = loadImage("sprites/ship.png");
+//   2. Swap an emoji above for a loadImage(...), e.g. change the cow to:
+//        { animal: loadImage("sprites/cow.png"), shot: "🍼" },
+//      or change your ship to:
+//        const PLAYER = loadImage("sprites/ship.png");
 //
 // That's it — the game knows how to draw both emoji and pictures.
 //
@@ -152,13 +162,14 @@ function drawThing(thing, x, y, size) {
 // GAME STATE  — all the moving parts live in plain variables.
 // ---------------------------------------------------------------------
 let player;        // {x, y}
-let invaders;      // array of {x, y, alive}
+let invaders;      // array of {x, y, alive, animal, shot}
 let bullets;       // YOUR shots going up:   array of {x, y}
-let milks;         // animal shots coming down: array of {x, y}
+let shots;         // animal shots coming down: array of {x, y, emoji}
 let invaderDir;    // +1 moving right, -1 moving left
 let score;
 let lives;
 let state;         // "playing", "won", or "lost"
+let invuln;        // frames left of "just got hit, can't be hit again yet"
 
 // Remember which keys are currently held down.
 const keys = {};
@@ -166,36 +177,46 @@ const keys = {};
 // shootCooldown stops one tap of space firing a hundred bullets.
 let shootCooldown = 0;
 
+// shotTimer counts down between animal shots, so they come in a steady
+// trickle instead of all at once.
+let shotTimer = 0;
+
 // ---------------------------------------------------------------------
 // setup(): build a fresh game. Called at the start and on restart.
 // ---------------------------------------------------------------------
 function setup() {
   // Put the player near the bottom, in the middle.
-  player = { x: W / 2, y: H - CELL };
+  player = { x: W / 2, y: H - CELL - 20 };
 
-  // Build the grid of animals.
+  // Build the grid of animals, centred across the screen.
   invaders = [];
-  const startX = 60;   // left edge of the grid
-  const startY = 70;   // top of the grid
-  const gapX = 60;     // space between animals across
-  const gapY = 55;     // space between rows
+  const gapX = 70;     // space between animals across
+  const gapY = 60;     // space between rows
+  const startX = (W - (COLS - 1) * gapX) / 2; // centre the grid horizontally
+  const startY = 80;   // top of the grid
   for (let row = 0; row < ROWS; row++) {
     for (let col = 0; col < COLS; col++) {
+      // Pick a random animal for this spot, so the herd is a mixed bunch.
+      const kind = ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
       invaders.push({
         x: startX + col * gapX,
         y: startY + row * gapY,
-        alive: true
+        alive: true,
+        animal: kind.animal, // which emoji to draw
+        shot: kind.shot      // what it throws at you
       });
     }
   }
 
   bullets = [];
-  milks = [];
+  shots = [];
   invaderDir = 1;
   score = 0;
   lives = STARTING_LIVES;
   state = "playing";
   shootCooldown = 0;
+  shotTimer = 0;
+  invuln = 0;
 }
 
 // ---------------------------------------------------------------------
@@ -266,15 +287,23 @@ function update() {
     }
   }
 
-  // --- Animals shoot milk ---
-  for (const inv of invaders) {
-    if (inv.alive && Math.random() < SHOOT_CHANCE) {
-      milks.push({ x: inv.x, y: inv.y + CELL / 2 });
+  // --- Animals shoot ---
+  // This works like the REAL Space Invaders: only a few shots fall at
+  // once (MAX_SHOTS), and they come on a timer instead of all at the same
+  // time. Only the FRONT animal in a column (the lowest one) can shoot,
+  // and each animal throws its OWN thing (milk, eggs, mud, bananas, ice).
+  if (shotTimer > 0) shotTimer--;
+  if (shotTimer === 0 && shots.length < MAX_SHOTS) {
+    const shooter = pickShooter();
+    if (shooter) {
+      shots.push({ x: shooter.x, y: shooter.y + CELL / 2, emoji: shooter.shot });
+      // Reload a bit faster as the herd thins out (keeps the tension).
+      shotTimer = Math.round(SHOT_RELOAD * (0.4 + 0.6 * aliveCount / totalCount));
     }
   }
-  // Move milk down; drop ones that fall off the bottom.
-  for (const m of milks) m.y += MILK_SPEED;
-  milks = milks.filter((m) => m.y < H + 20);
+  // Move shots down; drop ones that fall off the bottom.
+  for (const m of shots) m.y += SHOT_SPEED;
+  shots = shots.filter((m) => m.y < H + 20);
 
   // --- COLLISIONS happen here ---
 
@@ -290,15 +319,20 @@ function update() {
   }
   bullets = bullets.filter((b) => b.y > -20);
 
-  // Milk hitting the player.
-  for (const m of milks) {
-    if (hit(m.x, m.y, player.x, player.y, CELL)) {
-      m.y = H + 999;  // remove this milk
-      lives--;        // lose a life
+  // Count down the "safe" flashing time after being hit.
+  if (invuln > 0) invuln--;
+
+  // Shots hitting the player. While you're flashing (invuln) you're safe,
+  // so one splash can't drain several lives at once.
+  for (const m of shots) {
+    if (invuln === 0 && hit(m.x, m.y, player.x, player.y, CELL)) {
+      m.y = H + 999;       // remove this shot
+      lives--;             // lose a life
+      invuln = SAFE_TIME;  // brief flashing safety so you can recover
       if (lives <= 0) state = "lost";
     }
   }
-  milks = milks.filter((m) => m.y < H + 20);
+  shots = shots.filter((m) => m.y < H + 20);
 
   // --- Did you win? ---
   if (invaders.every((inv) => !inv.alive)) state = "won";
@@ -310,6 +344,23 @@ function update() {
 // ---------------------------------------------------------------------
 function hit(ax, ay, bx, by, size) {
   return Math.abs(ax - bx) < size / 2 && Math.abs(ay - by) < size / 2;
+}
+
+// ---------------------------------------------------------------------
+// pickShooter(): choose which animal fires next. Like the arcade game,
+// only the FRONT (lowest) animal in a column can shoot — so as you clear
+// columns, fewer animals can fire at you. Picks a random column each time.
+// ---------------------------------------------------------------------
+function pickShooter() {
+  const alive = invaders.filter((inv) => inv.alive);
+  if (alive.length === 0) return null;
+  // Pick a random living animal, then find the lowest one in its column.
+  const pick = alive[Math.floor(Math.random() * alive.length)];
+  let front = pick;
+  for (const inv of alive) {
+    if (Math.abs(inv.x - pick.x) < 1 && inv.y > front.y) front = inv;
+  }
+  return front;
 }
 
 
@@ -332,17 +383,19 @@ function draw() {
 
   // Draw the animals.
   for (const inv of invaders) {
-    if (inv.alive) drawThing(INVADER, inv.x, inv.y);
+    if (inv.alive) drawThing(inv.animal, inv.x, inv.y);
   }
 
   // Draw your bullets.
   for (const b of bullets) drawThing(PLAYER_SHOT, b.x, b.y, 24);
 
-  // Draw the falling milk.
-  for (const m of milks) drawThing(PROJECTILE, m.x, m.y, 28);
+  // Draw the falling shots — each one is its animal's own thing.
+  for (const m of shots) drawThing(m.emoji, m.x, m.y, 28);
 
-  // Draw the player.
-  drawThing(PLAYER, player.x, player.y);
+  // Draw the player. While safe after a hit, blink it on and off so you
+  // can see you're temporarily protected.
+  const blinking = invuln > 0 && Math.floor(invuln / 6) % 2 === 0;
+  if (!blinking) drawThing(PLAYER, player.x, player.y);
 
   // Win / lose messages.
   if (state !== "playing") {
