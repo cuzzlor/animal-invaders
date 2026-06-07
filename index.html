@@ -28,12 +28,15 @@
   html, body {
     margin: 0;
     height: 100%;
-    background: #000;
     color: #fff;
     font-family: "Courier New", monospace;
     /* Stops the arrow keys from scrolling the page while you play. */
     overflow: hidden;
   }
+  /* Black goes on <html> ONLY. If we put it on <body> too, the body's
+     background would paint OVER the star canvas (which sits at z-index -1)
+     and hide it. The root background paints furthest back, behind the stars. */
+  html { background: #000; }
   /* Centre the game on the screen. */
   #wrap {
     display: flex;
@@ -42,13 +45,24 @@
     justify-content: center;
     height: 100%;
   }
-  canvas {
-    background: #000;
+  #game {
     /* Fill the FULL height of the window, keeping the right shape. The
-       game sits as a tall band centred in the middle of the screen. */
+       game sits as a tall band centred in the middle of the screen.
+       Transparent background so the moving stars show through behind it. */
     display: block;
     height: 100vh;
     width: auto;
+    background: transparent;
+  }
+  /* The starfield sits behind EVERYTHING, filling the whole window. */
+  #stars {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: -1;
+    display: block;
   }
   /* Controls line, pinned to the bottom so it doesn't shrink the game. */
   p {
@@ -65,6 +79,8 @@
 </style>
 </head>
 <body>
+<!-- The space we're flying through. Lives behind the game. -->
+<canvas id="stars"></canvas>
 <div id="wrap">
   <canvas id="game" width="880" height="960"></canvas>
   <p>Move: ← →  (or A / D) &nbsp;•&nbsp; Shoot: Space &nbsp;•&nbsp; Restart: Enter</p>
@@ -376,9 +392,9 @@ function pickShooter() {
 // draw(): the "showing" half of the game loop. Paints everything.
 // ---------------------------------------------------------------------
 function draw() {
-  // Clear the screen each frame.
-  ctx.fillStyle = "#000";
-  ctx.fillRect(0, 0, W, H);
+  // Wipe the screen clear each frame. We clear to TRANSPARENT (not black)
+  // so the moving starfield behind the game shows through.
+  ctx.clearRect(0, 0, W, H);
 
   // The HUD: score and lives at the top.
   ctx.fillStyle = "#fff";
@@ -435,6 +451,86 @@ function loop() {
 // Build the first game and start the loop.
 setup();
 loop();
+
+
+// =====================================================================
+// =====  THE STARFIELD  — the space we fly through.  ==================
+// =====================================================================
+// This runs on its OWN canvas behind the game. Stars drift slowly
+// downward (so it feels like we're flying upward through space), come in
+// different sizes and colours, and some gently twinkle on and off.
+
+const STAR_COUNT  = 220;   // how many stars are on screen
+const STAR_COLORS = [      // mostly white, with a few coloured ones mixed in
+  "#ffffff", "#ffffff", "#ffffff",
+  "#bcd2ff", // pale blue
+  "#fff4c2", // warm yellow
+  "#ffd0e0", // pink
+  "#c2fff0", // cyan
+  "#ffc9a3", // orange
+];
+
+const starCanvas = document.getElementById("stars");
+const starCtx = starCanvas.getContext("2d");
+let stars = [];
+
+// Match the star canvas to the window size (and redo it if the window
+// is resized, so the stars always fill the whole screen).
+function resizeStars() {
+  starCanvas.width = window.innerWidth;
+  starCanvas.height = window.innerHeight;
+}
+window.addEventListener("resize", resizeStars);
+resizeStars();
+
+// Make one star. Bigger stars drift a little faster, which makes the
+// field feel deep — like nearer stars zipping past farther ones.
+function makeStar(anywhere) {
+  const size = 0.7 + Math.random() * 2.3; // 0.7 — 3.0 pixels across
+  return {
+    x: Math.random() * starCanvas.width,
+    y: anywhere ? Math.random() * starCanvas.height : -2,
+    size: size,
+    color: STAR_COLORS[Math.floor(Math.random() * STAR_COLORS.length)],
+    speed: 0.12 + size * 0.18,            // slow drift, faster when bigger
+    twinkle: Math.random() < 0.4,         // about 4 in 10 stars blink
+    phase: Math.random() * Math.PI * 2,   // where in its blink it starts
+    twinkleSpeed: 0.02 + Math.random() * 0.05,
+  };
+}
+for (let i = 0; i < STAR_COUNT; i++) stars.push(makeStar(true));
+
+// Draw + move the stars, ~60 times a second, forever.
+function drawStars() {
+  starCtx.clearRect(0, 0, starCanvas.width, starCanvas.height);
+  for (const s of stars) {
+    // Drift downward; when a star falls off the bottom, send it back to
+    // the top at a new spot so the field never runs out.
+    s.y += s.speed;
+    if (s.y > starCanvas.height + 2) {
+      s.y = -2;
+      s.x = Math.random() * starCanvas.width;
+    }
+    // Twinkling stars fade in and out; the rest stay steady.
+    let alpha = 1;
+    if (s.twinkle) {
+      s.phase += s.twinkleSpeed;
+      alpha = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(s.phase));
+    }
+    starCtx.globalAlpha = alpha;
+    starCtx.fillStyle = s.color;
+    // A soft glow in the star's own colour makes it twinkle nicely.
+    starCtx.shadowColor = s.color;
+    starCtx.shadowBlur = s.size * 3;
+    starCtx.beginPath();
+    starCtx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+    starCtx.fill();
+  }
+  starCtx.globalAlpha = 1;
+  starCtx.shadowBlur = 0;
+  requestAnimationFrame(drawStars);
+}
+drawStars();
 </script>
 </body>
 </html>
