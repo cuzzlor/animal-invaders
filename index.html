@@ -176,8 +176,16 @@ const FONT = CELL + "px serif"; // emoji are just text, so we pick a font size
 // centred at (x, y). This is the magic that makes the one-line PNG
 // swap above "just work" — every drawing goes through here.
 // ---------------------------------------------------------------------
-function drawThing(thing, x, y, size) {
+function drawThing(thing, x, y, size, rotate) {
   size = size || CELL;
+  // Optionally spin the drawing around its centre (used to point the
+  // rocket straight up — the 🚀 emoji leans to the upper-right by default).
+  if (rotate) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rotate);
+    ctx.translate(-x, -y);
+  }
   if (typeof thing === "string") {
     // It's an emoji / text. Draw it centred.
     ctx.font = size + "px serif";
@@ -193,6 +201,7 @@ function drawThing(thing, x, y, size) {
     ctx.fillStyle = "#555";
     ctx.fillRect(x - size / 2, y - size / 2, size, size);
   }
+  if (rotate) ctx.restore();
 }
 
 
@@ -257,6 +266,7 @@ function setup() {
     const blocks = [];
     for (let r = 0; r < BASE_BLOCKS_H; r++) {
       for (let c = 0; c < BASE_BLOCKS_W; c++) {
+        if (isCarved(r, c)) continue; // shaped: leave carved-out spots empty
         blocks.push({
           x: bx + c * BASE_BLOCK + BASE_BLOCK / 2,
           y: baseY + r * BASE_BLOCK + BASE_BLOCK / 2,
@@ -460,6 +470,22 @@ function pickShooter() {
 }
 
 // ---------------------------------------------------------------------
+// isCarved(): which block spots are CUT OUT to give a base its shape —
+// rounded top corners and an arched doorway in the bottom middle.
+// ---------------------------------------------------------------------
+function isCarved(r, c) {
+  const lastRow = BASE_BLOCKS_H - 1;
+  const lastCol = BASE_BLOCKS_W - 1;
+  const mid = Math.floor(BASE_BLOCKS_W / 2);
+  // Round off the two top corners.
+  if (r === 0 && (c === 0 || c === lastCol)) return true;
+  // Carve an arched doorway up from the bottom middle.
+  if (r === lastRow && Math.abs(c - mid) <= 1) return true; // 3 blocks wide at the very bottom
+  if (r === lastRow - 1 && c === mid) return true;          // 1 block higher in the centre
+  return false;
+}
+
+// ---------------------------------------------------------------------
 // hitBase(): did a shot/bullet at (x, y) hit a base block? If so, that
 // block crumbles away and we return true (so the shot is used up).
 // ---------------------------------------------------------------------
@@ -548,7 +574,8 @@ function draw() {
   // Draw the player. While safe after a hit, blink it on and off so you
   // can see you're temporarily protected.
   const blinking = invuln > 0 && Math.floor(invuln / 6) % 2 === 0;
-  if (!blinking) drawThing(PLAYER, player.x, player.y);
+  // Rotate the ship -45° so the rocket points straight up, not up-right.
+  if (!blinking) drawThing(PLAYER, player.x, player.y, CELL, -Math.PI / 4);
 
   // Draw the explosion bits, fading and shrinking as they age.
   for (const p of particles) {
