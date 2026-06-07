@@ -106,7 +106,8 @@ const ANIMALS = [
   { animal: "🐧", shot: "🧊" }, // penguin shoots ice
 ];
 const PLAYER     = "🚀";   // your ship — try 🛸 🐶 😎
-const PLAYER_SHOT = "•";   // what YOU shoot back up at them — try ⚡ ❤️ 🔆
+const BULLET_COLOR  = "#7ef9ff"; // colour of YOUR laser streaks — try "#ff5", "#f6f"
+const BULLET_LENGTH = 22;  // how long your shots look (bigger = longer streaks)
 
 // --- The numbers you'll reach for first ---
 const ROWS        = 4;     // how many rows of animals
@@ -114,6 +115,7 @@ const COLS        = 8;     // how many animals in each row
 const INVADER_SPEED = 0.6; // how fast the herd slides sideways (bigger = faster)
 const MAX_SHOTS     = 3;   // most shots falling at ONCE (the real Space Invaders only allows 3!)
 const SHOT_RELOAD   = 45;  // frames to wait between shots (smaller = they shoot more often)
+const SHOT_ANGLE    = 1.2; // how far sideways an angled shot drifts (0 = all straight down)
 const PLAYER_SPEED  = 4;   // how fast your ship moves (bigger = faster)
 const PLAYER_BULLET_SPEED = 5; // how fast your shots fly up
 const SHOT_SPEED    = 2; // how fast the animals' shots fall down
@@ -320,14 +322,19 @@ function update() {
   if (shotTimer === 0 && shots.length < MAX_SHOTS) {
     const shooter = pickShooter();
     if (shooter) {
-      shots.push({ x: shooter.x, y: shooter.y + CELL / 2, emoji: shooter.shot });
+      // Half the shots fall straight down; the rest drift on a slight angle.
+      const vx = Math.random() < 0.5 ? 0 : (Math.random() * 2 - 1) * SHOT_ANGLE;
+      shots.push({ x: shooter.x, y: shooter.y + CELL / 2, emoji: shooter.shot, vx: vx });
       // Reload a bit faster as the herd thins out (keeps the tension).
       shotTimer = Math.round(SHOT_RELOAD * (0.4 + 0.6 * aliveCount / totalCount));
     }
   }
-  // Move shots down; drop ones that fall off the bottom.
-  for (const m of shots) m.y += SHOT_SPEED;
-  shots = shots.filter((m) => m.y < H + 20);
+  // Move shots down (and sideways for angled ones); drop ones that leave the screen.
+  for (const m of shots) {
+    m.y += SHOT_SPEED;
+    m.x += m.vx;
+  }
+  shots = shots.filter((m) => m.y < H + 20 && m.x > -20 && m.x < W + 20);
 
   // --- COLLISIONS happen here ---
 
@@ -410,8 +417,19 @@ function draw() {
     if (inv.alive) drawThing(inv.animal, inv.x, inv.y);
   }
 
-  // Draw your bullets.
-  for (const b of bullets) drawThing(PLAYER_SHOT, b.x, b.y, 24);
+  // Draw your bullets as glowing vertical streaks (like little lasers).
+  ctx.strokeStyle = BULLET_COLOR;
+  ctx.lineWidth = 4;
+  ctx.lineCap = "round";
+  ctx.shadowColor = BULLET_COLOR;
+  ctx.shadowBlur = 8;
+  for (const b of bullets) {
+    ctx.beginPath();
+    ctx.moveTo(b.x, b.y);
+    ctx.lineTo(b.x, b.y + BULLET_LENGTH); // streak trails BELOW as it flies up
+    ctx.stroke();
+  }
+  ctx.shadowBlur = 0;
 
   // Draw the falling shots — each one is its animal's own thing.
   for (const m of shots) drawThing(m.emoji, m.x, m.y, 28);
