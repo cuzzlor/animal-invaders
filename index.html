@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<!--
+  ===================================================================
+   ANIMAL INVADERS  🐄🍼
+  ===================================================================
+  Hi! This is YOUR game. You invented it, and you can change it.
+
+  Everything you'll want to change first lives in the
+  "CHANGE THESE TO CUSTOMISE YOUR GAME!" block just below, inside
+  the <script> down the page. Look for the big green-comment box.
+
+  To play: just double-click this file to open it in your web browser.
+  No installing anything. No internet needed.
+
+  Controls:
+    - Move:  Left / Right arrow keys  (or A and D)
+    - Shoot: Spacebar
+    - Restart after winning/losing: press Enter
+  ===================================================================
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Animal Invaders</title>
+<style>
+  /* Simple retro look. Black space background, white pixel-y text. */
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: #000;
+    color: #fff;
+    font-family: "Courier New", monospace;
+    /* Stops the arrow keys from scrolling the page while you play. */
+    overflow: hidden;
+  }
+  /* Centre the game on the screen. */
+  #wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+  }
+  canvas {
+    background: #000;
+    border: 2px solid #333;
+    /* Crisp edges instead of blurry scaling. */
+    image-rendering: pixelated;
+  }
+  p { color: #888; font-size: 14px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="game" width="600" height="700"></canvas>
+  <p>Move: ← →  (or A / D) &nbsp;•&nbsp; Shoot: Space &nbsp;•&nbsp; Restart: Enter</p>
+</div>
+
+<script>
+// =====================================================================
+// =====  CHANGE THESE TO CUSTOMISE YOUR GAME!  ========================
+// =====================================================================
+//
+// These are the things that are the most fun to change. Try swapping
+// the emoji for different ones, or change the numbers, then save the
+// file and re-open it in your browser to see what happens!
+
+const INVADER    = "🐄";   // the animal that invades — try 🐷 🐔 🐸 🦖 👾
+const PROJECTILE = "🍼";   // what the animals shoot — try 🥛 💧 ⭐ 🔥
+const PLAYER     = "🚀";   // your ship — try 🛸 🐶 😎
+const PLAYER_SHOT = "•";   // what YOU shoot back up at them — try ⚡ ❤️ 🔆
+
+// --- The numbers you'll reach for first ---
+const ROWS        = 4;     // how many rows of animals
+const COLS        = 8;     // how many animals in each row
+const INVADER_SPEED = 0.6; // how fast the herd slides sideways (bigger = faster)
+const SHOOT_CHANCE  = 0.004; // how often the animals shoot (bigger = more milk!)
+const PLAYER_SPEED  = 6;   // how fast your ship moves (bigger = faster)
+const PLAYER_BULLET_SPEED = 9; // how fast your shots fly up
+const MILK_SPEED    = 4;   // how fast the animals' shots fall down
+const STARTING_LIVES = 3;  // how many tries you get
+
+// --- Want to use your OWN drawing instead of an emoji? ---
+// Easy! It takes one line.
+//   1. Make a picture in a sprite tool (like Sprite AI or OpenArt) and
+//      save the PNG next to this file. A "sprites" folder is fine too,
+//      e.g. save it as  sprites/cow.png
+//   2. Comment out the emoji line above (put // in front of it) and
+//      uncomment ONE of the matching lines below by deleting its //.
+//
+// const INVADER    = loadImage("sprites/cow.png");
+// const PROJECTILE = loadImage("sprites/milk.png");
+// const PLAYER     = loadImage("sprites/ship.png");
+//
+// That's it — the game knows how to draw both emoji and pictures.
+//
+// =====================================================================
+// =====  (You can stop reading here if you like! The rest is the  =====
+// =====   game engine. Peek if you're curious how it all works.)  =====
+// =====================================================================
+
+
+// ---------------------------------------------------------------------
+// loadImage(): the tiny helper that lets a PNG stand in for an emoji.
+// It hands back an <img> straight away; the picture fills in once the
+// file has loaded. If the file is missing the game just keeps going.
+// ---------------------------------------------------------------------
+function loadImage(src) {
+  const img = new Image();
+  img.src = src;
+  img.isSprite = true; // a little flag so we know "this is a picture"
+  return img;
+}
+
+// Grab the canvas (our drawing surface) and its 2D pen ("ctx").
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+const W = canvas.width;
+const H = canvas.height;
+
+// How big things are drawn, in pixels.
+const CELL = 40;          // the size of one animal / the player
+const FONT = CELL + "px serif"; // emoji are just text, so we pick a font size
+
+// ---------------------------------------------------------------------
+// drawThing(): draws either an emoji (a string) OR a loaded picture,
+// centred at (x, y). This is the magic that makes the one-line PNG
+// swap above "just work" — every drawing goes through here.
+// ---------------------------------------------------------------------
+function drawThing(thing, x, y, size) {
+  size = size || CELL;
+  if (typeof thing === "string") {
+    // It's an emoji / text. Draw it centred.
+    ctx.font = size + "px serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(thing, x, y);
+  } else if (thing && thing.isSprite && thing.complete && thing.naturalWidth) {
+    // It's a picture that has finished loading. Draw it centred.
+    ctx.drawImage(thing, x - size / 2, y - size / 2, size, size);
+  } else {
+    // A picture that isn't ready yet — draw a placeholder box so you
+    // can still see and play. It pops in once the PNG loads.
+    ctx.fillStyle = "#555";
+    ctx.fillRect(x - size / 2, y - size / 2, size, size);
+  }
+}
+
+
+// ---------------------------------------------------------------------
+// GAME STATE  — all the moving parts live in plain variables.
+// ---------------------------------------------------------------------
+let player;        // {x, y}
+let invaders;      // array of {x, y, alive}
+let bullets;       // YOUR shots going up:   array of {x, y}
+let milks;         // animal shots coming down: array of {x, y}
+let invaderDir;    // +1 moving right, -1 moving left
+let score;
+let lives;
+let state;         // "playing", "won", or "lost"
+
+// Remember which keys are currently held down.
+const keys = {};
+
+// shootCooldown stops one tap of space firing a hundred bullets.
+let shootCooldown = 0;
+
+// ---------------------------------------------------------------------
+// setup(): build a fresh game. Called at the start and on restart.
+// ---------------------------------------------------------------------
+function setup() {
+  // Put the player near the bottom, in the middle.
+  player = { x: W / 2, y: H - CELL };
+
+  // Build the grid of animals.
+  invaders = [];
+  const startX = 60;   // left edge of the grid
+  const startY = 70;   // top of the grid
+  const gapX = 60;     // space between animals across
+  const gapY = 55;     // space between rows
+  for (let row = 0; row < ROWS; row++) {
+    for (let col = 0; col < COLS; col++) {
+      invaders.push({
+        x: startX + col * gapX,
+        y: startY + row * gapY,
+        alive: true
+      });
+    }
+  }
+
+  bullets = [];
+  milks = [];
+  invaderDir = 1;
+  score = 0;
+  lives = STARTING_LIVES;
+  state = "playing";
+  shootCooldown = 0;
+}
+
+// ---------------------------------------------------------------------
+// KEYBOARD — note when keys go down and up.
+// ---------------------------------------------------------------------
+document.addEventListener("keydown", (e) => {
+  keys[e.key] = true;
+  // Press Enter to start over once you've won or lost.
+  if (e.key === "Enter" && state !== "playing") {
+    setup();
+  }
+  // Stop space/arrows from scrolling the page.
+  if ([" ", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) {
+    e.preventDefault();
+  }
+});
+document.addEventListener("keyup", (e) => {
+  keys[e.key] = false;
+});
+
+
+// ---------------------------------------------------------------------
+// update(): the "thinking" half of the game loop. Runs ~60 times a
+// second. It moves everything and checks for collisions.
+// ---------------------------------------------------------------------
+function update() {
+  if (state !== "playing") return; // frozen on win/lose screens
+
+  // --- Move the player ---
+  if (keys["ArrowLeft"] || keys["a"] || keys["A"])  player.x -= PLAYER_SPEED;
+  if (keys["ArrowRight"] || keys["d"] || keys["D"]) player.x += PLAYER_SPEED;
+  // Keep the player inside the screen.
+  player.x = Math.max(CELL / 2, Math.min(W - CELL / 2, player.x));
+
+  // --- Player shoots ---
+  if (shootCooldown > 0) shootCooldown--;
+  if ((keys[" "] || keys["Spacebar"]) && shootCooldown === 0) {
+    bullets.push({ x: player.x, y: player.y - CELL / 2 });
+    shootCooldown = 15; // wait a bit before the next shot
+  }
+
+  // --- Move YOUR bullets up; drop ones that fly off the top ---
+  for (const b of bullets) b.y -= PLAYER_BULLET_SPEED;
+  bullets = bullets.filter((b) => b.y > -20);
+
+  // --- Move the herd ---
+  // The fewer animals are left, the faster they go (classic tension!).
+  const aliveCount = invaders.filter((inv) => inv.alive).length;
+  const totalCount = ROWS * COLS;
+  // Speed grows from 1x up to about 4x as the herd is wiped out.
+  const speedMult = 1 + (1 - aliveCount / totalCount) * 3;
+  const step = INVADER_SPEED * speedMult;
+
+  // Move them sideways. If any hits an edge, the whole herd drops and
+  // reverses direction.
+  let hitEdge = false;
+  for (const inv of invaders) {
+    if (!inv.alive) continue;
+    inv.x += step * invaderDir;
+    if (inv.x > W - CELL / 2 || inv.x < CELL / 2) hitEdge = true;
+  }
+  if (hitEdge) {
+    invaderDir *= -1;
+    for (const inv of invaders) {
+      if (inv.alive) inv.y += 20; // drop down a row
+      // If the animals reach the bottom, it's game over.
+      if (inv.alive && inv.y > player.y - CELL) state = "lost";
+    }
+  }
+
+  // --- Animals shoot milk ---
+  for (const inv of invaders) {
+    if (inv.alive && Math.random() < SHOOT_CHANCE) {
+      milks.push({ x: inv.x, y: inv.y + CELL / 2 });
+    }
+  }
+  // Move milk down; drop ones that fall off the bottom.
+  for (const m of milks) m.y += MILK_SPEED;
+  milks = milks.filter((m) => m.y < H + 20);
+
+  // --- COLLISIONS happen here ---
+
+  // Your bullets hitting animals.
+  for (const b of bullets) {
+    for (const inv of invaders) {
+      if (inv.alive && hit(b.x, b.y, inv.x, inv.y, CELL)) {
+        inv.alive = false; // animal destroyed
+        b.y = -999;        // send bullet off-screen so it's cleaned up
+        score += 10;       // points!
+      }
+    }
+  }
+  bullets = bullets.filter((b) => b.y > -20);
+
+  // Milk hitting the player.
+  for (const m of milks) {
+    if (hit(m.x, m.y, player.x, player.y, CELL)) {
+      m.y = H + 999;  // remove this milk
+      lives--;        // lose a life
+      if (lives <= 0) state = "lost";
+    }
+  }
+  milks = milks.filter((m) => m.y < H + 20);
+
+  // --- Did you win? ---
+  if (invaders.every((inv) => !inv.alive)) state = "won";
+}
+
+// ---------------------------------------------------------------------
+// hit(): simple box overlap check. Are two things close enough to
+// count as touching? (This is "bounding-box" collision.)
+// ---------------------------------------------------------------------
+function hit(ax, ay, bx, by, size) {
+  return Math.abs(ax - bx) < size / 2 && Math.abs(ay - by) < size / 2;
+}
+
+
+// ---------------------------------------------------------------------
+// draw(): the "showing" half of the game loop. Paints everything.
+// ---------------------------------------------------------------------
+function draw() {
+  // Clear the screen each frame.
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, W, H);
+
+  // The HUD: score and lives at the top.
+  ctx.fillStyle = "#fff";
+  ctx.font = "20px 'Courier New', monospace";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText("SCORE: " + score, 12, 28);
+  ctx.textAlign = "right";
+  ctx.fillText("LIVES: " + "❤️".repeat(lives), W - 12, 28);
+
+  // Draw the animals.
+  for (const inv of invaders) {
+    if (inv.alive) drawThing(INVADER, inv.x, inv.y);
+  }
+
+  // Draw your bullets.
+  for (const b of bullets) drawThing(PLAYER_SHOT, b.x, b.y, 24);
+
+  // Draw the falling milk.
+  for (const m of milks) drawThing(PROJECTILE, m.x, m.y, 28);
+
+  // Draw the player.
+  drawThing(PLAYER, player.x, player.y);
+
+  // Win / lose messages.
+  if (state !== "playing") {
+    ctx.fillStyle = "rgba(0,0,0,0.7)";
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = "#fff";
+    ctx.textAlign = "center";
+    ctx.font = "48px 'Courier New', monospace";
+    ctx.fillText(state === "won" ? "YOU WIN! 🎉" : "GAME OVER", W / 2, H / 2 - 20);
+    ctx.font = "22px 'Courier New', monospace";
+    ctx.fillText("Score: " + score, W / 2, H / 2 + 25);
+    ctx.fillText("Press Enter to play again", W / 2, H / 2 + 60);
+  }
+}
+
+
+// ---------------------------------------------------------------------
+// THE GAME LOOP.
+// requestAnimationFrame asks the browser to call loop() again before
+// the next screen refresh (about 60 times a second). Each time we
+// update everything, then draw it. That's the whole game!
+// ---------------------------------------------------------------------
+function loop() {
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+// Build the first game and start the loop.
+setup();
+loop();
+</script>
+</body>
+</html>
