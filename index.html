@@ -66,7 +66,7 @@
 </head>
 <body>
 <div id="wrap">
-  <canvas id="game" width="720" height="960"></canvas>
+  <canvas id="game" width="880" height="960"></canvas>
   <p>Move: ← →  (or A / D) &nbsp;•&nbsp; Shoot: Space &nbsp;•&nbsp; Restart: Enter</p>
 </div>
 
@@ -185,9 +185,6 @@ let invuln;        // frames left of "just got hit, can't be hit again yet"
 // Remember which keys are currently held down.
 const keys = {};
 
-// shootCooldown stops one tap of space firing a hundred bullets.
-let shootCooldown = 0;
-
 // shotTimer counts down between animal shots, so they come in a steady
 // trickle instead of all at once.
 let shotTimer = 0;
@@ -225,7 +222,6 @@ function setup() {
   score = 0;
   lives = STARTING_LIVES;
   state = "playing";
-  shootCooldown = 0;
   shotTimer = 0;
   invuln = 0;
 }
@@ -238,6 +234,12 @@ document.addEventListener("keydown", (e) => {
   // Press Enter to start over once you've won or lost.
   if (e.key === "Enter" && state !== "playing") {
     setup();
+  }
+  // Shoot on a fresh press of Space — one shot per press. We ignore
+  // e.repeat (the machine-gun events the OS sends while a key is HELD),
+  // so holding Space does nothing; you must tap it for each shot.
+  if ((e.key === " " || e.key === "Spacebar") && !e.repeat && state === "playing") {
+    bullets.push({ x: player.x, y: player.y - CELL / 2 });
   }
   // Stop space/arrows from scrolling the page.
   if ([" ", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) {
@@ -262,12 +264,7 @@ function update() {
   // Keep the player inside the screen.
   player.x = Math.max(CELL / 2, Math.min(W - CELL / 2, player.x));
 
-  // --- Player shoots ---
-  if (shootCooldown > 0) shootCooldown--;
-  if ((keys[" "] || keys["Spacebar"]) && shootCooldown === 0) {
-    bullets.push({ x: player.x, y: player.y - CELL / 2 });
-    shootCooldown = 15; // wait a bit before the next shot
-  }
+  // (Shooting happens on a key PRESS — see the keydown handler above.)
 
   // --- Move YOUR bullets up; drop ones that fly off the top ---
   for (const b of bullets) b.y -= PLAYER_BULLET_SPEED;
