@@ -113,7 +113,7 @@
 <canvas id="stars"></canvas>
 <div id="wrap">
   <canvas id="game" width="880" height="960"></canvas>
-  <p>Move: ← →  (or A / D) &nbsp;•&nbsp; Shoot: Space &nbsp;•&nbsp; Restart: Enter</p>
+  <p>Move: ← →  (or A / D) &nbsp;•&nbsp; Shoot: Space &nbsp;•&nbsp; Restart: Enter &nbsp;•&nbsp; Sound: M</p>
 </div>
 
 <!-- Touch controls — only visible on phones/tablets (see the CSS above). -->
@@ -379,6 +379,8 @@ function nextStage() {
 // ---------------------------------------------------------------------
 document.addEventListener("keydown", (e) => {
   keys[e.key] = true;
+  // M mutes / un-mutes the sound at any time.
+  if (e.key === "m" || e.key === "M") { toggleSound(); return; }
   // On the start screen or game-over screen, Enter/Space begins (or restarts).
   if (state !== "playing" && (e.key === "Enter" || e.key === " " || e.key === "Spacebar")) {
     startOrRestart();
@@ -411,7 +413,19 @@ document.addEventListener("keyup", (e) => {
 // fades out fast. The audio "context" is created on the first shot (browsers
 // only allow sound to start after the player interacts with the page).
 let audioCtx = null;
+
+// Sound starts ON. Tap the 🔊 button (top-left) or press M to mute; the
+// choice is remembered for next time. Every sound checks this first.
+let soundOn = true;
+try { soundOn = localStorage.getItem("ai-sound") !== "off"; } catch (e) {}
+function toggleSound() {
+  soundOn = !soundOn;
+  try { localStorage.setItem("ai-sound", soundOn ? "on" : "off"); } catch (e) {}
+  if (soundOn) playShootSound(); // a tiny chirp so you know sound is back on
+}
+
 function playShootSound() {
+  if (!soundOn) return;
   try {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     const t = audioCtx.currentTime;
@@ -431,6 +445,7 @@ function playShootSound() {
 // A short "boom" made with the Web Audio API — a burst of filtered white
 // noise that fades out, for when you blow up an animal. No sound files needed.
 function playExplosionSound(big = false) {
+  if (!soundOn) return;
   try {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     const t = audioCtx.currentTime;
@@ -513,6 +528,24 @@ holdButton("btn-right", "ArrowRight");
 document.getElementById("btn-fire").addEventListener("pointerdown", (e) => {
   e.preventDefault();
   fireShot();
+});
+
+// The 🔊 toggle's spot on the canvas (in game pixels), and a helper to turn
+// a screen tap into game pixels (the canvas is scaled to fit the screen).
+const SOUND_ICON = { x: 12, y: 42, w: 36, h: 32 };
+function canvasPoint(e) {
+  const r = canvas.getBoundingClientRect();
+  return { x: (e.clientX - r.left) * (W / r.width), y: (e.clientY - r.top) * (H / r.height) };
+}
+// Tapping the 🔊 icon toggles sound — and must NOT also start the game,
+// so we stop the tap from reaching the "tap anywhere to start" listener.
+canvas.addEventListener("pointerdown", (e) => {
+  const p = canvasPoint(e);
+  if (p.x >= SOUND_ICON.x && p.x <= SOUND_ICON.x + SOUND_ICON.w &&
+      p.y >= SOUND_ICON.y && p.y <= SOUND_ICON.y + SOUND_ICON.h) {
+    e.stopPropagation();
+    toggleSound();
+  }
 });
 
 // Tap or click ANYWHERE to start from the start screen (or to play again
@@ -760,6 +793,15 @@ function draw() {
   ctx.fillText("STAGE " + stage, W / 2, 28);
   ctx.textAlign = "right";
   ctx.fillText("LIVES: " + "❤️".repeat(lives), W - 12, 28);
+
+  // Small sound toggle, tucked under the score at the top-left. Tap it
+  // (or press M) to mute/un-mute. Dimmed when sound is off.
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.font = "26px serif";
+  ctx.globalAlpha = soundOn ? 1 : 0.45;
+  ctx.fillText(soundOn ? "🔊" : "🔇", SOUND_ICON.x, SOUND_ICON.y + SOUND_ICON.h / 2);
+  ctx.globalAlpha = 1;
 
   // Draw the animals.
   for (const inv of invaders) {
