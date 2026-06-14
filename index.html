@@ -150,6 +150,17 @@
     cursor: pointer;
   }
   #nameentry button:active { background: rgba(126, 249, 255, 0.35); }
+  /* The "No thanks" dismiss — quieter than SAVE, so it reads as the
+     secondary choice. Closes the box without recording a score. */
+  #nameentry .skip {
+    margin-top: 8px;
+    font-size: 14px;
+    padding: 6px 18px;
+    border-color: #888;
+    background: transparent;
+    color: #aaa;
+  }
+  #nameentry .skip:active { background: rgba(255, 255, 255, 0.1); }
 </style>
 </head>
 <body>
@@ -165,6 +176,7 @@
   <div class="title">⭐ NEW HIGH SCORE! ⭐</div>
   <input id="name" maxlength="12" placeholder="YOUR NAME" autocomplete="off" spellcheck="false">
   <button id="savescore">SAVE</button>
+  <button id="skipscore" class="skip">No thanks</button>
 </div>
 
 <!-- Touch controls — only visible on phones/tablets (see the CSS above). -->
@@ -880,6 +892,7 @@ function recordScore(name, s, st) {
 const nameEntryEl = document.getElementById("nameentry");
 const nameInputEl = document.getElementById("name");
 const saveBtnEl   = document.getElementById("savescore");
+const skipBtnEl   = document.getElementById("skipscore");
 
 function showNameEntry() {
   enteringName = true;
@@ -901,12 +914,21 @@ function submitName() {
   enteringName = false;
   hideNameEntry();
 }
+// Close the box WITHOUT saving — for when you'd rather not be on the board.
+function dismissNameEntry() {
+  if (!enteringName) return;
+  enteringName = false;
+  hideNameEntry();
+}
 // SAVE button, or Enter while typing, both lock in your name.
 saveBtnEl.addEventListener("click", submitName);
+// "No thanks" button skips saving and closes the box.
+skipBtnEl.addEventListener("click", dismissNameEntry);
 nameInputEl.addEventListener("keydown", (e) => {
   // Don't let these keys leak out to the game (e.g. Space restarting).
   e.stopPropagation();
   if (e.key === "Enter") submitName();
+  if (e.key === "Escape") dismissNameEntry(); // Esc = "no thanks"
 });
 
 // Called once, the moment a game ends: if the score is good enough, open
