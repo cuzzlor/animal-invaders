@@ -1005,9 +1005,13 @@ function draw() {
   ctx.fillText(soundOn ? "🔊" : "🔇", SOUND_ICON.x, SOUND_ICON.y + SOUND_ICON.h / 2);
   ctx.globalAlpha = 1;
 
-  // Draw the animals.
-  for (const inv of invaders) {
-    if (inv.alive) drawThing(inv.animal, inv.x, inv.y);
+  // Draw the animals — but NOT on the start screen, where the herd would
+  // show through behind the title and high scores and look cluttered. The
+  // start screen has its own tidy row of animals instead.
+  if (state !== "start") {
+    for (const inv of invaders) {
+      if (inv.alive) drawThing(inv.animal, inv.x, inv.y);
+    }
   }
 
   // Draw the bases (only the blocks that are still alive).
