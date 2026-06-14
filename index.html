@@ -55,6 +55,10 @@
     width: min(100vw, 91.67vh);
     height: auto;
     background: transparent;
+    /* The 880px canvas is scaled to fit your screen. By default the browser
+       BLURS that scaling; "pixelated" keeps the pixel-art sprites crisp. */
+    image-rendering: pixelated;
+    image-rendering: crisp-edges; /* fallback name some browsers use */
   }
   /* The starfield sits behind EVERYTHING, filling the whole window. */
   #stars {
@@ -188,24 +192,99 @@
 
 <script>
 // =====================================================================
+// =====  PIXEL ART  — the little hand-drawn sprites.  =================
+// =====================================================================
+// Every animal, the rocket, and each falling shot is drawn as "pixel
+// art": a small grid where each letter is one fat pixel of colour, and a
+// dot (".") is see-through. SPRITE_PAL says what colour each letter is.
+// Want to recolour the cow? Change a letter in COW_ART, or tweak a colour
+// in SPRITE_PAL. (You can also still use a plain emoji instead of a sprite
+// anywhere below — both work.)
+const SPRITE_PAL = {
+  '.': null,
+  'W': '#f2f2f2', 'G': '#9aa6b2', 'K': '#1c1c20', 'R': '#e23b3b',
+  'C': '#74e8ff', 'D': '#176a73', 'P': '#ffa6b8', 'N': '#c23a5e',
+  'H': '#e8d49a', 'O': '#ff8c1a', 'Y': '#ffd23d', 'B': '#8a5a2c',
+  'T': '#c98f5f', 'o': '#ff7fa3', 'm': '#6e4a25', 's': '#d9dde2',
+};
+// spr(): wraps a grid of strings so the game knows "this is a sprite".
+function spr(rows) { return { isPixel: true, rows: rows }; }
+
+const ROCKET_ART = spr([
+  "......R......", ".....RRR.....", "....RRRRR....", "...RRRRRRR...",
+  "...WsssssW...", "..WsssssssW..", "..WsDDDDDsW..", "..WsDCCCDsW..",
+  "..WsDCCCDsW..", "..WsDDDDDsW..", "..WsssssssW..", "..WsssssssW..",
+  ".RRsssssssRR.", "RRRsssssssRRR", "R..WsssssW..R", "...GGGGGGG...",
+  "....OOOOO....", ".....OYO.....",
+]);
+const COW_ART = spr([
+  ".HH.......HH.", "HHKH.....HKHH", ".KWWWWWWWWWK.", ".WWKKWWWKKWW.",
+  "WWWKKWWWKKWWW", "WWWWWWWWWWWWW", "WWKWWWWWWWKWW", ".WWWWWWWWWWW.",
+  "..PPPPPPPPP..", "..PNPPPPPNP..", "..PPPPPPPPP..", "...PPPPPPP...",
+  "....PPPPP....",
+]);
+const CHICKEN_ART = spr([
+  "....R.R......", "...RRRRR.....", "..WWWWWWWW...", ".WWWWWWWWWW..",
+  ".WWKKWWKKWW..", ".WWKKWWKKWW..", ".WWWWOOWWWW..", ".WWWOOOOWWW..",
+  ".WWWWOOWWWW..", ".WWWRRRRWWW..", "..WWRRRRWW...", "...WWWWWW....",
+]);
+const PIG_ART = spr([
+  ".oo.......oo.", "oooo.....oooo", ".ooooooooooo.", "ooooooooooooo",
+  "ooKKoooooKKoo", "ooKKoooooKKoo", "oooPPPPPPPooo", "oooPKPPPKPooo",
+  "oooPPPPPPPooo", ".ooooooooooo.", "..ooooooooo..", "...ooooooo...",
+]);
+const MONKEY_ART = spr([
+  "...BBBBBBB...", ".BBBBBBBBBBB.", "BBBBBBBBBBBBB", "BBBTTTTTTTBBB",
+  "BBTTTTTTTTTBB", "BBTKKTTTKKTBB", "BBTKKTTTKKTBB", "BBTTTTTTTTTBB",
+  "BBTTTKTKTTTBB", "BBBTTTTTTTBBB", ".BBTTTTTTTBB.", "..BBBBBBBBB..",
+]);
+const PENGUIN_ART = spr([
+  "...KKKKKKK...", "..KKKKKKKKK..", ".KKKKKKKKKKK.", ".KKWWWWWWWKK.",
+  ".KWWKWWWKWWK.", ".KWWWOOOWWWK.", ".KWWWOOOWWWK.", "KKWWWWWWWWWKK",
+  "KKWWWWWWWWWKK", "KKKWWWWWWWKKK", ".K.WWWWWWW.K.", "...WWWWWWW...",
+  "...OO...OO...",
+]);
+// The five things the animals throw at you.
+const MILK_ART = spr([
+  "...WW....", "...WW....", "..WWWW...", ".WWWWWW..", ".WWCCWW..",
+  ".WWWWWW..", ".WWWWWW..", ".WWWWWW..", "..WWWW...",
+]);
+const EGG_ART = spr([
+  "...WWW...", "..WWWWW..", ".WWWWWWW.", ".WWWWWWW.", ".WWWWWWW.",
+  ".WWWWWWW.", "..WWWWW..", "...WWW...", ".........",
+]);
+const MUD_ART = spr([
+  "....m....", "...mmm...", "..mmmmm..", "...mmm...", "..mmmmm..",
+  ".mmmmmmm.", ".mmmmmmm.", "mmmmmmmmm", ".........",
+]);
+const BANANA_ART = spr([
+  "...YYK...", "..YYY....", ".YYY.....", ".YY......", ".YYY.....",
+  "..YYY....", "...YYK...", ".........", ".........",
+]);
+const ICE_ART = spr([
+  ".CCCCCCC.", "CCCCCCCCC", "CCWWCCCCC", "CCWCCCCCC", "CCCCCCCCC",
+  "CCCCCCCCC", "CCCCCCCCC", ".CCCCCCC.", ".........",
+]);
+
+// =====================================================================
 // =====  CHANGE THESE TO CUSTOMISE YOUR GAME!  ========================
 // =====================================================================
 //
 // These are the things that are the most fun to change. Try swapping
-// the emoji for different ones, or change the numbers, then save the
-// file and re-open it in your browser to see what happens!
+// the sprites (or use an emoji like "🐸"!) for different ones, or change
+// the numbers, then save the file and re-open it to see what happens!
 
 // The animals that invade, and what each one shoots. The herd is built
-// from a RANDOM mix of these, so every game looks different! Add your own
-// pair, or change an emoji — try 🐸 🦖 👾 for animals, ⭐ 🔥 💧 for shots.
+// from a RANDOM mix of these, so every game looks different! Each pair is
+// a pixel-art sprite from up above — swap in your own, or an emoji string.
 const ANIMALS = [
-  { animal: "🐄", shot: "🍼" }, // cow shoots milk
-  { animal: "🐔", shot: "🥚" }, // chicken shoots eggs
-  { animal: "🐷", shot: "💩" }, // pig shoots mud
-  { animal: "🐵", shot: "🍌" }, // monkey shoots bananas
-  { animal: "🐧", shot: "🧊" }, // penguin shoots ice
+  { animal: COW_ART,     shot: MILK_ART   }, // cow shoots milk
+  { animal: CHICKEN_ART, shot: EGG_ART    }, // chicken shoots eggs
+  { animal: PIG_ART,     shot: MUD_ART    }, // pig shoots mud
+  { animal: MONKEY_ART,  shot: BANANA_ART }, // monkey shoots bananas
+  { animal: PENGUIN_ART, shot: ICE_ART    }, // penguin shoots ice
 ];
-const PLAYER     = "🚀";   // your ship — try 🛸 🐶 😎
+const PLAYER     = ROCKET_ART;   // your ship — a pixel rocket (or an emoji)
 const BULLET_COLOR  = "#7ef9ff"; // colour of YOUR laser streaks — try "#ff5", "#f6f"
 const BULLET_LENGTH = 22;  // how long your shots look (bigger = longer streaks)
 
@@ -291,7 +370,26 @@ function drawThing(thing, x, y, size, rotate) {
     ctx.rotate(rotate);
     ctx.translate(-x, -y);
   }
-  if (typeof thing === "string") {
+  if (thing && thing.isPixel) {
+    // It's pixel art: a grid of letters. Draw each letter as one fat,
+    // crisp square. We fit the grid into a size×size box and centre it.
+    // Block sizes are rounded to whole pixels so the art stays sharp.
+    const rows = thing.rows;
+    const gh = rows.length;
+    const gw = rows[0].length;
+    const ps = Math.max(1, Math.round(size / Math.max(gw, gh))); // pixel block size
+    const startX = Math.round(x - (gw * ps) / 2);
+    const startY = Math.round(y - (gh * ps) / 2);
+    for (let r = 0; r < gh; r++) {
+      const line = rows[r];
+      for (let c = 0; c < gw; c++) {
+        const col = SPRITE_PAL[line[c]];
+        if (!col) continue; // "." = see-through, skip it
+        ctx.fillStyle = col;
+        ctx.fillRect(startX + c * ps, startY + r * ps, ps, ps);
+      }
+    }
+  } else if (typeof thing === "string") {
     // It's an emoji / text. Draw it centred.
     ctx.font = size + "px serif";
     ctx.textAlign = "center";
@@ -1044,8 +1142,10 @@ function draw() {
   // Draw the player. While safe after a hit, blink it on and off so you
   // can see you're temporarily protected.
   const blinking = invuln > 0 && Math.floor(invuln / 6) % 2 === 0;
-  // Rotate the ship -45° so the rocket points straight up, not up-right.
-  if (!blinking) drawThing(PLAYER, player.x, player.y, CELL, -Math.PI / 4);
+  // The pixel rocket already points straight up. Only the 🚀 EMOJI needs a
+  // -45° spin (it leans up-right), so we rotate just when PLAYER is a string.
+  const playerRot = (typeof PLAYER === "string") ? -Math.PI / 4 : 0;
+  if (!blinking) drawThing(PLAYER, player.x, player.y, CELL, playerRot);
 
   // Draw the explosion bits, fading and shrinking as they age.
   for (const p of particles) {
@@ -1077,8 +1177,12 @@ function draw() {
     ctx.textAlign = "center";
     ctx.font = "52px 'Courier New', monospace";
     ctx.fillText("ANIMAL INVADERS", W / 2, 150);
-    ctx.font = "40px serif";
-    ctx.fillText("🐮 🐔 🐷 🐵 🐧", W / 2, 215);
+    // A row of the actual pixel animals (one of each kind), centred.
+    const previewGap = 64;
+    const previewStart = W / 2 - (ANIMALS.length - 1) * previewGap / 2;
+    for (let i = 0; i < ANIMALS.length; i++) {
+      drawThing(ANIMALS[i].animal, previewStart + i * previewGap, 225, 48);
+    }
     ctx.fillStyle = "#7ef9ff";
     ctx.font = "30px 'Courier New', monospace";
     ctx.fillText("▶  TAP or CLICK to START", W / 2, 290);
