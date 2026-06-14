@@ -106,6 +106,50 @@
     #touch { display: block; }
     p { display: none; } /* keyboard hints don't help on a touch screen */
   }
+  /* Name-entry box — pops up over the game ONLY when you earn a spot on the
+     high-score board. An HTML <input> is used (instead of drawing on the
+     canvas) so it works everywhere: a real keyboard on computers, and the
+     pop-up keyboard on phones/tablets. Hidden until you qualify. */
+  #nameentry {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.85);
+    border: 2px solid #7ef9ff;
+    border-radius: 10px;
+    padding: 22px 26px;
+    text-align: center;
+    z-index: 10;
+  }
+  #nameentry .title { color: #ffd34d; font-size: 22px; margin-bottom: 14px; }
+  #nameentry input {
+    font-family: inherit;
+    font-size: 22px;
+    text-align: center;
+    text-transform: uppercase;
+    width: 220px;
+    padding: 8px;
+    border-radius: 6px;
+    border: 1px solid #888;
+    background: #111;
+    color: #fff;
+    outline: none;
+  }
+  #nameentry button {
+    display: block;
+    margin: 14px auto 0;
+    font-family: inherit;
+    font-size: 18px;
+    padding: 8px 26px;
+    border-radius: 6px;
+    border: 1px solid #7ef9ff;
+    background: rgba(126, 249, 255, 0.15);
+    color: #fff;
+    cursor: pointer;
+  }
+  #nameentry button:active { background: rgba(126, 249, 255, 0.35); }
 </style>
 </head>
 <body>
@@ -114,6 +158,13 @@
 <div id="wrap">
   <canvas id="game" width="880" height="960"></canvas>
   <p>Move: ← →  (or A / D) &nbsp;•&nbsp; Shoot: Space &nbsp;•&nbsp; Restart: Enter &nbsp;•&nbsp; Sound: M</p>
+</div>
+
+<!-- Pops up only when you make the high-score top 20. See the CSS above. -->
+<div id="nameentry">
+  <div class="title">⭐ NEW HIGH SCORE! ⭐</div>
+  <input id="name" maxlength="12" placeholder="YOUR NAME" autocomplete="off" spellcheck="false">
+  <button id="savescore">SAVE</button>
 </div>
 
 <!-- Touch controls — only visible on phones/tablets (see the CSS above). -->
@@ -263,6 +314,9 @@ let state;         // "start" (waiting), "playing", or "lost"
 let invuln;        // frames left of "just got hit, can't be hit again yet"
 let stage;         // which wave you're on (1, 2, 3, ...) — everything speeds up
 let stageBanner;   // frames left to show the "STAGE N" banner
+let gameOverHandled; // did we already deal with this game over (save score etc.)?
+let enteringName;  // true while the "new high score!" name box is open
+let lastEntry;     // the run you just saved, so we can highlight it gold
 
 // Remember which keys are currently held down.
 const keys = {};
@@ -341,6 +395,10 @@ function newGame(startState) {
   lives = STARTING_LIVES;
   stage = 1;
   state = startState;
+  gameOverHandled = false;
+  enteringName = false;
+  lastEntry = null;
+  hideNameEntry();
   buildLevel();
 }
 
@@ -378,6 +436,9 @@ function nextStage() {
 // KEYBOARD — note when keys go down and up.
 // ---------------------------------------------------------------------
 document.addEventListener("keydown", (e) => {
+  // While the high-score name box is open, let the typing go to it and
+  // ignore all game controls (so Space doesn't restart mid-name, etc.).
+  if (enteringName) return;
   keys[e.key] = true;
   // M mutes / un-mutes the sound at any time.
   if (e.key === "m" || e.key === "M") { toggleSound(); return; }
@@ -551,6 +612,7 @@ canvas.addEventListener("pointerdown", (e) => {
 // Tap or click ANYWHERE to start from the start screen (or to play again
 // after game over). Ignored while you're playing.
 document.addEventListener("pointerdown", () => {
+  if (enteringName) return; // don't restart while typing your name
   if (state !== "playing") startOrRestart();
 });
 
@@ -776,6 +838,124 @@ function spawnExplosion(x, y, scale = 1) {
 
 
 // ---------------------------------------------------------------------
+// HIGH SCORES — a "leaderboard" of the best 20 games, kept on THIS
+// computer (in the browser's localStorage, the same place the sound
+// setting lives). It survives closing the tab, but it's per-device:
+// there's no internet server, so it doesn't sync between people.
+// Each entry is { name, score, stage }.
+// ---------------------------------------------------------------------
+const LB_KEY = "ai-scores"; // where the board is saved
+const LB_MAX = 20;          // keep only the best 20
+
+// Read the saved board back into an array (sorted best-first). If nothing
+// is saved yet, or it's somehow broken, we just start with an empty board.
+function loadScores() {
+  try {
+    const arr = JSON.parse(localStorage.getItem(LB_KEY)) || [];
+    return arr.filter((e) => e && typeof e.score === "number");
+  } catch (e) { return []; }
+}
+function saveScores(arr) {
+  try { localStorage.setItem(LB_KEY, JSON.stringify(arr)); } catch (e) {}
+}
+
+// Does this score earn a place on the board? (Any score > 0 does while
+// there are still free spots; after that it must beat the lowest entry.)
+function scoreQualifies(s) {
+  if (s <= 0) return false;
+  const board = loadScores();
+  return board.length < LB_MAX || s > board[board.length - 1].score;
+}
+
+// Add a finished game to the board, re-sort best-first, and trim to 20.
+function recordScore(name, s, st) {
+  const board = loadScores();
+  board.push({ name: (name || "YOU").slice(0, 12), score: s, stage: st });
+  board.sort((a, b) => b.score - a.score);
+  board.length = Math.min(board.length, LB_MAX);
+  saveScores(board);
+}
+
+// --- The "you made the board!" name box (an HTML pop-up, see the CSS) ---
+const nameEntryEl = document.getElementById("nameentry");
+const nameInputEl = document.getElementById("name");
+const saveBtnEl   = document.getElementById("savescore");
+
+function showNameEntry() {
+  enteringName = true;
+  nameEntryEl.style.display = "block";
+  // Pre-fill the name you used last time, so regulars can just hit SAVE.
+  try { nameInputEl.value = localStorage.getItem("ai-name") || ""; } catch (e) {}
+  nameInputEl.focus();
+  nameInputEl.select();
+}
+function hideNameEntry() {
+  if (nameEntryEl) nameEntryEl.style.display = "none";
+}
+function submitName() {
+  if (!enteringName) return;
+  const name = (nameInputEl.value || "YOU").trim().toUpperCase() || "YOU";
+  try { localStorage.setItem("ai-name", name); } catch (e) {}
+  recordScore(name, score, stage);
+  lastEntry = { name: name, score: score, stage: stage };
+  enteringName = false;
+  hideNameEntry();
+}
+// SAVE button, or Enter while typing, both lock in your name.
+saveBtnEl.addEventListener("click", submitName);
+nameInputEl.addEventListener("keydown", (e) => {
+  // Don't let these keys leak out to the game (e.g. Space restarting).
+  e.stopPropagation();
+  if (e.key === "Enter") submitName();
+});
+
+// Called once, the moment a game ends: if the score is good enough, open
+// the name box; the board itself is drawn on the game-over screen.
+function onGameOver() {
+  if (scoreQualifies(score)) showNameEntry();
+}
+
+// ---------------------------------------------------------------------
+// drawLeaderboard(): paint the top-20 list centred at x, starting at
+// topY. Laid out in two columns of ten. If `highlight` matches an entry
+// (the run you just finished), that line is drawn in gold.
+// ---------------------------------------------------------------------
+function drawLeaderboard(x, topY, highlight) {
+  const board = loadScores();
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#7ef9ff";
+  ctx.font = "24px 'Courier New', monospace";
+  ctx.fillText("HIGH SCORES", x, topY);
+
+  if (board.length === 0) {
+    ctx.fillStyle = "#888";
+    ctx.font = "18px 'Courier New', monospace";
+    ctx.fillText("No scores yet — be the first!", x, topY + 34);
+    return;
+  }
+
+  ctx.font = "18px 'Courier New', monospace";
+  const lineH = 24;
+  const colW = 250;            // width of one column
+  const colX = [x - colW / 2, x + colW / 2]; // left & right column centres
+  let highlighted = false;     // only gold-light the FIRST match
+  for (let i = 0; i < board.length; i++) {
+    const e = board[i];
+    const col = i < 10 ? 0 : 1;       // first ten left, next ten right
+    const rowY = topY + 34 + (i % 10) * lineH;
+    const isMe = !highlighted && highlight &&
+                 e.name === highlight.name && e.score === highlight.score &&
+                 e.stage === highlight.stage;
+    if (isMe) highlighted = true;
+    ctx.fillStyle = isMe ? "#ffd34d" : "#fff";
+    const rank = String(i + 1).padStart(2, " ");
+    const nm = e.name.padEnd(12, " ").slice(0, 12);
+    const sc = String(e.score).padStart(5, " ");
+    ctx.fillText(rank + ". " + nm + " " + sc, colX[col], rowY);
+  }
+}
+
+// ---------------------------------------------------------------------
 // draw(): the "showing" half of the game loop. Paints everything.
 // ---------------------------------------------------------------------
 function draw() {
@@ -870,15 +1050,17 @@ function draw() {
     ctx.fillStyle = "#fff";
     ctx.textAlign = "center";
     ctx.font = "52px 'Courier New', monospace";
-    ctx.fillText("ANIMAL INVADERS", W / 2, H / 2 - 70);
+    ctx.fillText("ANIMAL INVADERS", W / 2, 150);
     ctx.font = "40px serif";
-    ctx.fillText("🐮 🐔 🐷 🐵 🐧", W / 2, H / 2 - 5);
+    ctx.fillText("🐮 🐔 🐷 🐵 🐧", W / 2, 215);
     ctx.fillStyle = "#7ef9ff";
     ctx.font = "30px 'Courier New', monospace";
-    ctx.fillText("▶  TAP or CLICK to START", W / 2, H / 2 + 65);
+    ctx.fillText("▶  TAP or CLICK to START", W / 2, 290);
     ctx.fillStyle = "#888";
     ctx.font = "18px 'Courier New', monospace";
-    ctx.fillText("Move with ← →   •   Shoot with Space", W / 2, H / 2 + 110);
+    ctx.fillText("Move with ← →   •   Shoot with Space", W / 2, 330);
+    // The best games so far, right on the start screen.
+    drawLeaderboard(W / 2, 410);
   }
 
   // Game-over screen.
@@ -888,11 +1070,20 @@ function draw() {
     ctx.fillStyle = "#fff";
     ctx.textAlign = "center";
     ctx.font = "48px 'Courier New', monospace";
-    ctx.fillText("GAME OVER", W / 2, H / 2 - 35);
+    ctx.fillText("GAME OVER", W / 2, 150);
     ctx.font = "22px 'Courier New', monospace";
-    ctx.fillText("Reached stage " + stage, W / 2, H / 2 + 10);
-    ctx.fillText("Score: " + score, W / 2, H / 2 + 45);
-    ctx.fillText("Tap or press Enter to play again", W / 2, H / 2 + 80);
+    ctx.fillText("Reached stage " + stage, W / 2, 190);
+    ctx.fillText("Score: " + score, W / 2, 222);
+    // While the name box is up, that HTML pop-up covers the middle — don't
+    // draw the board or the restart hint behind it. Once you've saved (or if
+    // you didn't make the board), show the leaderboard and how to play again.
+    if (!enteringName) {
+      drawLeaderboard(W / 2, 290, lastEntry);
+      ctx.fillStyle = "#fff";
+      ctx.textAlign = "center";
+      ctx.font = "22px 'Courier New', monospace";
+      ctx.fillText("Tap or press Enter to play again", W / 2, 600);
+    }
   }
 }
 
@@ -905,6 +1096,11 @@ function draw() {
 // ---------------------------------------------------------------------
 function loop() {
   update();
+  // The frame the game ends: deal with it once (save a high score, etc.).
+  if (state === "lost" && !gameOverHandled) {
+    gameOverHandled = true;
+    onGameOver();
+  }
   draw();
   requestAnimationFrame(loop);
 }
