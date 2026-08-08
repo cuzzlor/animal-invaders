@@ -172,7 +172,7 @@
 <canvas id="stars"></canvas>
 <div id="wrap">
   <canvas id="game" width="880" height="960"></canvas>
-  <p>Move: ← →  (or A / D) &nbsp;•&nbsp; Shoot: Space &nbsp;•&nbsp; Restart: Enter &nbsp;•&nbsp; Sound: M</p>
+  <p>Move: ← →  (or A / D) &nbsp;•&nbsp; Shoot: Space &nbsp;•&nbsp; Pause: P &nbsp;•&nbsp; Restart: Enter &nbsp;•&nbsp; Sound: M</p>
 </div>
 
 <!-- Pops up only when you make the high-score top 20. See the CSS above. -->
@@ -421,6 +421,7 @@ let invaderDir;    // +1 moving right, -1 moving left
 let score;
 let lives;
 let state;         // "start" (waiting), "playing", or "lost"
+let paused;        // true while the game is frozen by the ⏸ button (or P)
 let invuln;        // frames left of "just got hit, can't be hit again yet"
 let stage;         // which wave you're on (1, 2, 3, ...) — everything speeds up
 let stageBanner;   // frames left to show the "STAGE N" banner
@@ -505,6 +506,7 @@ function newGame(startState) {
   lives = STARTING_LIVES;
   stage = 1;
   state = startState;
+  paused = false;
   gameOverHandled = false;
   enteringName = false;
   lastEntry = null;
@@ -532,6 +534,33 @@ function startOrRestart() {
   else if (state === "lost") newGame("playing");
 }
 
+// togglePause(): freeze / un-freeze a game in progress. Everything stops
+// moving (update() bails out) but the screen keeps being drawn, so you see
+// the board exactly as you left it under a "PAUSED" sign. Only means
+// anything mid-game — there's nothing to pause on the start/game-over screens.
+function togglePause() {
+  if (state !== "playing") return;
+  paused = !paused;
+}
+
+// Look away and the game waits for you. Switching to another tab, another
+// app, or minimising the window pauses a game in progress, so you never come
+// back to find the herd landed while you were gone. It only ever pauses,
+// never un-pauses: you come back to the PAUSED screen and start again when
+// your hands are ready.
+//   visibilitychange covers switching tabs and minimising; the window's blur
+// covers clicking away to another app while the tab is still on screen.
+// We also forget any held-down keys, because the keyup happens off-page and
+// we'd never hear it — otherwise you'd resume already drifting sideways.
+function pauseOnLeave() {
+  for (const k in keys) keys[k] = false;
+  if (state === "playing") paused = true;
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) pauseOnLeave();
+});
+window.addEventListener("blur", pauseOnLeave);
+
 // ---------------------------------------------------------------------
 // nextStage(): you cleared the herd! Keep your score and lives, bump the
 // stage (which speeds everything up), and lay out a fresh, faster wave.
@@ -552,6 +581,8 @@ document.addEventListener("keydown", (e) => {
   keys[e.key] = true;
   // M mutes / un-mutes the sound at any time.
   if (e.key === "m" || e.key === "M") { toggleSound(); return; }
+  // P (or Escape) pauses / un-pauses a game in progress.
+  if (e.key === "p" || e.key === "P" || e.key === "Escape") { togglePause(); return; }
   // On the start screen or game-over screen, Enter/Space begins (or restarts).
   if (state !== "playing" && (e.key === "Enter" || e.key === " " || e.key === "Spacebar")) {
     startOrRestart();
@@ -561,7 +592,7 @@ document.addEventListener("keydown", (e) => {
   // Shoot on a fresh press of Space — one shot per press. We ignore
   // e.repeat (the machine-gun events the OS sends while a key is HELD),
   // so holding Space does nothing; you must tap it for each shot.
-  if ((e.key === " " || e.key === "Spacebar") && !e.repeat && state === "playing") {
+  if ((e.key === " " || e.key === "Spacebar") && !e.repeat && state === "playing" && !paused) {
     bullets.push({ x: player.x, y: player.y - CELL / 2 });
     playShootSound();
   }
@@ -676,9 +707,10 @@ function playExplosionSound(big = false) {
 }
 
 function fireShot() {
-  // Only the FIRE button shoots, and only while playing. Starting the game
-  // and restarting are handled by the "tap anywhere" listener below.
-  if (state === "playing") {
+  // Only the FIRE button shoots, and only while playing (and not paused).
+  // Starting the game and restarting are handled by the "tap anywhere"
+  // listener below.
+  if (state === "playing" && !paused) {
     bullets.push({ x: player.x, y: player.y - CELL / 2 });
     playShootSound();
   }
@@ -701,21 +733,29 @@ document.getElementById("btn-fire").addEventListener("pointerdown", (e) => {
   fireShot();
 });
 
-// The 🔊 toggle's spot on the canvas (in game pixels), and a helper to turn
-// a screen tap into game pixels (the canvas is scaled to fit the screen).
+// Where the two little toggles sit on the canvas (in game pixels), side by
+// side under the score, and a helper to turn a screen tap into game pixels
+// (the canvas is scaled to fit the screen).
 const SOUND_ICON = { x: 12, y: 42, w: 36, h: 32 };
+const PAUSE_ICON = { x: 56, y: 42, w: 36, h: 32 };
 function canvasPoint(e) {
   const r = canvas.getBoundingClientRect();
   return { x: (e.clientX - r.left) * (W / r.width), y: (e.clientY - r.top) * (H / r.height) };
 }
-// Tapping the 🔊 icon toggles sound — and must NOT also start the game,
-// so we stop the tap from reaching the "tap anywhere to start" listener.
+function hitIcon(p, icon) {
+  return p.x >= icon.x && p.x <= icon.x + icon.w &&
+         p.y >= icon.y && p.y <= icon.y + icon.h;
+}
+// Tapping the 🔊 or ⏸ icon toggles that thing — and must NOT also start the
+// game, so we stop the tap from reaching the "tap anywhere to start" listener.
 canvas.addEventListener("pointerdown", (e) => {
   const p = canvasPoint(e);
-  if (p.x >= SOUND_ICON.x && p.x <= SOUND_ICON.x + SOUND_ICON.w &&
-      p.y >= SOUND_ICON.y && p.y <= SOUND_ICON.y + SOUND_ICON.h) {
+  if (hitIcon(p, SOUND_ICON)) {
     e.stopPropagation();
     toggleSound();
+  } else if (state === "playing" && hitIcon(p, PAUSE_ICON)) {
+    e.stopPropagation();
+    togglePause();
   }
 });
 
@@ -733,6 +773,7 @@ document.addEventListener("pointerdown", () => {
 // ---------------------------------------------------------------------
 function update() {
   if (state !== "playing") return; // frozen on the game-over screen
+  if (paused) return;              // ...and frozen while paused
 
   // Each stage speeds the animals up a little. speedScale is 1 on stage 1,
   // 1.12 on stage 2, and so on. shotSpeed is how fast their shots fall now.
@@ -1076,6 +1117,28 @@ function drawLeaderboard(x, topY, highlight) {
 }
 
 // ---------------------------------------------------------------------
+// drawIcons(): the two little toggles tucked under the score at the
+// top-left — sound and pause. Drawn as their own step because the PAUSED
+// screen dims everything and then paints them back on top, so the ▶ you
+// need in order to un-pause stays bright and tappable.
+// ---------------------------------------------------------------------
+function drawIcons() {
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.font = "26px serif";
+  // Sound: tap it (or press M) to mute/un-mute. Dimmed when sound is off.
+  ctx.globalAlpha = soundOn ? 1 : 0.45;
+  ctx.fillText(soundOn ? "🔊" : "🔇", SOUND_ICON.x, SOUND_ICON.y + SOUND_ICON.h / 2);
+  // Pause: shows ⏸ while the game is running and ▶ while it's paused —
+  // i.e. what the button will DO next. Only there mid-game, since there's
+  // nothing to pause on the start or game-over screens.
+  ctx.globalAlpha = 1;
+  if (state === "playing") {
+    ctx.fillText(paused ? "▶️" : "⏸️", PAUSE_ICON.x, PAUSE_ICON.y + PAUSE_ICON.h / 2);
+  }
+}
+
+// ---------------------------------------------------------------------
 // draw(): the "showing" half of the game loop. Paints everything.
 // ---------------------------------------------------------------------
 function draw() {
@@ -1094,13 +1157,8 @@ function draw() {
   ctx.textAlign = "right";
   ctx.fillText("LIVES: " + "❤️".repeat(lives), W - 12, 28);
 
-  // Small sound toggle, tucked under the score at the top-left. Tap it
-  // (or press M) to mute/un-mute. Dimmed when sound is off.
-  ctx.textAlign = "left";
-  ctx.textBaseline = "middle";
-  ctx.font = "26px serif";
-  ctx.globalAlpha = soundOn ? 1 : 0.45;
-  ctx.fillText(soundOn ? "🔊" : "🔇", SOUND_ICON.x, SOUND_ICON.y + SOUND_ICON.h / 2);
+  // The sound and pause toggles, under the score at the top-left.
+  drawIcons();
   ctx.globalAlpha = 1;
 
   // Draw the animals — but NOT on the start screen, where the herd would
@@ -1167,6 +1225,21 @@ function draw() {
     ctx.font = "44px 'Courier New', monospace";
     ctx.fillText("STAGE " + stage, W / 2, H / 2);
     ctx.restore();
+  }
+
+  // Paused — dim the board (everything is frozen exactly where you left it)
+  // and say so, then paint the toggles back on top so the ▶ stays tappable.
+  if (state === "playing" && paused) {
+    ctx.fillStyle = "rgba(0,0,0,0.6)";
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = "#fff";
+    ctx.textAlign = "center";
+    ctx.font = "52px 'Courier New', monospace";
+    ctx.fillText("PAUSED", W / 2, H / 2);
+    ctx.fillStyle = "#7ef9ff";
+    ctx.font = "22px 'Courier New', monospace";
+    ctx.fillText("Tap ▶ or press P to keep playing", W / 2, H / 2 + 48);
+    drawIcons();
   }
 
   // Start screen — shown until the player taps/clicks/presses to begin.

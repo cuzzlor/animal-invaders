@@ -13,7 +13,11 @@ nothing to install, no internet needed.
 |--------|------|
 | Move left / right | ← →  (or `A` / `D`) |
 | Shoot | `Spacebar` |
+| Pause / un-pause | `P` (or tap the ⏸ button, top-left) |
 | Play again after you win or lose | `Enter` |
+
+The game pauses itself if you switch tabs or click away, so nothing happens
+while you're not looking.
 
 Shoot all the cows to win. Dodge the milk bottles — if one hits you, you lose a
 life. Lose all 3 lives (or let the cows reach the bottom) and it's game over.
