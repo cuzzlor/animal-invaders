@@ -172,7 +172,7 @@
 <canvas id="stars"></canvas>
 <div id="wrap">
   <canvas id="game" width="880" height="960"></canvas>
-  <p>Move: ← →  (or A / D) &nbsp;•&nbsp; Shoot: Space &nbsp;•&nbsp; Pause: P &nbsp;•&nbsp; Restart: Enter &nbsp;•&nbsp; Sound: M</p>
+  <p>Move: ← →  (or A / D) &nbsp;•&nbsp; Shoot: Space &nbsp;•&nbsp; Pause: P &nbsp;•&nbsp; Restart stage: R &nbsp;•&nbsp; Play again: Enter &nbsp;•&nbsp; Shop: S &nbsp;•&nbsp; Sound: M</p>
 </div>
 
 <!-- Pops up only when you make the high-score top 20. See the CSS above. -->
@@ -206,6 +206,8 @@ const SPRITE_PAL = {
   'C': '#74e8ff', 'D': '#176a73', 'P': '#ffa6b8', 'N': '#c23a5e',
   'H': '#e8d49a', 'O': '#ff8c1a', 'Y': '#ffd23d', 'B': '#8a5a2c',
   'T': '#c98f5f', 'o': '#ff7fa3', 'm': '#6e4a25', 's': '#d9dde2',
+  'r': '#8c1f1f', 'L': '#ffd7d7', // deep red & hot laser-white, for the ships
+  'g': '#6fe08a', 'v': '#a86cf0', // green & violet, for two of the ships
 };
 // spr(): wraps a grid of strings so the game knows "this is a sprite".
 function spr(rows) { return { isPixel: true, rows: rows }; }
@@ -216,6 +218,36 @@ const ROCKET_ART = spr([
   "..WsDCCCDsW..", "..WsDDDDDsW..", "..WsssssssW..", "..WsssssssW..",
   ".RRsssssssRR.", "RRRsssssssRRR", "R..WsssssW..R", "...GGGGGGG...",
   "....OOOOO....", ".....OYO.....",
+]);
+// The two ships you can buy in the shop. Same 13×18 grid as the rocket
+// above, so they all sit the same way on screen.
+const TWIN_ROCKET_ART = spr([
+  "..Y.......Y..", "..Y.......Y..", "..Y..YYY..Y..", "..YYYYYYYYY..",
+  "..YsssssssY..", ".WsssssssssW.", ".WsDDDDDDDsW.", ".WsDCCCCCDsW.",
+  ".WsDCCCCCDsW.", ".WsDDDDDDDsW.", ".WsssssssssW.", ".WsssssssssW.",
+  "YYsssssssssYY", "YYYsssssssYYY", "Y..WsssssW..Y", "...GGGGGGG...",
+  "...OOOOOOO...", "....OYYYO....",
+]);
+const RAPID_ROCKET_ART = spr([
+  "......g......", "......g......", ".....ggg.....", "....ggggg....",
+  "...gg...gg...", "..ggWWWWWgg..", "..ggWDDDWgg..", "..ggWDCDWgg..",
+  "..ggWDDDWgg..", "..ggWWWWWgg..", "..ggsssssgg..", ".gggsssssggg.",
+  "ggg.sssss.ggg", "gg..sssss..gg", "g...WsssW...g", "...GGGGGGG...",
+  "....OOOOO....", ".....OYO.....",
+]);
+const BOMB_ROCKET_ART = spr([
+  "....vvvvv....", "...vvvvvvv...", "..vvvvvvvvv..", "..vvOOOOOvv..",
+  "..vvOYYYOvv..", "..vvOOOOOvv..", ".vvvWWWWWvvv.", ".vvvWDDDWvvv.",
+  ".vvvWDCDWvvv.", ".vvvWDDDWvvv.", ".vvvWWWWWvvv.", ".vvvsssssvvv.",
+  "vvv.sssss.vvv", "vv..sssss..vv", "v...WsssW...v", "...GGGGGGG...",
+  "....OOOOO....", ".....OYO.....",
+]);
+const LASER_ROCKET_ART = spr([
+  "......L......", ".....LLL.....", "....RLLLR....", "...RRRLRRR...",
+  "..RRRRRRRRR..", "..RrWWWWWrR..", "..RrWDDDWrR..", "..RrWDCDWrR..",
+  "..RrWDDDWrR..", "..RrWWWWWrR..", "..RrsssssrR..", ".RRrsssssrRR.",
+  "RRRrsssssrRRR", "RR.rsssssr.RR", "R...WsssW...R", "...GGGGGGG...",
+  "....ORRRO....", ".....RYR.....",
 ]);
 const COW_ART = spr([
   ".HH.......HH.", "HHKH.....HKHH", ".KWWWWWWWWWK.", ".WWKKWWWKKWW.",
@@ -284,9 +316,53 @@ const ANIMALS = [
   { animal: MONKEY_ART,  shot: BANANA_ART }, // monkey shoots bananas
   { animal: PENGUIN_ART, shot: ICE_ART    }, // penguin shoots ice
 ];
-const PLAYER     = ROCKET_ART;   // your ship — a pixel rocket (or an emoji)
+const PLAYER     = ROCKET_ART;   // your starting ship (or an emoji)
 const BULLET_COLOR  = "#7ef9ff"; // colour of YOUR laser streaks — try "#ff5", "#f6f"
 const BULLET_LENGTH = 22;  // how long your shots look (bigger = longer streaks)
+
+// --- The shop: ships you EARN by scoring big ---
+// Each ship needs a score of `need` in ONE game — not added up over lots of
+// games, all in a single run. Manage it once and the ship is yours for good:
+// visit the SHOP after a game to fly it. Make `need` smaller if you'd like to
+// reach the good ships sooner!
+// How often each gun can shoot, in frames (60 frames = one second), and
+// how far the BLAST CANNON's explosion reaches.
+const RAPID_EVERY = 12;  // between RAPID FIRE shots (12 = five a second)
+const BOMB_RELOAD = 30;  // between BLAST CANNON shells (30 = half a second)
+const BOMB_RADIUS = 75;  // how far the blast reaches, in pixels
+const BOMB_CORE   = 34;  // inside this it's full strength; past it, half
+
+// `damage` is how much of an animal one bullet takes off. Animals have 1
+// health, so damage 1 downs them in a single hit and 0.5 takes two.
+const SHIPS = [
+  {
+    id: "scout", name: "SCOUT", art: PLAYER, need: 0, fire: "single", damage: 1, reload: 0,
+    blurb: ["The trusty rocket you start with.", "One shot at a time."],
+  },
+  {
+    id: "rapid", name: "RAPID FIRE", art: RAPID_ROCKET_ART, need: 2500, fire: "single",
+    damage: 0.5, reload: RAPID_EVERY, auto: true, // `auto` = keeps firing while held
+    blurb: ["HOLD to pour out five shots a second,", "but each one hits only half as hard."],
+  },
+  {
+    id: "twin", name: "TWIN BLASTER", art: TWIN_ROCKET_ART, need: 5000, fire: "twin", damage: 1, reload: 0,
+    blurb: ["Two cannons, two bullets a shot —", "clear the herd twice as fast."],
+  },
+  {
+    id: "bomb", name: "BLAST CANNON", art: BOMB_ROCKET_ART, need: 7500, fire: "bomb",
+    damage: 1, reload: BOMB_RELOAD,
+    blurb: ["A shell that BLOWS UP where it lands,", "wiping out all nearby. Reloads 0.5s."],
+  },
+  {
+    id: "laser", name: "RED LASER", art: LASER_ROCKET_ART, need: 10000, fire: "laser", damage: 1, reload: 0,
+    blurb: ["A beam that smashes clean through", "them all. Burns 3s, reloads 1s."],
+  },
+];
+const BEAM_TIME    = 180;  // frames the red beam burns for (180 = 3 seconds)
+const BEAM_RELOAD  = 60;   // frames it reloads for afterwards (60 = 1 second)
+const BEAM_WIDTH   = 18;   // how wide the beam's bright core is, in pixels
+const BEAM_BURN    = 16;   // frames an animal must be held in the beam before it melts
+const BEAM_DRAG    = 0.65; // how much of your usual speed you steer at while firing
 
 // --- The numbers you'll reach for first ---
 const ROWS        = 4;     // how many rows of animals
@@ -413,21 +489,27 @@ function drawThing(thing, x, y, size, rotate) {
 // ---------------------------------------------------------------------
 let player;        // {x, y}
 let invaders;      // array of {x, y, alive, animal, shot}
-let bullets;       // YOUR shots going up:   array of {x, y}
+let bullets;       // YOUR shots going up:   array of {x, y, dmg}
 let shots;         // animal shots coming down: array of {x, y, emoji}
 let bases;         // the shields: array of { blocks: [{x, y, alive}] }
 let particles;     // explosion bits: array of {x, y, vx, vy, life, maxLife, color}
 let invaderDir;    // +1 moving right, -1 moving left
 let score;
 let lives;
-let state;         // "start" (waiting), "playing", or "lost"
+let state;         // "start" (waiting), "playing", "lost", or "shop"
 let paused;        // true while the game is frozen by the ⏸ button (or P)
+let beamTimer;     // frames left of the RED LASER's beam (0 = not firing)
+let beamCooldown;  // frames left before the beam can be fired again
+let gunTimer;      // frames until this ship's gun has finished reloading
 let invuln;        // frames left of "just got hit, can't be hit again yet"
 let stage;         // which wave you're on (1, 2, 3, ...) — everything speeds up
 let stageBanner;   // frames left to show the "STAGE N" banner
+let stageStartScore; // the score and lives you had when this stage began —
+let stageStartLives; // what the ⏮ restart button winds you back to
 let gameOverHandled; // did we already deal with this game over (save score etc.)?
 let enteringName;  // true while the "new high score!" name box is open
 let lastEntry;     // the run you just saved, so we can highlight it gold
+let justUnlocked = []; // ships the run you just finished earned, to shout about
 
 // Remember which keys are currently held down.
 const keys = {};
@@ -456,7 +538,9 @@ function buildLevel() {
         y: startY + row * gapY,
         alive: true,
         animal: kind.animal, // which emoji to draw
-        shot: kind.shot      // what it throws at you
+        shot: kind.shot,     // what it throws at you
+        heat: 0,             // how long it's been held in the RED LASER's beam
+        hp: 1,               // health: most bullets take off 1, so one hit downs it
       });
     }
   }
@@ -493,7 +577,14 @@ function buildLevel() {
   invaderDir = 1;
   shotTimer = 0;
   invuln = 0;
+  beamTimer = 0;      // a fresh wave means a cooled-off, fully loaded gun
+  beamCooldown = 0;
+  gunTimer = 0;
   stageBanner = BANNER_TIME;
+  // Remember where you stood as this wave began, so the ⏮ button can put
+  // you back exactly here.
+  stageStartScore = score;
+  stageStartLives = lives;
 }
 
 // ---------------------------------------------------------------------
@@ -531,7 +622,45 @@ function begin() {
 // — begin from the start screen, or play again after game over.
 function startOrRestart() {
   if (state === "start") begin();
-  else if (state === "lost") newGame("playing");
+  else if (state === "lost" || state === "shop") newGame("playing");
+}
+
+// ---------------------------------------------------------------------
+// openShop() / closeShop(): pop into the ship shop and back out again.
+// You can get there from the start screen, from the game-over screen once
+// you've dealt with the name box, or straight out of a game in progress
+// with the 🛒 button. shopCameFrom remembers which screen sent you, so
+// BACK returns you to the right one.
+//   Opening it mid-game freezes everything (update() only runs while the
+// state is "playing") and pauses you, so you come back to the PAUSED
+// screen and choose when to dive back in rather than being dropped
+// straight into the middle of a wave.
+// ---------------------------------------------------------------------
+let shopCameFrom = "start";
+function openShop() {
+  if (state !== "start" && state !== "lost" && state !== "playing") return;
+  if (enteringName) return; // deal with the high-score box first
+  if (state === "playing") paused = true;
+  shopCameFrom = state;
+  state = "shop";
+}
+function closeShop() {
+  if (state !== "shop") return;
+  state = shopCameFrom;
+}
+
+// ---------------------------------------------------------------------
+// restartStage(): put the current wave back exactly as it began — a full
+// herd, fresh bases, and the score and lives you had when the stage
+// started. You keep your stage number (and the speed that comes with it);
+// only what you did THIS stage is rewound. Winding the score back too is
+// what stops it being a way to farm points off a half-cleared wave.
+// ---------------------------------------------------------------------
+function restartStage() {
+  if (state !== "playing") return;
+  score = stageStartScore;
+  lives = stageStartLives;
+  buildLevel(); // re-lays the wave, and re-takes the same snapshot
 }
 
 // togglePause(): freeze / un-freeze a game in progress. Everything stops
@@ -581,9 +710,26 @@ document.addEventListener("keydown", (e) => {
   keys[e.key] = true;
   // M mutes / un-mutes the sound at any time.
   if (e.key === "m" || e.key === "M") { toggleSound(); return; }
-  // P (or Escape) pauses / un-pauses a game in progress.
-  if (e.key === "p" || e.key === "P" || e.key === "Escape") { togglePause(); return; }
-  // On the start screen or game-over screen, Enter/Space begins (or restarts).
+  // P (or Escape) pauses / un-pauses a game in progress — and backs you
+  // out of the shop, where there's nothing to pause.
+  if (e.key === "p" || e.key === "P" || e.key === "Escape") {
+    if (state === "shop") closeShop(); else togglePause();
+    return;
+  }
+  // R starts the stage you're on again, from the top.
+  if (e.key === "r" || e.key === "R") { restartStage(); return; }
+  // S opens the shop from the start or game-over screen (and shuts it again).
+  if (e.key === "s" || e.key === "S") {
+    if (state === "shop") closeShop(); else openShop();
+    return;
+  }
+  // In the shop, 1 / 2 / 3 fly the ship on that row, if you've earned it.
+  // (The same thing the row's button does when tapped.)
+  if (state === "shop" && e.key >= "1" && e.key <= String(SHIPS.length)) {
+    equipShip(SHIPS[Number(e.key) - 1]);
+    return;
+  }
+  // On the start / game-over / shop screens, Enter/Space begins (or restarts).
   if (state !== "playing" && (e.key === "Enter" || e.key === " " || e.key === "Spacebar")) {
     startOrRestart();
     e.preventDefault();
@@ -592,10 +738,7 @@ document.addEventListener("keydown", (e) => {
   // Shoot on a fresh press of Space — one shot per press. We ignore
   // e.repeat (the machine-gun events the OS sends while a key is HELD),
   // so holding Space does nothing; you must tap it for each shot.
-  if ((e.key === " " || e.key === "Spacebar") && !e.repeat && state === "playing" && !paused) {
-    bullets.push({ x: player.x, y: player.y - CELL / 2 });
-    playShootSound();
-  }
+  if ((e.key === " " || e.key === "Spacebar") && !e.repeat) playerFire();
   // Stop space/arrows from scrolling the page.
   if ([" ", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) {
     e.preventDefault();
@@ -626,21 +769,24 @@ function toggleSound() {
   if (soundOn) playShootSound(); // a tiny chirp so you know sound is back on
 }
 
-function playShootSound() {
+// `light` gives a shorter, quieter, higher pew — used by the RAPID FIRE
+// ship, whose steady stream would be a racket at full volume.
+function playShootSound(light) {
   if (!soundOn) return;
   try {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     const t = audioCtx.currentTime;
+    const dur = light ? 0.05 : 0.12;
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
     osc.type = "square";
-    osc.frequency.setValueAtTime(880, t);          // start high...
-    osc.frequency.exponentialRampToValueAtTime(220, t + 0.12); // ...sweep down
-    gain.gain.setValueAtTime(0.15, t);              // gentle volume
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);   // quick fade
+    osc.frequency.setValueAtTime(light ? 1250 : 880, t);        // start high...
+    osc.frequency.exponentialRampToValueAtTime(light ? 620 : 220, t + dur); // ...sweep down
+    gain.gain.setValueAtTime(light ? 0.05 : 0.15, t);           // gentle volume
+    gain.gain.exponentialRampToValueAtTime(0.001, t + dur);     // quick fade
     osc.connect(gain).connect(audioCtx.destination);
     osc.start(t);
-    osc.stop(t + 0.12);
+    osc.stop(t + dur);
   } catch (e) { /* if audio isn't available, just stay silent */ }
 }
 
@@ -706,14 +852,80 @@ function playExplosionSound(big = false) {
   } catch (e) { /* if audio isn't available, just stay silent */ }
 }
 
-function fireShot() {
-  // Only the FIRE button shoots, and only while playing (and not paused).
-  // Starting the game and restarting are handled by the "tap anywhere"
-  // listener below.
-  if (state === "playing" && !paused) {
-    bullets.push({ x: player.x, y: player.y - CELL / 2 });
-    playShootSound();
+// The RED LASER's voice: a short, gritty zap. Played once loudly as the
+// beam lights up, then quietly over and over while it burns — which is why
+// the beam crackles as it fires, and falls silent the moment you pause
+// (the ticks are counted out by update(), and update() freezes too).
+function playLaserSound(start) {
+  if (!soundOn) return;
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const t = audioCtx.currentTime;
+    const dur = start ? 0.3 : 0.1;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = "sawtooth";                              // buzzy, not pure — it's a laser
+    osc.frequency.setValueAtTime(start ? 1200 : 520, t);
+    osc.frequency.exponentialRampToValueAtTime(start ? 180 : 380, t + dur);
+    gain.gain.setValueAtTime(start ? 0.18 : 0.05, t);   // the crackle stays well under the zap
+    gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(t);
+    osc.stop(t + dur);
+  } catch (e) { /* if audio isn't available, just stay silent */ }
+}
+
+// shootBullets(): put this ship's shot in the air — two bullets for the
+// TWIN BLASTER, one for everybody else, each carrying the ship's damage.
+// Called both by a press and by the RAPID FIRE stream, so a bullet is
+// always built the same way.
+function shootBullets() {
+  const ship = currentShip();
+  const nose = player.y - CELL / 2;
+  if (ship.fire === "twin") {
+    bullets.push({ x: player.x - 11, y: nose, dmg: ship.damage });
+    bullets.push({ x: player.x + 11, y: nose, dmg: ship.damage });
+  } else {
+    // `bomb` marks a BLAST CANNON shell — it blows up where it lands
+    // instead of just poking the one animal it touched.
+    bullets.push({ x: player.x, y: nose, dmg: ship.damage, bomb: ship.fire === "bomb" });
   }
+  gunTimer = ship.reload;                 // this gun's own reload time
+  playShootSound(!!ship.auto);            // a held stream gets a lighter, quicker pew
+}
+
+// ---------------------------------------------------------------------
+// playerFire(): what happens when you PRESS fire, whichever ship you're
+// flying. Both the Space bar and the on-screen FIRE button come through
+// here, so the two can never drift apart.
+//   SCOUT        — one bullet, as always.
+//   RAPID FIRE   — one light bullet now; hold the button and update()
+//                  keeps the stream going at five a second.
+//   TWIN BLASTER — two bullets side by side.
+//   RED LASER    — lights up the beam (see update()), if it's reloaded.
+// ---------------------------------------------------------------------
+function playerFire() {
+  if (state !== "playing" || paused) return;
+  const ship = currentShip();
+  if (ship.fire === "laser") {
+    // One press burns the beam for BEAM_TIME; you can't fire again until
+    // it's finished burning AND finished reloading.
+    if (beamTimer === 0 && beamCooldown === 0) {
+      beamTimer = BEAM_TIME;
+      playLaserSound(true);
+    }
+    return;
+  }
+  // A gun that's still reloading simply doesn't go off — hammering the key
+  // can't beat a ship's fire rate.
+  if (gunTimer > 0) return;
+  shootBullets();
+}
+
+function fireShot() {
+  // The on-screen FIRE button. Starting the game and restarting are handled
+  // by the "tap anywhere" listener below.
+  playerFire();
 }
 
 // A move button holds a direction down while you're pressing it.
@@ -728,6 +940,9 @@ function holdButton(id, key) {
 }
 holdButton("btn-left", "ArrowLeft");
 holdButton("btn-right", "ArrowRight");
+// FIRE both shoots on the tap AND stays "held", so the RAPID FIRE ship
+// streams while your finger is down, exactly like holding the Space bar.
+holdButton("btn-fire", " ");
 document.getElementById("btn-fire").addEventListener("pointerdown", (e) => {
   e.preventDefault();
   fireShot();
@@ -736,8 +951,10 @@ document.getElementById("btn-fire").addEventListener("pointerdown", (e) => {
 // Where the two little toggles sit on the canvas (in game pixels), side by
 // side under the score, and a helper to turn a screen tap into game pixels
 // (the canvas is scaled to fit the screen).
-const SOUND_ICON = { x: 12, y: 42, w: 36, h: 32 };
-const PAUSE_ICON = { x: 56, y: 42, w: 36, h: 32 };
+const SOUND_ICON   = { x: 12,  y: 42, w: 36, h: 32 };
+const PAUSE_ICON   = { x: 56,  y: 42, w: 36, h: 32 };
+const RESTART_ICON = { x: 100, y: 42, w: 36, h: 32 };
+const SHOP_ICON    = { x: 144, y: 42, w: 36, h: 32 };
 function canvasPoint(e) {
   const r = canvas.getBoundingClientRect();
   return { x: (e.clientX - r.left) * (W / r.width), y: (e.clientY - r.top) * (H / r.height) };
@@ -746,23 +963,47 @@ function hitIcon(p, icon) {
   return p.x >= icon.x && p.x <= icon.x + icon.w &&
          p.y >= icon.y && p.y <= icon.y + icon.h;
 }
-// Tapping the 🔊 or ⏸ icon toggles that thing — and must NOT also start the
-// game, so we stop the tap from reaching the "tap anywhere to start" listener.
+// Tapping an icon or an on-screen button does that one thing — and must NOT
+// also start the game, so a hit stops the tap from reaching the "tap
+// anywhere to start" listener below.
 canvas.addEventListener("pointerdown", (e) => {
   const p = canvasPoint(e);
   if (hitIcon(p, SOUND_ICON)) {
     e.stopPropagation();
     toggleSound();
-  } else if (state === "playing" && hitIcon(p, PAUSE_ICON)) {
+    return;
+  }
+  if (state === "playing" && hitIcon(p, PAUSE_ICON)) {
     e.stopPropagation();
     togglePause();
+    return;
+  }
+  if (state === "playing" && hitIcon(p, RESTART_ICON)) {
+    e.stopPropagation();
+    restartStage();
+    return;
+  }
+  if (state === "playing" && hitIcon(p, SHOP_ICON)) {
+    e.stopPropagation();
+    openShop();
+    return;
+  }
+  // The buttons on the start / game-over / shop screens.
+  for (const b of screenButtons()) {
+    if (b.action && hitIcon(p, b)) {
+      e.stopPropagation();
+      b.action();
+      return;
+    }
   }
 });
 
 // Tap or click ANYWHERE to start from the start screen (or to play again
-// after game over). Ignored while you're playing.
+// after game over). Ignored while you're playing — and in the shop, where
+// browsing shouldn't fling you into a game; that screen has its own buttons.
 document.addEventListener("pointerdown", () => {
   if (enteringName) return; // don't restart while typing your name
+  if (state === "shop") return;
   if (state !== "playing") startOrRestart();
 });
 
@@ -782,12 +1023,20 @@ function update() {
   if (stageBanner > 0) stageBanner--; // count down the "STAGE N" banner
 
   // --- Move the player ---
-  if (keys["ArrowLeft"] || keys["a"] || keys["A"])  player.x -= PLAYER_SPEED;
-  if (keys["ArrowRight"] || keys["d"] || keys["D"]) player.x += PLAYER_SPEED;
+  // Firing the RED LASER is heavy work: while the beam is lit you steer
+  // slowly, so you can't simply sweep it across the whole herd in one go.
+  const moveSpeed = PLAYER_SPEED * (beamTimer > 0 ? BEAM_DRAG : 1);
+  if (keys["ArrowLeft"] || keys["a"] || keys["A"])  player.x -= moveSpeed;
+  if (keys["ArrowRight"] || keys["d"] || keys["D"]) player.x += moveSpeed;
   // Keep the player inside the screen.
   player.x = Math.max(CELL / 2, Math.min(W - CELL / 2, player.x));
 
-  // (Shooting happens on a key PRESS — see the keydown handler above.)
+  // --- Shooting ---
+  // Most ships fire once per press (see the keydown handler above). The
+  // RAPID FIRE ship instead pours out a stream for as long as you hold the
+  // button down, one bullet every RAPID_EVERY frames.
+  if (gunTimer > 0) gunTimer--;
+  if (currentShip().auto && keys[" "] && gunTimer === 0) shootBullets();
 
   // --- Move YOUR bullets up; drop ones that fly off the top ---
   for (const b of bullets) b.y -= PLAYER_BULLET_SPEED;
@@ -854,15 +1103,73 @@ function update() {
 
   // --- COLLISIONS happen here ---
 
-  // Your bullets hitting animals.
+  // --- The RED LASER's beam ---
+  // While it burns, the beam is a column of light from the ship's nose
+  // straight up and off the top of the screen, and it keeps going instead
+  // of stopping at the first thing it touches — so it works on a whole
+  // column of animals at once.
+  //   Animals don't pop the instant it touches them, though: they have to
+  // be HELD in the beam for BEAM_BURN frames before they melt, and they
+  // cool off again the moment you swing away. Together with the slow steering
+  // above, that's what stops one burn wiping out the entire wave — you have
+  // to pick your column and stay on it.
+  //   Their falling shots are flimsier and burn up on contact, and your own
+  // bases are untouched: the beam passes right over your cover, so the most
+  // powerful gun in the game can't make you lose by wrecking a shield.
+  const beamOn = beamTimer > 0;
+  const reach = (CELL + BEAM_WIDTH) / 2;
+  const inBeam = (x, y) => Math.abs(x - player.x) < reach && y < player.y;
+  let melted = 0;
+  for (const inv of invaders) {
+    if (!inv.alive) continue;
+    if (beamOn && inBeam(inv.x, inv.y)) {
+      inv.heat++;
+      if (inv.heat >= BEAM_BURN) {
+        inv.alive = false;
+        spawnExplosion(inv.x, inv.y);
+        score += 10;
+        melted++;
+      }
+    } else if (inv.heat > 0) {
+      inv.heat--; // out of the beam — cool back down
+    }
+  }
+  // ONE boom for the whole column, however many animals went up together —
+  // a handful of overlapping explosions would just be noise.
+  if (melted > 0) playExplosionSound();
+  if (beamOn) {
+    beamTimer--;
+    if (beamTimer % 6 === 0) playLaserSound(false); // the crackle as it burns
+    shots = shots.filter((m) => !inBeam(m.x, m.y)); // their shots burn up
+    if (beamTimer === 0) beamCooldown = BEAM_RELOAD; // burnt out — now reload
+  } else if (beamCooldown > 0) {
+    beamCooldown--;
+  }
+
+  // Your bullets hitting animals. A bullet takes its ship's `dmg` off the
+  // animal's health — a full-strength one downs it outright, while the RAPID
+  // FIRE ship's lighter bullets need two hits. A hit that isn't fatal throws
+  // off a little spark, so you can see it landed.
   for (const b of bullets) {
     for (const inv of invaders) {
       if (inv.alive && hit(b.x, b.y, inv.x, inv.y, CELL)) {
-        inv.alive = false;          // animal destroyed
-        spawnExplosion(inv.x, inv.y); // BOOM!
-        playExplosionSound();         // ...and the BOOM is heard
+        // A BLAST CANNON shell doesn't poke one animal — it goes off, and
+        // the bang does all the damage to everything standing near it.
+        if (b.bomb) {
+          bombBlast(b.x, b.y);
+          b.y = -999;
+          break;                    // one bang per shell
+        }
+        inv.hp -= b.dmg;
         b.y = -999;                 // send bullet off-screen so it's cleaned up
-        score += 10;                // points!
+        if (inv.hp <= 0) {
+          inv.alive = false;          // animal destroyed
+          spawnExplosion(inv.x, inv.y); // BOOM!
+          playExplosionSound();         // ...and the BOOM is heard
+          score += 10;                  // points!
+        } else {
+          spawnExplosion(b.x, inv.y + CELL / 4, 0.3); // winged it — just a spark
+        }
       }
     }
     // Your bullets also chip away at the bases (don't shoot your own cover!).
@@ -970,6 +1277,33 @@ function hitBase(x, y) {
 // EXPLOSIONS — when an animal is shot, throw out a little burst of
 // coloured bits that fly apart and fade away.
 // ---------------------------------------------------------------------
+// ---------------------------------------------------------------------
+// bombBlast(): a BLAST CANNON shell goes off at (x, y). Every animal
+// within BOMB_RADIUS takes damage — full strength right next to the bang
+// (inside BOMB_CORE) and half strength out at the edges. So a shell
+// downs whatever it lands on and leaves the neighbours winged, and a
+// second one finishes the cluster off.
+// Your bases are left alone; the shell only goes off on an animal.
+// ---------------------------------------------------------------------
+function bombBlast(x, y) {
+  spawnExplosion(x, y, 2.2);  // a big one, so you can see the blast
+  playExplosionSound(true);
+  for (const inv of invaders) {
+    if (!inv.alive) continue;
+    const dist = Math.hypot(inv.x - x, inv.y - y);
+    if (dist > BOMB_RADIUS) continue;
+    inv.hp -= dist <= BOMB_CORE ? 1 : 0.5;
+    // Nothing walks away from a shell half-standing: anything knocked to
+    // half health or below is finished off by the shock. So the blast
+    // clears its whole radius, rather than leaving wounded animals behind.
+    if (inv.hp <= 0.5) {
+      inv.alive = false;
+      spawnExplosion(inv.x, inv.y);
+      score += 10;
+    }
+  }
+}
+
 const BOOM_COLORS = ["#ffffff", "#ffd34d", "#ff8c1a", "#ff4d4d"];
 function spawnExplosion(x, y, scale = 1) {
   const count = Math.round(16 * scale);
@@ -987,6 +1321,59 @@ function spawnExplosion(x, y, scale = 1) {
   }
 }
 
+
+// ---------------------------------------------------------------------
+// THE SHOP — the ships you've earned, and the run that earned them.
+// A ship unlocks when a SINGLE game scores at least its `need`. So the
+// only number that matters is your best-ever run: beat 5,000 once and the
+// TWIN BLASTER is yours forever, however badly the next game goes.
+// It's remembered in localStorage (same as the high scores), so it's kept
+// on THIS computer only.
+// ---------------------------------------------------------------------
+const BEST_KEY = "ai-best"; // the highest score you've ever managed in one game
+const SHIP_KEY = "ai-ship"; // id of the ship you're flying
+
+// Read them back, falling back to a sensible default if nothing is saved
+// yet (or if it's somehow broken) so a bad save can never wedge you.
+let bestRun = 0;
+try { bestRun = Math.max(0, Number(localStorage.getItem(BEST_KEY)) || 0); } catch (e) {}
+
+// Which ships that best run has earned you. Worked out from bestRun rather
+// than kept in its own list, so the two can never disagree.
+function unlocked(ship) { return bestRun >= ship.need; }
+
+let shipId = "scout";
+try {
+  const saved = localStorage.getItem(SHIP_KEY);
+  const ship = SHIPS.find((s) => s.id === saved);
+  if (ship && unlocked(ship)) shipId = ship.id;
+} catch (e) {}
+
+function saveShop() {
+  try {
+    localStorage.setItem(BEST_KEY, String(bestRun));
+    localStorage.setItem(SHIP_KEY, shipId);
+  } catch (e) { /* private browsing etc. — just don't remember it */ }
+}
+
+// The ship you're currently flying.
+function currentShip() {
+  return SHIPS.find((s) => s.id === shipId) || SHIPS[0];
+}
+
+// Fly a ship you've earned. Locked ones simply don't budge, and the choice
+// is saved straight away so closing the tab can't lose it.
+function equipShip(ship) {
+  if (!unlocked(ship)) return; // not earned yet — nothing happens
+  if (ship.id === shipId) return;
+  shipId = ship.id;
+  // If you swapped ships mid-game, put the gun away with the old one —
+  // otherwise a SCOUT could pick up a beam the RED LASER left burning.
+  beamTimer = 0;
+  beamCooldown = 0;
+  saveShop();
+  playShootSound(); // a little chirp to say "you're in this one now"
+}
 
 // ---------------------------------------------------------------------
 // HIGH SCORES — a "leaderboard" of the best 20 games, kept on THIS
@@ -1070,9 +1457,19 @@ nameInputEl.addEventListener("keydown", (e) => {
   if (e.key === "Escape") dismissNameEntry(); // Esc = "no thanks"
 });
 
-// Called once, the moment a game ends: if the score is good enough, open
-// the name box; the board itself is drawn on the game-over screen.
+// Called once, the moment a game ends: work out whether this run was big
+// enough to earn a new ship, remember it if it was your best ever, then —
+// if the score is good enough — open the name box. The board itself is
+// drawn on the game-over screen.
 function onGameOver() {
+  beamTimer = 0;            // switch the gun off, so no beam is left hanging
+  beamCooldown = 0;         // over the game-over screen
+  // Ships this run just earned: ones the run reached but your old best hadn't.
+  justUnlocked = SHIPS.filter((s) => s.need > 0 && bestRun < s.need && score >= s.need);
+  if (score > bestRun) {
+    bestRun = score;
+    saveShop();
+  }
   if (scoreQualifies(score)) showNameEntry();
 }
 
@@ -1116,6 +1513,201 @@ function drawLeaderboard(x, topY, highlight) {
   }
 }
 
+// =====================================================================
+// =====  SCREEN BUTTONS  — the tappable boxes on the start,  ==========
+// =====  game-over and shop screens.                         ==========
+// =====================================================================
+// screenButtons() rebuilds the list for whatever screen you're looking
+// at, and BOTH the painting and the tap test read that one list — so a
+// button can never be drawn somewhere you can't actually press. A button
+// with no `action` is just a label (like "FLYING THIS") and ignores taps.
+const BTN_H = 54;
+const BTN_STYLE = {
+  normal: { edge: "#7ef9ff", fill: "rgba(126,249,255,0.15)", text: "#ffffff" },
+  gold:   { edge: "#ffd34d", fill: "rgba(255,211,77,0.15)",  text: "#ffd34d" },
+  quiet:  { edge: "#888888", fill: null,                     text: "#aaaaaa" },
+  locked: { edge: "#555555", fill: null,                     text: "#666666" },
+};
+
+function button(x, y, w, label, action, style) {
+  return { x: x, y: y, w: w, h: BTN_H, label: label, action: action, style: style };
+}
+// Lay out a row of equal-width buttons, centred across the screen.
+function buttonRow(y, w, items) {
+  const gap = 24;
+  let x = (W - (items.length * w + (items.length - 1) * gap)) / 2;
+  return items.map((it) => {
+    const b = button(x, y, w, it.label, it.action, it.style);
+    x += w + gap;
+    return b;
+  });
+}
+
+function screenButtons() {
+  if (enteringName) return []; // the high-score name box owns the screen
+  if (state === "start") {
+    // Tucked into the gap between the bottom of the leaderboard and the
+    // tops of the bases, so it never sits on top of the board or the game.
+    return buttonRow(678, 200, [{ label: "SHOP", action: openShop, style: "quiet" }]);
+  }
+  if (state === "lost") {
+    return buttonRow(600, 240, [
+      { label: "PLAY AGAIN", action: () => newGame("playing") },
+      { label: "SHOP", action: openShop },
+    ]);
+  }
+  if (state === "shop") {
+    // One button per ship: fly the ones you've earned, and a dead LOCKED
+    // box on the ones you haven't.
+    const rows = SHIPS.map((ship, i) => {
+      const mine = unlocked(ship);
+      const flying = ship.id === shipId;
+      const label = flying ? "FLYING THIS" : mine ? "FLY THIS" : "LOCKED";
+      const style = flying ? "gold" : mine ? "normal" : "locked";
+      // Nothing to do if you're already flying it, or haven't earned it.
+      const action = (flying || !mine) ? null : () => equipShip(ship);
+      return button(616, shopCardY(i) + (SHOP_CARD_H - BTN_H) / 2, 198, label, action, style);
+    });
+    // If you stepped in from a game in progress, the only way out is back
+    // into it — a "PLAY" that quietly threw your run away would be cruel.
+    if (shopCameFrom === "playing") {
+      return rows.concat(buttonRow(848, 260, [
+        { label: "BACK TO GAME", action: closeShop },
+      ]));
+    }
+    return rows.concat(buttonRow(848, 210, [
+      { label: "BACK", action: closeShop, style: "quiet" },
+      { label: "PLAY", action: () => newGame("playing") },
+    ]));
+  }
+  return []; // no buttons while you're playing
+}
+
+// A rounded rectangle path, used for the buttons and the shop's ship cards.
+function roundRectPath(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y,     x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x,     y + h, r);
+  ctx.arcTo(x,     y + h, x,     y,     r);
+  ctx.arcTo(x,     y,     x + w, y,     r);
+  ctx.closePath();
+}
+
+function drawButtons() {
+  ctx.lineWidth = 2;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = "20px 'Courier New', monospace";
+  for (const b of screenButtons()) {
+    const s = BTN_STYLE[b.style] || BTN_STYLE.normal;
+    roundRectPath(b.x, b.y, b.w, b.h, 8);
+    if (s.fill) { ctx.fillStyle = s.fill; ctx.fill(); }
+    ctx.strokeStyle = s.edge;
+    ctx.stroke();
+    ctx.fillStyle = s.text;
+    ctx.fillText(b.label, b.x + b.w / 2, b.y + b.h / 2 + 1);
+  }
+}
+
+// ---------------------------------------------------------------------
+// drawShop(): the ship shop — a screen of its own, with one card per
+// ship showing what it looks like, what it does, and what it costs.
+// ---------------------------------------------------------------------
+const SHOP_CARD_TOP = 146; // where the first ship card starts
+const SHOP_CARD_H   = 126; // how tall each card is
+const SHOP_CARD_GAP = 10;  // the space between two cards
+function shopCardY(i) { return SHOP_CARD_TOP + i * (SHOP_CARD_H + SHOP_CARD_GAP); }
+
+function drawShop() {
+  ctx.fillStyle = "rgba(0,0,0,0.82)";
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "#7ef9ff";
+  ctx.font = "42px 'Courier New', monospace";
+  ctx.fillText("SHIP SHOP", W / 2, 70);
+  ctx.fillStyle = "#ffd34d";
+  ctx.font = "26px 'Courier New', monospace";
+  ctx.fillText("BEST RUN: " + bestRun, W / 2, 106);
+  ctx.fillStyle = "#888";
+  ctx.font = "17px 'Courier New', monospace";
+  ctx.fillText("Ships are earned by scoring big in ONE game", W / 2, 130);
+
+  for (let i = 0; i < SHIPS.length; i++) {
+    const ship = SHIPS[i];
+    const y = shopCardY(i);
+    const mine = unlocked(ship);
+    const flying = ship.id === shipId;
+
+    // The card itself — gold edge for the ship you're flying, a plain edge
+    // for the ones you own, and a dim one for what you can't afford yet.
+    roundRectPath(50, y, 780, SHOP_CARD_H, 12);
+    ctx.fillStyle = flying ? "rgba(255,211,77,0.08)" : "rgba(255,255,255,0.05)";
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = flying ? "#ffd34d" : mine ? "#7ef9ff" : "#444";
+    ctx.stroke();
+
+    // The row number you can press on a keyboard, then the ship itself.
+    ctx.fillStyle = "#666";
+    ctx.font = "19px 'Courier New', monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(String(i + 1), 76, y + SHOP_CARD_H / 2);
+    drawThing(ship.art, 140, y + SHOP_CARD_H / 2, 80,
+              typeof ship.art === "string" ? -Math.PI / 4 : 0);
+
+    // Its name, and what it does.
+    ctx.textAlign = "left";
+    ctx.fillStyle = mine ? "#fff" : "#bbb";
+    ctx.font = "24px 'Courier New', monospace";
+    ctx.fillText(ship.name, 198, y + 30);
+    ctx.fillStyle = "#9aa6b2";
+    ctx.font = "16px 'Courier New', monospace";
+    for (let l = 0; l < ship.blurb.length; l++) {
+      ctx.fillText(ship.blurb[l], 198, y + 58 + l * 22);
+    }
+    // How you get it — and, if you haven't yet, how close you've come.
+    ctx.font = "14px 'Courier New', monospace";
+    ctx.fillStyle = flying ? "#ffd34d" : mine ? "#5fd66f" : "#777";
+    ctx.fillText(flying ? "★ FLYING THIS ONE"
+                 : mine ? (ship.need === 0 ? "✓ ALWAYS YOURS" : "✓ EARNED")
+                 : "LOCKED — score " + ship.need + " in one game",
+                 198, y + SHOP_CARD_H - 27);
+    if (!mine) {
+      // A bar creeping toward the score you need, so you can see how far off
+      // your best run is rather than just being told "no".
+      const barW = 250;
+      const gone = Math.min(1, bestRun / ship.need);
+      ctx.fillStyle = "rgba(255,255,255,0.12)";
+      ctx.fillRect(198, y + SHOP_CARD_H - 11, barW, 4);
+      ctx.fillStyle = "#7ef9ff";
+      ctx.fillRect(198, y + SHOP_CARD_H - 11, barW * gone, 4);
+      ctx.fillStyle = "#666";
+      ctx.font = "13px 'Courier New', monospace";
+      ctx.fillText("best so far: " + bestRun, 198 + barW + 10, y + SHOP_CARD_H - 8);
+    }
+  }
+
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#888";
+  ctx.font = "17px 'Courier New', monospace";
+  ctx.fillText("Tap a ship you've earned to fly it (or press 1–" + SHIPS.length + ")" +
+               "   •   Esc goes back", W / 2, 922);
+}
+
+// drawReloadBar(): a little bar under the ship that fills back up as a
+// slow gun reloads, so you know exactly when you can fire again.
+function drawReloadBar(done, color) {
+  const full = CELL;
+  const y = player.y + CELL / 2 + 6;
+  ctx.fillStyle = "rgba(255,255,255,0.18)";
+  ctx.fillRect(player.x - full / 2, y, full, 4);
+  ctx.fillStyle = color;
+  ctx.fillRect(player.x - full / 2, y, full * done, 4);
+}
+
 // ---------------------------------------------------------------------
 // drawIcons(): the two little toggles tucked under the score at the
 // top-left — sound and pause. Drawn as their own step because the PAUSED
@@ -1130,11 +1722,14 @@ function drawIcons() {
   ctx.globalAlpha = soundOn ? 1 : 0.45;
   ctx.fillText(soundOn ? "🔊" : "🔇", SOUND_ICON.x, SOUND_ICON.y + SOUND_ICON.h / 2);
   // Pause: shows ⏸ while the game is running and ▶ while it's paused —
-  // i.e. what the button will DO next. Only there mid-game, since there's
-  // nothing to pause on the start or game-over screens.
+  // i.e. what the button will DO next. Then ⏮, which starts the stage you're
+  // on again. Both only appear mid-game, since there's nothing to pause or
+  // restart on the start and game-over screens.
   ctx.globalAlpha = 1;
   if (state === "playing") {
     ctx.fillText(paused ? "▶️" : "⏸️", PAUSE_ICON.x, PAUSE_ICON.y + PAUSE_ICON.h / 2);
+    ctx.fillText("⏮️", RESTART_ICON.x, RESTART_ICON.y + RESTART_ICON.h / 2);
+    ctx.fillText("🛒", SHOP_ICON.x, SHOP_ICON.y + SHOP_ICON.h / 2);
   }
 }
 
@@ -1145,6 +1740,16 @@ function draw() {
   // Wipe the screen clear each frame. We clear to TRANSPARENT (not black)
   // so the moving starfield behind the game shows through.
   ctx.clearRect(0, 0, W, H);
+
+  // The shop is a screen all of its own — no game board behind it. (The
+  // 🔊 still comes along, so you can mute while you're browsing.)
+  if (state === "shop") {
+    drawShop();
+    drawIcons();
+    ctx.globalAlpha = 1;
+    drawButtons();
+    return;
+  }
 
   // The HUD: score (left), stage (centre), lives (right) at the top.
   ctx.fillStyle = "#fff";
@@ -1166,7 +1771,23 @@ function draw() {
   // start screen has its own tidy row of animals instead.
   if (state !== "start") {
     for (const inv of invaders) {
-      if (inv.alive) drawThing(inv.animal, inv.x, inv.y);
+      if (!inv.alive) continue;
+      // An animal that's been winged but not downed (the RAPID FIRE ship's
+      // half-strength bullets take two) fades, so you can see it's hurt.
+      ctx.globalAlpha = inv.hp < 1 ? 0.5 : 1;
+      drawThing(inv.animal, inv.x, inv.y);
+      ctx.globalAlpha = 1;
+      // An animal being held in the RED LASER's beam glows redder and redder
+      // until it melts — so you can see the beam working, and see it cool off
+      // again if you swing away too soon.
+      if (inv.heat > 0) {
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+        ctx.globalAlpha = 0.75 * (inv.heat / BEAM_BURN);
+        ctx.fillStyle = "#ff3b3b";
+        ctx.fillRect(inv.x - CELL / 2, inv.y - CELL / 2, CELL, CELL);
+        ctx.restore();
+      }
     }
   }
 
@@ -1187,6 +1808,7 @@ function draw() {
   ctx.shadowColor = BULLET_COLOR;
   ctx.shadowBlur = 8;
   for (const b of bullets) {
+    if (b.bomb) continue;                 // shells are drawn as balls, below
     ctx.beginPath();
     ctx.moveTo(b.x, b.y);
     ctx.lineTo(b.x, b.y + BULLET_LENGTH); // streak trails BELOW as it flies up
@@ -1194,16 +1816,64 @@ function draw() {
   }
   ctx.shadowBlur = 0;
 
+  // BLAST CANNON shells are fat glowing balls, so you can tell at a glance
+  // that something is about to go bang.
+  for (const b of bullets) {
+    if (!b.bomb) continue;
+    ctx.save();
+    ctx.shadowColor = "#ff8c1a";
+    ctx.shadowBlur = 14;
+    ctx.fillStyle = "#ffd23d";
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, 8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#ff8c1a";
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
   // Draw the falling shots — each one is its animal's own thing.
   for (const m of shots) drawThing(m.emoji, m.x, m.y, 28);
 
-  // Draw the player. While safe after a hit, blink it on and off so you
-  // can see you're temporarily protected.
+  // The RED LASER's beam: a soft red glow with a white-hot core, running
+  // from the ship's nose to the top of the screen. It's drawn in "lighter"
+  // mode so it ADDS light to whatever it crosses rather than painting over
+  // it, and it shimmers a little so it reads as live energy.
+  const noseY = player.y - CELL / 2;
+  if (beamTimer > 0) {
+    const flicker = 0.85 + 0.15 * Math.sin(beamTimer * 0.9);
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.shadowColor = "#ff2d2d";
+    ctx.shadowBlur = 24;
+    ctx.globalAlpha = 0.5 * flicker;
+    ctx.fillStyle = "#ff2d2d";
+    ctx.fillRect(player.x - BEAM_WIDTH, 0, BEAM_WIDTH * 2, noseY);      // outer glow
+    ctx.globalAlpha = 0.85 * flicker;
+    ctx.fillStyle = "#ff6b6b";
+    ctx.fillRect(player.x - BEAM_WIDTH / 2, 0, BEAM_WIDTH, noseY);      // the beam itself
+    ctx.globalAlpha = flicker;
+    ctx.fillStyle = "#ffe9e9";
+    ctx.fillRect(player.x - 3, 0, 6, noseY);                            // white-hot core
+    ctx.restore();
+  } else if (beamCooldown > 0) {
+    drawReloadBar(1 - beamCooldown / BEAM_RELOAD, "#ff6b6b");
+  } else if (currentShip().fire === "bomb" && gunTimer > 0) {
+    // The BLAST CANNON gets the same little bar — half a second is long
+    // enough that you want to see the next shell coming.
+    drawReloadBar(1 - gunTimer / BOMB_RELOAD, "#ffd23d");
+  }
+
+  // Draw the player — whichever ship you've bought and are flying. While
+  // safe after a hit, blink it on and off so you can see you're protected.
   const blinking = invuln > 0 && Math.floor(invuln / 6) % 2 === 0;
-  // The pixel rocket already points straight up. Only the 🚀 EMOJI needs a
-  // -45° spin (it leans up-right), so we rotate just when PLAYER is a string.
-  const playerRot = (typeof PLAYER === "string") ? -Math.PI / 4 : 0;
-  if (!blinking) drawThing(PLAYER, player.x, player.y, CELL, playerRot);
+  // The pixel rockets already point straight up. Only an EMOJI ship needs a
+  // -45° spin (🚀 leans up-right), so we rotate just when it's a string.
+  const shipArt = currentShip().art;
+  const playerRot = (typeof shipArt === "string") ? -Math.PI / 4 : 0;
+  if (!blinking) drawThing(shipArt, player.x, player.y, CELL, playerRot);
 
   // Draw the explosion bits, fading and shrinking as they age.
   for (const p of particles) {
@@ -1262,6 +1932,7 @@ function draw() {
     ctx.fillStyle = "#888";
     ctx.font = "18px 'Courier New', monospace";
     ctx.fillText("Move with ← →   •   Shoot with Space", W / 2, 330);
+    ctx.fillText("Flying: " + currentShip().name + "   •   best run: " + bestRun, W / 2, 360);
     // The best games so far, right on the start screen.
     drawLeaderboard(W / 2, 410);
   }
@@ -1277,17 +1948,33 @@ function draw() {
     ctx.font = "22px 'Courier New', monospace";
     ctx.fillText("Reached stage " + stage, W / 2, 190);
     ctx.fillText("Score: " + score, W / 2, 222);
+    // Did this run earn you a ship? That's the big news if so; otherwise
+    // just show the best run you've ever had to measure yourself against.
+    if (justUnlocked.length > 0) {
+      ctx.fillStyle = "#ffd34d";
+      ctx.font = "22px 'Courier New', monospace";
+      ctx.fillText("★ NEW SHIP UNLOCKED: " + justUnlocked.map((s) => s.name).join(" + ") + " ★",
+                   W / 2, 256);
+    } else {
+      ctx.fillStyle = "#888";
+      ctx.font = "20px 'Courier New', monospace";
+      ctx.fillText("Best run: " + bestRun, W / 2, 254);
+    }
     // While the name box is up, that HTML pop-up covers the middle — don't
-    // draw the board or the restart hint behind it. Once you've saved (or if
-    // you didn't make the board), show the leaderboard and how to play again.
+    // draw the board or the buttons behind it. Once you've saved (or if you
+    // didn't make the board), show the leaderboard and where to go next.
     if (!enteringName) {
       drawLeaderboard(W / 2, 290, lastEntry);
-      ctx.fillStyle = "#fff";
+      ctx.fillStyle = "#888";
       ctx.textAlign = "center";
-      ctx.font = "22px 'Courier New', monospace";
-      ctx.fillText("Tap or press Enter to play again", W / 2, 600);
+      ctx.font = "17px 'Courier New', monospace";
+      ctx.fillText("Enter plays again   •   S opens the shop", W / 2, 684);
     }
   }
+
+  // The tappable boxes for whichever screen we just painted. Always last,
+  // so nothing can end up drawn over the top of a button.
+  drawButtons();
 }
 
 
