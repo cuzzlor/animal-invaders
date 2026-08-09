@@ -40,7 +40,7 @@ back to exactly where you were — the new ship is in your hands immediately.
 | **Scout** | yours already | The rocket you start with. One shot at a time. |
 | **Rapid Fire** | score 2,500 in one game | **Hold** the button and it pours out five shots a second — but each one only hits half as hard, so most animals take two. |
 | **Twin Blaster** | score 5,000 in one game | Two cannons — two bullets every shot, so you clear the herd twice as fast. |
-| **Blast Cannon** | score 7,500 in one game | Lobs a shell that **blows up** where it lands, clearing whatever it hits and everything close around it. Half a second to reload. |
+| **Blast Cannon** | score 7,500 in one game | Lobs a shell that **blows up** where it lands, clearing whatever it hits and the whole ring of animals around it — about seven at a time in the thick of the herd. Half a second to reload. |
 | **Red Laser** | score 10,000 in one game | A red beam that smashes clean through every animal it touches (and melts their shots). Burns for 3 seconds, then reloads for 1. |
 
 Rapid Fire is the only ship you **hold** the button for; every other one fires

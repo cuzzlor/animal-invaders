@@ -329,8 +329,10 @@ const BULLET_LENGTH = 22;  // how long your shots look (bigger = longer streaks)
 // how far the BLAST CANNON's explosion reaches.
 const RAPID_EVERY = 12;  // between RAPID FIRE shots (12 = five a second)
 const BOMB_RELOAD = 30;  // between BLAST CANNON shells (30 = half a second)
-const BOMB_RADIUS = 75;  // how far the blast reaches, in pixels
-const BOMB_CORE   = 34;  // inside this it's full strength; past it, half
+const BOMB_RADIUS = 95;  // how far the blast reaches, in pixels
+const BOMB_CORE   = 44;  // inside this it's full strength; past it, half
+const BOMB_BOOM   = 3.4; // how big the bang LOOKS (bigger = more flying bits)
+const BOMB_RING   = 20;  // frames the shockwave ring takes to reach full size
 
 // `damage` is how much of an animal one bullet takes off. Animals have 1
 // health, so damage 1 downs them in a single hit and 0.5 takes two.
@@ -493,6 +495,7 @@ let bullets;       // YOUR shots going up:   array of {x, y, dmg}
 let shots;         // animal shots coming down: array of {x, y, emoji}
 let bases;         // the shields: array of { blocks: [{x, y, alive}] }
 let particles;     // explosion bits: array of {x, y, vx, vy, life, maxLife, color}
+let shockwaves;    // BLAST CANNON blast rings: array of {x, y, life}
 let invaderDir;    // +1 moving right, -1 moving left
 let score;
 let lives;
@@ -574,6 +577,7 @@ function buildLevel() {
   bullets = [];
   shots = [];
   particles = [];
+  shockwaves = [];
   invaderDir = 1;
   shotTimer = 0;
   invuln = 0;
@@ -1207,6 +1211,10 @@ function update() {
   }
   particles = particles.filter((p) => p.life < p.maxLife);
 
+  // --- Grow the blast rings and drop them once they're full size ---
+  for (const r of shockwaves) r.life++;
+  shockwaves = shockwaves.filter((r) => r.life < BOMB_RING);
+
   // --- Lose a base, lose the game ---
   // If ANY base is completely wiped out, it's game over — protect them all!
   if (bases.some((base) => base.blocks.every((blk) => !blk.alive))) state = "lost";
@@ -1286,7 +1294,10 @@ function hitBase(x, y) {
 // Your bases are left alone; the shell only goes off on an animal.
 // ---------------------------------------------------------------------
 function bombBlast(x, y) {
-  spawnExplosion(x, y, 2.2);  // a big one, so you can see the blast
+  spawnExplosion(x, y, BOMB_BOOM); // a big one, so you can see the blast
+  // A ring that races out to exactly BOMB_RADIUS, so you can SEE how far
+  // the blast reached and learn where to aim the next shell.
+  shockwaves.push({ x: x, y: y, life: 0 });
   playExplosionSound(true);
   for (const inv of invaders) {
     if (!inv.alive) continue;
@@ -1874,6 +1885,29 @@ function draw() {
   const shipArt = currentShip().art;
   const playerRot = (typeof shipArt === "string") ? -Math.PI / 4 : 0;
   if (!blinking) drawThing(shipArt, player.x, player.y, CELL, playerRot);
+
+  // Draw the BLAST CANNON's shockwave rings. Each one sprints out to the
+  // edge of the blast and fades as it goes, so the ring you see is exactly
+  // the ground the shell cleared.
+  for (const r of shockwaves) {
+    const t = r.life / BOMB_RING;      // 0 → 1 as the ring grows
+    const radius = BOMB_RADIUS * (1 - (1 - t) * (1 - t)); // quick, then eases out
+    // A white-hot flash fills the blast for the first moment...
+    if (t < 0.5) {
+      ctx.globalAlpha = (1 - t * 2) * 0.55;
+      ctx.fillStyle = "#fff3b0";
+      ctx.beginPath();
+      ctx.arc(r.x, r.y, radius * 0.9, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // ...and the ring races on ahead of it to the edge of the blast.
+    ctx.globalAlpha = 1 - t * t;
+    ctx.strokeStyle = "#ffb02e";
+    ctx.lineWidth = 14 * (1 - t) + 2;  // thick at the bang, thin at the edge
+    ctx.beginPath();
+    ctx.arc(r.x, r.y, radius, 0, Math.PI * 2);
+    ctx.stroke();
+  }
 
   // Draw the explosion bits, fading and shrinking as they age.
   for (const p of particles) {
