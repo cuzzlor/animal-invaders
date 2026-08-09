@@ -208,6 +208,7 @@ const SPRITE_PAL = {
   'T': '#c98f5f', 'o': '#ff7fa3', 'm': '#6e4a25', 's': '#d9dde2',
   'r': '#8c1f1f', 'L': '#ffd7d7', // deep red & hot laser-white, for the ships
   'g': '#6fe08a', 'v': '#a86cf0', // green & violet, for two of the ships
+  'e': '#2ea8ff',                 // electric blue, for the ELECTRIC ARC
 };
 // spr(): wraps a grid of strings so the game knows "this is a sprite".
 function spr(rows) { return { isPixel: true, rows: rows }; }
@@ -248,6 +249,13 @@ const LASER_ROCKET_ART = spr([
   "..RrWDDDWrR..", "..RrWWWWWrR..", "..RrsssssrR..", ".RRrsssssrRR.",
   "RRRrsssssrRRR", "RR.rsssssr.RR", "R...WsssW...R", "...GGGGGGG...",
   "....ORRRO....", ".....RYR.....",
+]);
+const VOLT_ROCKET_ART = spr([
+  "......Y......", ".....YCY.....", "....YCCCY....", "...eeCCCee...",
+  "..eeCCCCCee..", "..eeWWWWWee..", "..eeWDDDWee..", "..eeWDCDWee..",
+  "..eeWDDDWee..", "..eeWWWWWee..", "..eesssssee..", ".eeessssseee.",
+  "eee.sssss.eee", "ee..sssss..ee", "e...WsssW...e", "...GGGGGGG...",
+  "....CCCCC....", ".....CYC.....",
 ]);
 const COW_ART = spr([
   ".HH.......HH.", "HHKH.....HKHH", ".KWWWWWWWWWK.", ".WWKKWWWKKWW.",
@@ -334,6 +342,36 @@ const BOMB_CORE   = 44;  // inside this it's full strength; past it, half
 const BOMB_BOOM   = 3.4; // how big the bang LOOKS (bigger = more flying bits)
 const BOMB_RING   = 20;  // frames the shockwave ring takes to reach full size
 
+// --- The two beam guns ---
+// A beam ship holds one button down and pours out a beam for `time` frames,
+// then reloads for `reload`. Animals don't pop the moment it touches them:
+// they have to be HELD in it for `burn` frames, and they cool off again as
+// soon as you swing away. `drag` is how slowly you steer while it's lit, and
+// `arc` is how far the current jumps sideways to animals beside the beam
+// (0 = it doesn't jump at all).
+const BEAM_TIME    = 180;  // frames the red beam burns for (180 = 3 seconds)
+const BEAM_RELOAD  = 60;   // frames it reloads for afterwards (60 = 1 second)
+const BEAM_WIDTH   = 18;   // how wide the beam's bright core is, in pixels
+const BEAM_BURN    = 16;   // frames an animal must be held in the beam before it melts
+const BEAM_DRAG    = 0.65; // how much of your usual speed you steer at while firing
+const LASER_BEAM = {
+  time: BEAM_TIME, reload: BEAM_RELOAD, width: BEAM_WIDTH,
+  burn: BEAM_BURN, drag: BEAM_DRAG, arc: 0,
+  color: "#ff4d4d", glow: "rgba(255,60,60,0.28)",
+};
+// The ELECTRIC ARC burns longer and kills quicker, and its current jumps
+// sideways — but only ONE hop, or it would run straight through the herd and
+// take the lot. It is also the heaviest gun to steer.
+const BOLT_TIME    = 300;  // frames the electric beam burns for (300 = 5 seconds)
+const BOLT_RELOAD  = 60;   // frames it reloads for afterwards (60 = 1 second)
+const BOLT_ARC     = 76;   // how far the current jumps sideways, in pixels
+const BOLT_JUMP    = 0.5;  // how hard a side jump hits, against the beam's 1
+const VOLT_BEAM = {
+  time: BOLT_TIME, reload: BOLT_RELOAD, width: BEAM_WIDTH,
+  burn: 31, drag: 0.55, arc: BOLT_ARC, jump: BOLT_JUMP,
+  color: "#7ef9ff", glow: "rgba(126,249,255,0.26)", jagged: true,
+};
+
 // `damage` is how much of an animal one bullet takes off. Animals have 1
 // health, so damage 1 downs them in a single hit and 0.5 takes two.
 const SHIPS = [
@@ -357,14 +395,15 @@ const SHIPS = [
   },
   {
     id: "laser", name: "RED LASER", art: LASER_ROCKET_ART, need: 10000, fire: "laser", damage: 1, reload: 0,
+    beam: LASER_BEAM,
     blurb: ["A beam that smashes clean through", "them all. Burns 3s, reloads 1s."],
   },
+  {
+    id: "volt", name: "ELECTRIC ARC", art: VOLT_ROCKET_ART, need: 15000, fire: "bolt", damage: 1, reload: 0,
+    beam: VOLT_BEAM,
+    blurb: ["Lightning that JUMPS to the animals", "beside it. Burns 5s, reloads 1s."],
+  },
 ];
-const BEAM_TIME    = 180;  // frames the red beam burns for (180 = 3 seconds)
-const BEAM_RELOAD  = 60;   // frames it reloads for afterwards (60 = 1 second)
-const BEAM_WIDTH   = 18;   // how wide the beam's bright core is, in pixels
-const BEAM_BURN    = 16;   // frames an animal must be held in the beam before it melts
-const BEAM_DRAG    = 0.65; // how much of your usual speed you steer at while firing
 
 // --- The numbers you'll reach for first ---
 const ROWS        = 4;     // how many rows of animals
@@ -496,6 +535,7 @@ let shots;         // animal shots coming down: array of {x, y, emoji}
 let bases;         // the shields: array of { blocks: [{x, y, alive}] }
 let particles;     // explosion bits: array of {x, y, vx, vy, life, maxLife, color}
 let shockwaves;    // BLAST CANNON blast rings: array of {x, y, life}
+let bolts;         // ELECTRIC ARC jumps drawn this frame: array of {x1,y1,x2,y2}
 let invaderDir;    // +1 moving right, -1 moving left
 let score;
 let lives;
@@ -578,6 +618,7 @@ function buildLevel() {
   shots = [];
   particles = [];
   shockwaves = [];
+  bolts = [];
   invaderDir = 1;
   shotTimer = 0;
   invuln = 0;
@@ -856,11 +897,13 @@ function playExplosionSound(big = false) {
   } catch (e) { /* if audio isn't available, just stay silent */ }
 }
 
-// The RED LASER's voice: a short, gritty zap. Played once loudly as the
+// The voice of both beam guns: a short, gritty zap. Played once loudly as the
 // beam lights up, then quietly over and over while it burns — which is why
 // the beam crackles as it fires, and falls silent the moment you pause
 // (the ticks are counted out by update(), and update() freezes too).
-function playLaserSound(start) {
+// `electric` gives the ELECTRIC ARC its own harsher, higher voice, so you can
+// hear which gun you're holding without looking.
+function playLaserSound(start, electric) {
   if (!soundOn) return;
   try {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -868,10 +911,16 @@ function playLaserSound(start) {
     const dur = start ? 0.3 : 0.1;
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
-    osc.type = "sawtooth";                              // buzzy, not pure — it's a laser
-    osc.frequency.setValueAtTime(start ? 1200 : 520, t);
-    osc.frequency.exponentialRampToValueAtTime(start ? 180 : 380, t + dur);
-    gain.gain.setValueAtTime(start ? 0.18 : 0.05, t);   // the crackle stays well under the zap
+    // Square is harsher than sawtooth — that's the crackle of the ARC.
+    osc.type = electric ? "square" : "sawtooth";
+    const top = electric ? (start ? 1800 : 900) : (start ? 1200 : 520);
+    const low = electric ? (start ? 260 : 600) : (start ? 180 : 380);
+    osc.frequency.setValueAtTime(top, t);
+    osc.frequency.exponentialRampToValueAtTime(low, t + dur);
+    // A square wave is louder for the same number, so hold the ARC down a bit.
+    const loud = electric ? 0.13 : 0.18;
+    const quiet = electric ? 0.035 : 0.05;
+    gain.gain.setValueAtTime(start ? loud : quiet, t); // the crackle stays well under the zap
     gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
     osc.connect(gain).connect(audioCtx.destination);
     osc.start(t);
@@ -907,16 +956,17 @@ function shootBullets() {
 //                  keeps the stream going at five a second.
 //   TWIN BLASTER — two bullets side by side.
 //   RED LASER    — lights up the beam (see update()), if it's reloaded.
+//   ELECTRIC ARC — the same, but a longer burn and the current jumps.
 // ---------------------------------------------------------------------
 function playerFire() {
   if (state !== "playing" || paused) return;
   const ship = currentShip();
-  if (ship.fire === "laser") {
-    // One press burns the beam for BEAM_TIME; you can't fire again until
-    // it's finished burning AND finished reloading.
+  if (ship.beam) {
+    // One press burns the beam for its whole `time`; you can't fire again
+    // until it's finished burning AND finished reloading.
     if (beamTimer === 0 && beamCooldown === 0) {
-      beamTimer = BEAM_TIME;
-      playLaserSound(true);
+      beamTimer = ship.beam.time;
+      playLaserSound(true, !!ship.beam.jagged);
     }
     return;
   }
@@ -1027,9 +1077,11 @@ function update() {
   if (stageBanner > 0) stageBanner--; // count down the "STAGE N" banner
 
   // --- Move the player ---
-  // Firing the RED LASER is heavy work: while the beam is lit you steer
-  // slowly, so you can't simply sweep it across the whole herd in one go.
-  const moveSpeed = PLAYER_SPEED * (beamTimer > 0 ? BEAM_DRAG : 1);
+  // Firing a beam is heavy work: while one is lit you steer slowly, so you
+  // can't simply sweep it across the whole herd in one go. The ELECTRIC ARC
+  // is the heaviest of the lot.
+  const lit = beamTimer > 0 && currentShip().beam;
+  const moveSpeed = PLAYER_SPEED * (lit ? currentShip().beam.drag : 1);
   if (keys["ArrowLeft"] || keys["a"] || keys["A"])  player.x -= moveSpeed;
   if (keys["ArrowRight"] || keys["d"] || keys["D"]) player.x += moveSpeed;
   // Keep the player inside the screen.
@@ -1107,35 +1159,56 @@ function update() {
 
   // --- COLLISIONS happen here ---
 
-  // --- The RED LASER's beam ---
+  // --- The beam guns: the RED LASER and the ELECTRIC ARC ---
   // While it burns, the beam is a column of light from the ship's nose
   // straight up and off the top of the screen, and it keeps going instead
   // of stopping at the first thing it touches — so it works on a whole
   // column of animals at once.
   //   Animals don't pop the instant it touches them, though: they have to
-  // be HELD in the beam for BEAM_BURN frames before they melt, and they
-  // cool off again the moment you swing away. Together with the slow steering
-  // above, that's what stops one burn wiping out the entire wave — you have
-  // to pick your column and stay on it.
+  // be HELD in it for `burn` frames before they go, and they cool off again
+  // the moment you swing away. Together with the slow steering above, that's
+  // what stops one burn wiping out the entire wave — you have to pick your
+  // column and stay on it.
+  //   The ELECTRIC ARC adds one thing: the current JUMPS out to the sides.
+  // See just below for how hard, and how far.
   //   Their falling shots are flimsier and burn up on contact, and your own
   // bases are untouched: the beam passes right over your cover, so the most
   // powerful gun in the game can't make you lose by wrecking a shield.
-  const beamOn = beamTimer > 0;
-  const reach = (CELL + BEAM_WIDTH) / 2;
+  const beamGun = currentShip().beam;
+  const beamOn = beamTimer > 0 && !!beamGun;
+  const reach = (CELL + (beamGun ? beamGun.width : BEAM_WIDTH)) / 2;
   const inBeam = (x, y) => Math.abs(x - player.x) < reach && y < player.y;
+  // The ELECTRIC ARC throws the current out sideways as well, as far as `arc`
+  // either side of the beam. Those side jumps carry HALF the punch of the beam
+  // itself (`jump`), so an animal the current only reaches sideways takes twice
+  // as long to go as one the beam is right on top of.
+  const inArc = (x, y) => Math.abs(x - player.x) < beamGun.arc && y < player.y;
+  bolts = [];                       // the jumps drawn this frame, if any
   let melted = 0;
   for (const inv of invaders) {
     if (!inv.alive) continue;
-    if (beamOn && inBeam(inv.x, inv.y)) {
-      inv.heat++;
-      if (inv.heat >= BEAM_BURN) {
+    const onIt = beamOn && inBeam(inv.x, inv.y);
+    const beside = !onIt && beamOn && beamGun.arc > 0 && inArc(inv.x, inv.y);
+    if (onIt || beside) {
+      if (beside) {
+        // Half strength ON AVERAGE — the current gutters from frame to frame,
+        // so which of them goes first is never quite the same twice.
+        inv.heat += beamGun.jump * 2 * Math.random();
+        bolts.push({
+          x1: player.x, y1: inv.y, x2: inv.x, y2: inv.y,
+          bright: 0.35 + Math.random() * 0.65,  // its own crackle
+        });
+      } else {
+        inv.heat++;
+      }
+      if (inv.heat >= beamGun.burn) {
         inv.alive = false;
         spawnExplosion(inv.x, inv.y);
         score += 10;
         melted++;
       }
     } else if (inv.heat > 0) {
-      inv.heat--; // out of the beam — cool back down
+      inv.heat--; // out of it — cool back down
     }
   }
   // ONE boom for the whole column, however many animals went up together —
@@ -1143,11 +1216,16 @@ function update() {
   if (melted > 0) playExplosionSound();
   if (beamOn) {
     beamTimer--;
-    if (beamTimer % 6 === 0) playLaserSound(false); // the crackle as it burns
+    // The crackle as it burns. The ARC crackles faster; it's a rougher gun.
+    const tick = beamGun.jagged ? 4 : 6;
+    if (beamTimer % tick === 0) playLaserSound(false, !!beamGun.jagged);
     shots = shots.filter((m) => !inBeam(m.x, m.y)); // their shots burn up
-    if (beamTimer === 0) beamCooldown = BEAM_RELOAD; // burnt out — now reload
-  } else if (beamCooldown > 0) {
-    beamCooldown--;
+    if (beamTimer === 0) beamCooldown = beamGun.reload; // burnt out — now reload
+  } else {
+    // A gun with no beam can't be left holding a lit one, or the timer would
+    // stick and the beam ships would never load again.
+    if (!beamGun) beamTimer = 0;
+    if (beamCooldown > 0) beamCooldown--;
   }
 
   // Your bullets hitting animals. A bullet takes its ship's `dmg` off the
@@ -1382,6 +1460,7 @@ function equipShip(ship) {
   // otherwise a SCOUT could pick up a beam the RED LASER left burning.
   beamTimer = 0;
   beamCooldown = 0;
+  bolts = [];
   saveShop();
   playShootSound(); // a little chirp to say "you're in this one now"
 }
@@ -1475,6 +1554,7 @@ nameInputEl.addEventListener("keydown", (e) => {
 function onGameOver() {
   beamTimer = 0;            // switch the gun off, so no beam is left hanging
   beamCooldown = 0;         // over the game-over screen
+  bolts = [];               // and no lightning left forking over it either
   // Ships this run just earned: ones the run reached but your old best hadn't.
   justUnlocked = SHIPS.filter((s) => s.need > 0 && bestRun < s.need && score >= s.need);
   if (score > bestRun) {
@@ -1625,9 +1705,11 @@ function drawButtons() {
 // drawShop(): the ship shop — a screen of its own, with one card per
 // ship showing what it looks like, what it does, and what it costs.
 // ---------------------------------------------------------------------
-const SHOP_CARD_TOP = 146; // where the first ship card starts
-const SHOP_CARD_H   = 126; // how tall each card is
-const SHOP_CARD_GAP = 10;  // the space between two cards
+// Six cards have to fit between the heading and the buttons at the bottom,
+// so they're shorter and closer together than they were with five.
+const SHOP_CARD_TOP = 142; // where the first ship card starts
+const SHOP_CARD_H   = 108; // how tall each card is
+const SHOP_CARD_GAP = 8;   // the space between two cards
 function shopCardY(i) { return SHOP_CARD_TOP + i * (SHOP_CARD_H + SHOP_CARD_GAP); }
 
 function drawShop() {
@@ -1666,18 +1748,18 @@ function drawShop() {
     ctx.font = "19px 'Courier New', monospace";
     ctx.textAlign = "center";
     ctx.fillText(String(i + 1), 76, y + SHOP_CARD_H / 2);
-    drawThing(ship.art, 140, y + SHOP_CARD_H / 2, 80,
+    drawThing(ship.art, 140, y + SHOP_CARD_H / 2, 72,
               typeof ship.art === "string" ? -Math.PI / 4 : 0);
 
     // Its name, and what it does.
     ctx.textAlign = "left";
     ctx.fillStyle = mine ? "#fff" : "#bbb";
-    ctx.font = "24px 'Courier New', monospace";
-    ctx.fillText(ship.name, 198, y + 30);
+    ctx.font = "23px 'Courier New', monospace";
+    ctx.fillText(ship.name, 198, y + 22);
     ctx.fillStyle = "#9aa6b2";
     ctx.font = "16px 'Courier New', monospace";
     for (let l = 0; l < ship.blurb.length; l++) {
-      ctx.fillText(ship.blurb[l], 198, y + 58 + l * 22);
+      ctx.fillText(ship.blurb[l], 198, y + 44 + l * 18);
     }
     // How you get it — and, if you haven't yet, how close you've come.
     ctx.font = "14px 'Courier New', monospace";
@@ -1685,19 +1767,20 @@ function drawShop() {
     ctx.fillText(flying ? "★ FLYING THIS ONE"
                  : mine ? (ship.need === 0 ? "✓ ALWAYS YOURS" : "✓ EARNED")
                  : "LOCKED — score " + ship.need + " in one game",
-                 198, y + SHOP_CARD_H - 27);
+                 198, y + SHOP_CARD_H - 26);
     if (!mine) {
       // A bar creeping toward the score you need, so you can see how far off
-      // your best run is rather than just being told "no".
+      // your best run is rather than just being told "no". It gets the bottom
+      // line of the card to itself, clear of the writing above.
       const barW = 250;
       const gone = Math.min(1, bestRun / ship.need);
       ctx.fillStyle = "rgba(255,255,255,0.12)";
-      ctx.fillRect(198, y + SHOP_CARD_H - 11, barW, 4);
+      ctx.fillRect(198, y + SHOP_CARD_H - 13, barW, 4);
       ctx.fillStyle = "#7ef9ff";
-      ctx.fillRect(198, y + SHOP_CARD_H - 11, barW * gone, 4);
+      ctx.fillRect(198, y + SHOP_CARD_H - 13, barW * gone, 4);
       ctx.fillStyle = "#666";
       ctx.font = "13px 'Courier New', monospace";
-      ctx.fillText("best so far: " + bestRun, 198 + barW + 10, y + SHOP_CARD_H - 8);
+      ctx.fillText("best so far: " + bestRun, 198 + barW + 10, y + SHOP_CARD_H - 10);
     }
   }
 
@@ -1706,6 +1789,82 @@ function drawShop() {
   ctx.font = "17px 'Courier New', monospace";
   ctx.fillText("Tap a ship you've earned to fly it (or press 1–" + SHIPS.length + ")" +
                "   •   Esc goes back", W / 2, 922);
+}
+
+// ---------------------------------------------------------------------
+// LIGHTNING — the ELECTRIC ARC's beam and its jumps are drawn as torn,
+// kinked lines instead of straight ones. The kinks are thrown about fresh
+// every frame, which is what makes the current look alive.
+// ---------------------------------------------------------------------
+// jaggedPath(): a list of points from one place to another, kinked at every
+// step. The two ends stay put and the middle is thrown about the most, which
+// is how a real bolt looks — pinned at both ends, wild in between.
+function jaggedPath(x1, y1, x2, y2, step, wobble) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const len = Math.hypot(dx, dy) || 1;
+  const steps = Math.max(2, Math.round(len / step));
+  const nx = -dy / len, ny = dx / len;   // sideways, at a right angle to the line
+  const pts = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const taper = Math.sin(t * Math.PI);  // 0 at the ends, 1 in the middle
+    const off = (Math.random() * 2 - 1) * wobble * taper;
+    // A kink along the line as well as across it, or every bend lands at the
+    // same height and it looks like a zip fastener.
+    const slip = (Math.random() - 0.5) * step * 0.5 * taper;
+    pts.push([x1 + dx * t + nx * off - ny * slip,
+              y1 + dy * t + ny * off + nx * slip]);
+  }
+  return pts;
+}
+
+function strokeBolt(pts, color, width, alpha) {
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+  ctx.stroke();
+}
+
+// The beam itself: three passes over the same torn line — a wide dim glow, the
+// beam, then a white-hot core down the middle — and then a handful of branches
+// that fork off the main channel and peter out, the way real lightning does.
+// All of it is re-drawn from scratch every frame, so the bolt never sits still.
+function drawBoltColumn(x, bottomY, gun, flicker) {
+  const pts = jaggedPath(x, bottomY, x, 0, 18, 13);
+  strokeBolt(pts, gun.color, gun.width * 1.9, 0.24 * flicker);
+  strokeBolt(pts, gun.color, gun.width * 0.7, 0.78 * flicker);
+  strokeBolt(pts, "#eaffff", 3, flicker);
+
+  // The forks. Each one starts at a bend in the main bolt, strikes off to one
+  // side and upward, and is drawn thinner and fainter the further it goes.
+  const forks = 4 + Math.floor(Math.random() * 4);
+  for (let i = 0; i < forks; i++) {
+    const from = pts[1 + Math.floor(Math.random() * (pts.length - 2))];
+    const reach = 24 + Math.random() * 66;
+    const side = Math.random() < 0.5 ? -1 : 1;
+    const fork = jaggedPath(from[0], from[1],
+                            from[0] + side * reach,
+                            from[1] - reach * (0.2 + Math.random() * 1.1),
+                            11, 9);
+    const glow = 0.5 + Math.random() * 0.5;
+    strokeBolt(fork, gun.color, 7, 0.42 * flicker * glow);
+    strokeBolt(fork, "#eaffff", 1.8, 0.7 * flicker * glow);
+  }
+}
+
+// One jump, from an animal in the beam to an animal beside it. `bright` is the
+// jump's own flicker, so the jumps crackle in and out one at a time instead of
+// all pulsing together.
+function drawBoltLine(x1, y1, x2, y2, gun, flicker, bright) {
+  const glow = flicker * (bright === undefined ? 1 : bright);
+  const pts = jaggedPath(x1, y1, x2, y2, 9, 13);
+  strokeBolt(pts, gun.color, 9, 0.30 * glow);
+  strokeBolt(pts, "#eaffff", 2.5, 0.9 * glow);
 }
 
 // drawReloadBar(): a little bar under the ship that fills back up as a
@@ -1788,14 +1947,15 @@ function draw() {
       ctx.globalAlpha = inv.hp < 1 ? 0.5 : 1;
       drawThing(inv.animal, inv.x, inv.y);
       ctx.globalAlpha = 1;
-      // An animal being held in the RED LASER's beam glows redder and redder
-      // until it melts — so you can see the beam working, and see it cool off
-      // again if you swing away too soon.
+      // An animal held in a beam glows brighter and brighter until it goes —
+      // red under the LASER, electric blue under the ARC — so you can see the
+      // beam working, and see it cool off again if you swing away too soon.
       if (inv.heat > 0) {
+        const heatGun = currentShip().beam || LASER_BEAM;
         ctx.save();
         ctx.globalCompositeOperation = "lighter";
-        ctx.globalAlpha = 0.75 * (inv.heat / BEAM_BURN);
-        ctx.fillStyle = "#ff3b3b";
+        ctx.globalAlpha = 0.75 * Math.min(1, inv.heat / heatGun.burn);
+        ctx.fillStyle = heatGun.jagged ? "#5fd8ff" : "#ff3b3b";
         ctx.fillRect(inv.x - CELL / 2, inv.y - CELL / 2, CELL, CELL);
         ctx.restore();
       }
@@ -1848,29 +2008,38 @@ function draw() {
   // Draw the falling shots — each one is its animal's own thing.
   for (const m of shots) drawThing(m.emoji, m.x, m.y, 28);
 
-  // The RED LASER's beam: a soft red glow with a white-hot core, running
-  // from the ship's nose to the top of the screen. It's drawn in "lighter"
-  // mode so it ADDS light to whatever it crosses rather than painting over
-  // it, and it shimmers a little so it reads as live energy.
+  // The beam: a soft glow with a white-hot core, running from the ship's nose
+  // to the top of the screen. It's drawn in "lighter" mode so it ADDS light to
+  // whatever it crosses rather than painting over it, and it shimmers a little
+  // so it reads as live energy. The RED LASER's is a straight column; the
+  // ELECTRIC ARC's is a torn, jagged one with the jumps forking off it.
   const noseY = player.y - CELL / 2;
-  if (beamTimer > 0) {
-    const flicker = 0.85 + 0.15 * Math.sin(beamTimer * 0.9);
+  const gun = currentShip().beam;
+  if (beamTimer > 0 && gun) {
+    // The LASER pulses evenly; the ARC gutters at random, like a live wire.
+    const flicker = gun.jagged ? 0.7 + Math.random() * 0.3
+                               : 0.85 + 0.15 * Math.sin(beamTimer * 0.9);
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
-    ctx.shadowColor = "#ff2d2d";
+    ctx.shadowColor = gun.color;
     ctx.shadowBlur = 24;
-    ctx.globalAlpha = 0.5 * flicker;
-    ctx.fillStyle = "#ff2d2d";
-    ctx.fillRect(player.x - BEAM_WIDTH, 0, BEAM_WIDTH * 2, noseY);      // outer glow
-    ctx.globalAlpha = 0.85 * flicker;
-    ctx.fillStyle = "#ff6b6b";
-    ctx.fillRect(player.x - BEAM_WIDTH / 2, 0, BEAM_WIDTH, noseY);      // the beam itself
-    ctx.globalAlpha = flicker;
-    ctx.fillStyle = "#ffe9e9";
-    ctx.fillRect(player.x - 3, 0, 6, noseY);                            // white-hot core
+    if (gun.jagged) {
+      drawBoltColumn(player.x, noseY, gun, flicker);
+    } else {
+      ctx.globalAlpha = 0.5 * flicker;
+      ctx.fillStyle = "#ff2d2d";
+      ctx.fillRect(player.x - gun.width, 0, gun.width * 2, noseY);      // outer glow
+      ctx.globalAlpha = 0.85 * flicker;
+      ctx.fillStyle = gun.color;
+      ctx.fillRect(player.x - gun.width / 2, 0, gun.width, noseY);      // the beam itself
+      ctx.globalAlpha = flicker;
+      ctx.fillStyle = "#ffe9e9";
+      ctx.fillRect(player.x - 3, 0, 6, noseY);                          // white-hot core
+    }
     ctx.restore();
   } else if (beamCooldown > 0) {
-    drawReloadBar(1 - beamCooldown / BEAM_RELOAD, "#ff6b6b");
+    drawReloadBar(1 - beamCooldown / (gun ? gun.reload : BEAM_RELOAD),
+                  gun ? gun.color : "#ff6b6b");
   } else if (currentShip().fire === "bomb" && gunTimer > 0) {
     // The BLAST CANNON gets the same little bar — half a second is long
     // enough that you want to see the next shell coming.
@@ -1885,6 +2054,18 @@ function draw() {
   const shipArt = currentShip().art;
   const playerRot = (typeof shipArt === "string") ? -Math.PI / 4 : 0;
   if (!blinking) drawThing(shipArt, player.x, player.y, CELL, playerRot);
+
+  // Draw the ELECTRIC ARC's jumps ON TOP of the animals, so you can see
+  // which ones the current has hold of. (The beam column itself is drawn
+  // further up, behind them, the same as the RED LASER's.)
+  if (beamTimer > 0 && currentShip().beam && currentShip().beam.jagged) {
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    const gun2 = currentShip().beam;
+    const flicker2 = 0.75 + Math.random() * 0.25;
+    for (const b of bolts) drawBoltLine(b.x1, b.y1, b.x2, b.y2, gun2, flicker2, b.bright);
+    ctx.restore();
+  }
 
   // Draw the BLAST CANNON's shockwave rings. Each one sprints out to the
   // edge of the blast and fades as it goes, so the ring you see is exactly

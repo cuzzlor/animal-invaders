@@ -42,6 +42,7 @@ back to exactly where you were — the new ship is in your hands immediately.
 | **Twin Blaster** | score 5,000 in one game | Two cannons — two bullets every shot, so you clear the herd twice as fast. |
 | **Blast Cannon** | score 7,500 in one game | Lobs a shell that **blows up** where it lands, clearing whatever it hits and the whole ring of animals around it — about seven at a time in the thick of the herd. Half a second to reload. |
 | **Red Laser** | score 10,000 in one game | A red beam that smashes clean through every animal it touches (and melts their shots). Burns for 3 seconds, then reloads for 1. |
+| **Electric Arc** | score 15,000 in one game | Lightning instead of a laser: the current **jumps sideways** to the animals beside the beam. Burns for 5 seconds, then reloads for 1. |
 
 Rapid Fire is the only ship you **hold** the button for; every other one fires
 once per press. An animal that's been hit but not finished off fades, so you can
@@ -50,12 +51,25 @@ see which ones need one more.
 The shop shows a bar creeping toward each ship, so you can see how close your
 best run has come.
 
-The Red Laser is powerful, but it isn't a delete key. Animals have to be **held
-in the beam** for a moment before they melt — swing away too soon and they cool
-off — and the beam is heavy, so you steer slowly while it's lit. Pick your
-column and hold your nerve. At best one beam takes out about a third of a wave,
-so you'll need a few. It passes straight over your own bases, so it can't wreck
-your cover.
+Neither beam is a delete key. Animals have to be **held in the beam** for a
+moment before they go — swing away too soon and they cool off — and a lit beam
+is heavy, so you steer slowly while it burns. Pick your column and hold your
+nerve. At best the Red Laser takes out about a third of a wave and the Electric
+Arc about two thirds, so you'll need more than one burn either way. Both pass
+straight over your own bases, so they can't wreck your cover.
+
+The Electric Arc's current **jumps** to the animals either side of the beam,
+which is why it clears so much more. A side jump hits at **half the strength**
+of the beam itself, so anything the current only reaches sideways takes twice
+as long to go: the column you're aimed at drops first and the ones beside it
+follow. And the current gutters, so no two jumps land equally hard — which of
+the neighbours goes first is never the same twice. Hold still and watch the
+herd come apart sideways.
+
+No two moments of it look the same. The bolt is torn into a fresh shape every
+frame, with branches forking off it and dying away, and every jump crackles at
+its own brightness — so it gutters and flickers like a live wire instead of
+sitting there like a painted line.
 
 Your best run, your ship, and the high scores are all kept in this browser on
 this computer — there's no internet server, so they don't follow you to another
