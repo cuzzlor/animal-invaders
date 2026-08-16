@@ -21,6 +21,27 @@ nothing to install, no internet needed.
 The game pauses itself if you switch tabs or click away, so nothing happens
 while you're not looking.
 
+## The sound of space 🌌
+
+Underneath the pews and the bangs there's a drone — the sound of being out
+there. It's five low notes and a slow wash of noise drifting over the top like
+solar wind, all made up on the spot by the browser. There's no music file to
+download.
+
+Two of the notes are a fraction apart (55 and 55.3 vibrations a second), so
+they slide in and out of step with each other and the drone slowly throbs
+instead of sitting flat. The same pair is stacked an octave up, at 110, because
+a laptop or a phone can't push air at 55 vibrations a second at all — their
+little speakers give up around 150, so a drone built only from the deep notes
+is silent on most machines however loud you turn it up. The octave carries the
+same throb up to where every speaker can reach it. A filter opens and closes
+over the noise on a twenty-second breath, so it never quite repeats.
+
+It fades up when you start playing and fades away again when you pause, mute,
+open the shop, or click off to another tab — so it's never droning at you when
+you've stopped. Press `M` (or the 🔊 button) to turn all the sound off. Want it
+louder or quieter? `SPACE_LEVEL` near the sound code in `index.html`.
+
 Shoot all the cows to win. Dodge the milk bottles — if one hits you, you lose a
 life. Lose all 3 lives (or let the cows reach the bottom) and it's game over.
 
@@ -65,6 +86,33 @@ Rapid Fire is the slow way to do it, and that's its own trade-off: half-strength
 bullets are the worst possible thing to bring to something with real armour.
 The beams do best, because you never have to lead a target that's sweeping
 across the screen.
+
+## A hardier herd 🐄🐄
+
+Beat the Big Chick and the animals come back **twice as tough.** From stage 16
+on, every ordinary animal has **2 health instead of 1**, so most guns need two
+hits where one used to do — and Rapid Fire's half-strength bullets need four.
+An animal you've hurt but not finished fades, and the fainter it is the less of
+it is left, so you can always see which ones need another.
+
+There's still plenty of time: a wave takes about 90 seconds to reach the bottom,
+and the slowest ship clears one in about half that.
+
+| Ship | What changes |
+|------|--------------|
+| Scout, Twin Blaster | two bullets per animal instead of one |
+| Rapid Fire | four bullets instead of two |
+| Red Laser | you must hold the beam on each animal twice as long — about 5 of a wave per burn, down from 10 |
+| Electric Arc | the same, but it copes better because it holds a crowd at once — about 17 per burn, down from 26 |
+| **Blast Cannon** | **nothing at all** |
+
+The Blast Cannon is the exception. A shell already does 3 damage, and 2 health
+doesn't save you from 3 — so it clears exactly the same ring of animals it
+always did. That makes it far and away the best wave-clearer once the herd
+toughens up.
+
+Want the change somewhere else, or bigger? `TOUGH_AFTER` is the last stage
+before it kicks in, and `TOUGH_HP` is how much health those animals get.
 
 ## The ship shop 🚀
 

@@ -419,7 +419,8 @@ const VOLT_BEAM = {
 };
 
 // `damage` is how much of an animal one bullet takes off. Animals have 1
-// health, so damage 1 downs them in a single hit and 0.5 takes two.
+// health to begin with, so damage 1 downs them in a single hit and 0.5 takes
+// two — and past stage TOUGH_AFTER they have 2, so it's two hits and four.
 const SHIPS = [
   {
     id: "scout", name: "SCOUT", art: PLAYER, need: 0, fire: "single", damage: 1, reload: 0,
@@ -470,6 +471,13 @@ const SAFE_TIME     = 90;  // frames you flash & can't be hit after losing a lif
 const STAGE_SPEEDUP = 0.12; // each stage everything gets this much faster (0.12 = 12%)
 const STAGE_BONUS   = 100;  // bonus points for clearing a stage
 const BANNER_TIME   = 100;  // frames the big "STAGE N" banner shows for
+
+// --- Tougher animals once you're past the boss ---
+// Beat the BIG CHICK and the herd comes back HARDIER. From stage 16 on, every
+// ordinary animal has twice the health, so most guns need two hits where one
+// used to do. (The boss keeps its own BOSS_HP either way.)
+const TOUGH_AFTER = 15; // stages ABOVE this one get the tougher herd
+const TOUGH_HP    = 2;  // how much health those animals have (1 is normal)
 
 // --- THE BIG CHICK: the boss ---
 // Every BOSS_EVERY stages there's no herd at all. Instead one ginormous baby
@@ -634,6 +642,9 @@ let shotTimer = 0;
 // it? Almost everything else in the game treats it as just another animal.
 function isBossStage() { return stage % BOSS_EVERY === 0; }
 function theBoss() { return invaders.find((inv) => inv.alive && inv.boss); }
+// How much health an ordinary animal has on this stage. Once you're past the
+// first boss they're twice as hard to put down.
+function herdHp() { return stage > TOUGH_AFTER ? TOUGH_HP : 1; }
 // How wide across a thing is. Everything is one CELL except the boss.
 function sizeOf(inv) { return inv.size || CELL; }
 
@@ -651,6 +662,7 @@ function buildLevel() {
       shot: BOSS_EGG_ART,
       heat: 0,
       hp: BOSS_HP,
+      maxHp: BOSS_HP,
       size: BOSS_SIZE,     // everything else is CELL (40) across
       boss: true,
     });
@@ -671,7 +683,10 @@ function buildLevel() {
           animal: kind.animal, // which emoji to draw
           shot: kind.shot,     // what it throws at you
           heat: 0,             // how long it's been held in the RED LASER's beam
-          hp: 1,               // health: most bullets take off 1, so one hit downs it
+          // Health. Most bullets take off 1, so one hit downs an animal — but
+          // past stage TOUGH_AFTER they have twice that and take two.
+          hp: herdHp(),
+          maxHp: herdHp(),     // what it started with, so we can show it fading
         });
       }
     }
@@ -737,6 +752,10 @@ function newGame(startState) {
   lastEntry = null;
   hideNameEntry();
   buildLevel();
+  // A fresh game is never paused, so space comes back on. Without this, a run
+  // you paused (or backed out of into the shop) and then restarted would come
+  // back silent: nothing else would ever tell the drone to fade in again.
+  updateSpace();
 }
 
 // setup(): the very first screen. Build the board but WAIT — the game
@@ -750,6 +769,10 @@ function begin() {
   if (state !== "start") return;
   state = "playing";
   stageBanner = BANNER_TIME; // flash "STAGE 1" as we kick off
+  // Bring up the space drone. This is the first press of the game, and a
+  // browser won't let a page make a sound until you've touched it — so this
+  // is the earliest moment we're allowed to start it.
+  updateSpace();
 }
 
 // startOrRestart(): what a tap / click / Enter does when you're NOT mid-game
@@ -777,10 +800,12 @@ function openShop() {
   if (state === "playing") paused = true;
   shopCameFrom = state;
   state = "shop";
+  updateSpace(); // browsing ships is quiet if you came in from a live game
 }
 function closeShop() {
   if (state !== "shop") return;
   state = shopCameFrom;
+  updateSpace();
 }
 
 // ---------------------------------------------------------------------
@@ -804,6 +829,7 @@ function restartStage() {
 function togglePause() {
   if (state !== "playing") return;
   paused = !paused;
+  updateSpace(); // the drone fades away with everything else, and comes back
 }
 
 // Look away and the game waits for you. Switching to another tab, another
@@ -818,6 +844,7 @@ function togglePause() {
 function pauseOnLeave() {
   for (const k in keys) keys[k] = false;
   if (state === "playing") paused = true;
+  updateSpace(); // and it goes quiet while you're away, rather than droning on
 }
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) pauseOnLeave();
@@ -905,6 +932,7 @@ function toggleSound() {
   soundOn = !soundOn;
   try { localStorage.setItem("ai-sound", soundOn ? "on" : "off"); } catch (e) {}
   if (soundOn) playShootSound(); // a tiny chirp so you know sound is back on
+  updateSpace();                 // and space itself fades in or out with it
 }
 
 // `light` gives a shorter, quieter, higher pew — used by the RAPID FIRE
@@ -1018,6 +1046,100 @@ function playLaserSound(start, electric) {
     osc.connect(gain).connect(audioCtx.destination);
     osc.start(t);
     osc.stop(t + dur);
+  } catch (e) { /* if audio isn't available, just stay silent */ }
+}
+
+// ---------------------------------------------------------------------
+// THE SOUND OF SPACE — a quiet drone that plays under everything else,
+// so the game doesn't sit in silence between the bangs.
+//   It's three things at once: two very low notes a fraction of a beat
+// apart, which drift in and out of step with each other and make the
+// sound feel vast rather than flat; a third note higher up to stop the
+// bottom end turning to mud; and a slow wash of filtered noise drifting
+// over the top, like solar wind.
+//   It's built ONCE and then left running forever. Only the volume moves.
+// Starting and stopping oscillators over and over would click, and the
+// drone has to be able to fade away and come back without a seam.
+// ---------------------------------------------------------------------
+const SPACE_LEVEL = 0.2;  // how far under everything else the drone sits
+const SPACE_FADE  = 1.5;  // seconds it takes to fade in or out
+let spaceGain = null;     // the drone's volume knob, once it's been built
+
+// How loud the drone should be right this moment. One place decides, so
+// muting, pausing and clicking away from the tab can't disagree.
+function spaceLevel() {
+  return !soundOn || paused ? 0 : SPACE_LEVEL;
+}
+
+function buildSpace() {
+  if (spaceGain) return;                 // already built — never build it twice
+  const t = audioCtx.currentTime;
+  spaceGain = audioCtx.createGain();
+  spaceGain.gain.setValueAtTime(0.0001, t);
+  spaceGain.connect(audioCtx.destination);
+
+  // The notes. 55 and 55.3 are close enough to beat slowly against each
+  // other — that slow throb is the whole trick.
+  //   The same pair is stacked an OCTAVE up, at 110, because a laptop or a
+  // phone simply cannot push air at 55 vibrations a second: their little
+  // speakers give up somewhere around 150, so a drone built only out of the
+  // deep notes is silent on most machines however loud you make it. The
+  // octave carries the same beat up to where every speaker can reach it.
+  // 165 is a fifth higher again, quiet, to stop the bottom end turning to mud.
+  [[55, 0.42], [55.3, 0.42], [110, 0.3], [110.6, 0.3], [165, 0.14]].forEach(([hz, vol]) => {
+    const osc = audioCtx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(hz, t);
+    const g = audioCtx.createGain();
+    g.gain.setValueAtTime(vol, t);
+    osc.connect(g).connect(spaceGain);
+    osc.start(t);
+  });
+
+  // The solar wind: four seconds of noise looped forever, pushed through
+  // a filter that opens and closes on a twenty-second breath. Because the
+  // filter moves and the noise doesn't, the loop never sounds like a loop.
+  const buf = audioCtx.createBuffer(1, audioCtx.sampleRate * 4, audioCtx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+  const noise = audioCtx.createBufferSource();
+  noise.buffer = buf;
+  noise.loop = true;
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = "lowpass";
+  // The wash sits well up into the range a small speaker can manage — down
+  // at 300 it was as inaudible as the deep notes were. High enough to hear,
+  // low enough that it's a wash and not a hiss.
+  filter.frequency.setValueAtTime(620, t);
+  const breath = audioCtx.createOscillator();
+  breath.type = "sine";
+  breath.frequency.setValueAtTime(0.05, t);   // one slow breath every 20 seconds
+  const breathDepth = audioCtx.createGain();
+  breathDepth.gain.setValueAtTime(420, t);    // how far the filter swings
+  breath.connect(breathDepth).connect(filter.frequency);
+  const noiseGain = audioCtx.createGain();
+  noiseGain.gain.setValueAtTime(0.3, t);
+  noise.connect(filter).connect(noiseGain).connect(spaceGain);
+  noise.start(t);
+  breath.start(t);
+}
+
+// Bring the drone up to where it ought to be, building it the first time.
+// Everything that could change the answer calls this: starting a game,
+// muting, pausing, and clicking away from the tab.
+function updateSpace() {
+  try {
+    if (!soundOn && !spaceGain) return;  // muted and never started — nothing to do
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.resume) audioCtx.resume();
+    buildSpace();
+    const t = audioCtx.currentTime;
+    const to = Math.max(0.0001, spaceLevel());
+    // Ramp from wherever it is NOW, so a fade that's still running gets
+    // picked up mid-way instead of jumping.
+    spaceGain.gain.cancelScheduledValues(t);
+    spaceGain.gain.setValueAtTime(Math.max(0.0001, spaceGain.gain.value), t);
+    spaceGain.gain.exponentialRampToValueAtTime(to, t + SPACE_FADE);
   } catch (e) { /* if audio isn't available, just stay silent */ }
 }
 
@@ -2217,11 +2339,12 @@ function draw() {
     for (const inv of invaders) {
       if (!inv.alive) continue;
       const size = sizeOf(inv);
-      // An animal that's been winged but not downed (the RAPID FIRE ship's
-      // half-strength bullets take two) fades, so you can see it's hurt. The
-      // boss doesn't fade — it has a health bar of its own up at the top, and
-      // it would spend the whole fight half see-through.
-      ctx.globalAlpha = !inv.boss && inv.hp < 1 ? 0.5 : 1;
+      // An animal that's been winged but not downed fades, so you can see it's
+      // hurt — the fainter it is, the less of it is left. That matters twice
+      // over past the boss, where a full-strength bullet only takes an animal
+      // half way down. The boss doesn't fade: it has a health bar of its own
+      // up at the top, and it would spend the whole fight half see-through.
+      ctx.globalAlpha = inv.boss ? 1 : Math.max(0.4, inv.hp / (inv.maxHp || 1));
       drawThing(inv.animal, inv.x, inv.y, size);
       ctx.globalAlpha = 1;
       // An animal held in a beam glows brighter and brighter until it goes —
