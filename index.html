@@ -209,6 +209,7 @@ const SPRITE_PAL = {
   'r': '#8c1f1f', 'L': '#ffd7d7', // deep red & hot laser-white, for the ships
   'g': '#6fe08a', 'v': '#a86cf0', // green & violet, for two of the ships
   'e': '#2ea8ff',                 // electric blue, for the ELECTRIC ARC
+  'f': '#ffec99', 'a': '#e0a51e', // pale fluff & deep yellow, for the BIG CHICK
 };
 // spr(): wraps a grid of strings so the game knows "this is a sprite".
 function spr(rows) { return { isPixel: true, rows: rows }; }
@@ -284,6 +285,40 @@ const PENGUIN_ART = spr([
   "KKWWWWWWWWWKK", "KKKWWWWWWWKKK", ".K.WWWWWWW.K.", "...WWWWWWW...",
   "...OO...OO...",
 ]);
+// THE BIG CHICK — the boss. Just a baby, but the size of a house: a fluffy
+// round chick still wearing the top of its egg as a hat. It's drawn on a much
+// bigger grid than the other animals because it's drawn much bigger, so it
+// has room for proper eyes and a beak instead of a few fat blocks.
+const BIG_CHICK_ART = spr([
+  ".......WWWWWWWW.......",   // the top of its egg, still stuck on its head,
+  "......WWWWWWWWWW......",
+  "......W.WW.WW.WW......",   // ...cracked along the bottom where it hatched
+  ".......ffffffff.......",   // fluff peeking out from under it
+  ".....ffffffffffff.....",
+  "....ffffffffffffff....",
+  "...YYYYYYYYYYYYYYYY...",
+  "..YYYYYYYYYYYYYYYYYY..",
+  "..YYYKKKYYYYYYKKKYYY..",   // two enormous eyes
+  "..YYYKWKYYYYYYKWKYYY..",
+  ".YYYYKKKYYYYYYKKKYYYY.",
+  ".YYYYYYYYOOOOYYYYYYYY.",   // and a beak
+  ".YYYYYYYYOOOOYYYYYYYY.",
+  "..YYYYYYYYOOYYYYYYYY..",
+  "..YYaaaYYYYYYYYaaaYY..",   // stubby little wings it can't fly with
+  "..YYaaaaYYYYYYaaaaYY..",
+  "...YYaaaYYYYYYaaaYY...",
+  "....YYYYYYYYYYYYYY....",
+  "......OO......OO......",   // and two skinny legs
+  ".....OOOO....OOOO.....",
+]);
+// The eggs it throws. Bigger than a chicken's, and already cracking.
+const BOSS_EGG_ART = spr([
+  "....WWW....", "..WWWWWWW..", ".WWWWWWWWW.", ".WWWWRWWWW.",
+  "WWWWRRRWWWW", "WWWWWRWWWWW", "WWWWRRRWWWW", "WWWWWRWWWWW",
+  ".WWWWRWWWW.", ".WWWWWWWWW.", "..WWWWWWW..", "...WWWWW...",
+  "....WWW....",
+]);
+
 // The five things the animals throw at you.
 const MILK_ART = spr([
   "...WW....", "...WW....", "..WWWW...", ".WWWWWW..", ".WWCCWW..",
@@ -340,6 +375,10 @@ const BOMB_RELOAD = 30;  // between BLAST CANNON shells (30 = half a second)
 const BOMB_RADIUS = 95;  // how far the blast reaches, in pixels
 const BOMB_CORE   = 44;  // inside this it's full strength; past it, half
 const BOMB_BOOM   = 3.4; // how big the bang LOOKS (bigger = more flying bits)
+// What one shell takes off. An ordinary animal has 1 health, so anything from
+// 1 up downs it outright and this number never showed — it only starts to
+// matter against something with real health, like the BIG CHICK boss.
+const BOMB_DAMAGE = 3;
 const BOMB_RING   = 20;  // frames the shockwave ring takes to reach full size
 
 // --- The two beam guns ---
@@ -359,16 +398,23 @@ const LASER_BEAM = {
   burn: BEAM_BURN, drag: BEAM_DRAG, arc: 0,
   color: "#ff4d4d", glow: "rgba(255,60,60,0.28)",
 };
-// The ELECTRIC ARC burns longer and kills quicker, and its current jumps
-// sideways — but only ONE hop, or it would run straight through the herd and
-// take the lot. It is also the heaviest gun to steer.
+// The ELECTRIC ARC burns longer, and its current WALKS out sideways through
+// the herd instead of stopping at the beam. `arc` is one hop, `hops` is how
+// many hops it can make, and each hop keeps only `jump` of the punch the hop
+// before it had — so the animals beside the beam take half, the ones past
+// them a quarter, and the ones past THOSE an eighth. Three hops is as far as
+// it goes: an eighth still finishes an animal inside one burn, but a fourth
+// hop would be too weak to finish anything, so it would be all show and no
+// bite. That fall-off is what stops one burn taking the whole wave. This is
+// also the heaviest gun in the game to steer.
 const BOLT_TIME    = 300;  // frames the electric beam burns for (300 = 5 seconds)
 const BOLT_RELOAD  = 60;   // frames it reloads for afterwards (60 = 1 second)
-const BOLT_ARC     = 76;   // how far the current jumps sideways, in pixels
-const BOLT_JUMP    = 0.5;  // how hard a side jump hits, against the beam's 1
+const BOLT_ARC     = 76;   // how far the current jumps in one hop, in pixels
+const BOLT_JUMP    = 0.5;  // how much of the last hop's punch the next one keeps
+const BOLT_HOPS    = 3;    // how many animals out from the beam it can walk
 const VOLT_BEAM = {
   time: BOLT_TIME, reload: BOLT_RELOAD, width: BEAM_WIDTH,
-  burn: 31, drag: 0.55, arc: BOLT_ARC, jump: BOLT_JUMP,
+  burn: 26, drag: 0.55, arc: BOLT_ARC, jump: BOLT_JUMP, hops: BOLT_HOPS,
   color: "#7ef9ff", glow: "rgba(126,249,255,0.26)", jagged: true,
 };
 
@@ -401,7 +447,7 @@ const SHIPS = [
   {
     id: "volt", name: "ELECTRIC ARC", art: VOLT_ROCKET_ART, need: 15000, fire: "bolt", damage: 1, reload: 0,
     beam: VOLT_BEAM,
-    blurb: ["Lightning that JUMPS to the animals", "beside it. Burns 5s, reloads 1s."],
+    blurb: ["Lightning that WALKS through the herd,", "animal to animal. Burns 5s, reloads 1s."],
   },
 ];
 
@@ -424,6 +470,25 @@ const SAFE_TIME     = 90;  // frames you flash & can't be hit after losing a lif
 const STAGE_SPEEDUP = 0.12; // each stage everything gets this much faster (0.12 = 12%)
 const STAGE_BONUS   = 100;  // bonus points for clearing a stage
 const BANNER_TIME   = 100;  // frames the big "STAGE N" banner shows for
+
+// --- THE BIG CHICK: the boss ---
+// Every BOSS_EVERY stages there's no herd at all. Instead one ginormous baby
+// chicken comes down on its own, and it takes BOSS_HP hits to see off — where
+// an ordinary animal takes one. It sweeps side to side, gets angrier and
+// faster the more you hurt it, and lays clutches of EGGS THAT EXPLODE: an egg
+// that lands blows a hole in whatever it lands on, so you can't just hide.
+const BOSS_EVERY   = 15;  // the boss turns up on stage 15, 30, 45...
+const BOSS_HP      = 45;  // how many hits it takes (an ordinary animal takes 1)
+const BOSS_SIZE    = 260; // how big it is drawn, in pixels — the player is 40
+const BOSS_TOP     = 190; // how far down the screen it starts
+const BOSS_SPEED   = 0.9; // how fast it sweeps to begin with
+const BOSS_RAGE    = 1.6; // how much FASTER it sweeps once nearly beaten
+const BOSS_DROP    = 5;   // how far it comes down each time it turns around
+const BOSS_POINTS  = 500; // what beating it is worth
+const BOSS_CLUTCH  = 3;   // how many eggs it lays at once
+const BOSS_RELOAD  = 110; // frames between clutches (smaller = more eggs)
+const EGG_RADIUS   = 60;  // how far an exploding egg's blast reaches, in pixels
+const EGG_BOOM     = 2.6; // how big the bang LOOKS
 
 // --- The bases (shields) you can hide behind ---
 const BASE_COUNT   = 3;    // how many bases there are
@@ -565,26 +630,50 @@ let shotTimer = 0;
 // buildLevel(): lay out a fresh wave of animals and brand-new bases, and
 // clear anything left flying around. Used at the start of every stage.
 // ---------------------------------------------------------------------
+// Is this a boss stage? And if there's a BIG CHICK on the board, which one is
+// it? Almost everything else in the game treats it as just another animal.
+function isBossStage() { return stage % BOSS_EVERY === 0; }
+function theBoss() { return invaders.find((inv) => inv.alive && inv.boss); }
+// How wide across a thing is. Everything is one CELL except the boss.
+function sizeOf(inv) { return inv.size || CELL; }
+
 function buildLevel() {
-  // Build the grid of animals, centred across the screen.
   invaders = [];
-  const gapX = 70;     // space between animals across
-  const gapY = 60;     // space between rows
-  const startX = (W - (COLS - 1) * gapX) / 2; // centre the grid horizontally
-  const startY = 80;   // top of the grid
-  for (let row = 0; row < ROWS; row++) {
-    for (let col = 0; col < COLS; col++) {
-      // Pick a random animal for this spot, so the herd is a mixed bunch.
-      const kind = ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
-      invaders.push({
-        x: startX + col * gapX,
-        y: startY + row * gapY,
-        alive: true,
-        animal: kind.animal, // which emoji to draw
-        shot: kind.shot,     // what it throws at you
-        heat: 0,             // how long it's been held in the RED LASER's beam
-        hp: 1,               // health: most bullets take off 1, so one hit downs it
-      });
+  if (isBossStage()) {
+    // No herd this time — just the BIG CHICK, on its own, in the middle.
+    // It's an ordinary invader in every way the rest of the game cares about;
+    // it's simply enormous (`size`), tough (`hp`), and its eggs go off.
+    invaders.push({
+      x: W / 2,
+      y: BOSS_TOP,
+      alive: true,
+      animal: BIG_CHICK_ART,
+      shot: BOSS_EGG_ART,
+      heat: 0,
+      hp: BOSS_HP,
+      size: BOSS_SIZE,     // everything else is CELL (40) across
+      boss: true,
+    });
+  } else {
+    // Build the grid of animals, centred across the screen.
+    const gapX = 70;     // space between animals across
+    const gapY = 60;     // space between rows
+    const startX = (W - (COLS - 1) * gapX) / 2; // centre the grid horizontally
+    const startY = 80;   // top of the grid
+    for (let row = 0; row < ROWS; row++) {
+      for (let col = 0; col < COLS; col++) {
+        // Pick a random animal for this spot, so the herd is a mixed bunch.
+        const kind = ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
+        invaders.push({
+          x: startX + col * gapX,
+          y: startY + row * gapY,
+          alive: true,
+          animal: kind.animal, // which emoji to draw
+          shot: kind.shot,     // what it throws at you
+          heat: 0,             // how long it's been held in the RED LASER's beam
+          hp: 1,               // health: most bullets take off 1, so one hit downs it
+        });
+      }
     }
   }
 
@@ -742,6 +831,10 @@ window.addEventListener("blur", pauseOnLeave);
 function nextStage() {
   score += STAGE_BONUS * stage; // reward for clearing the wave
   stage++;
+  // Whatever was still in the air belonged to the wave you just beat. This
+  // matters most after the boss: being blown up by the last egg of a chicken
+  // you've already beaten would be a rotten way to lose a life.
+  shots = [];
   buildLevel();
 }
 
@@ -1098,28 +1191,76 @@ function update() {
   for (const b of bullets) b.y -= PLAYER_BULLET_SPEED;
   bullets = bullets.filter((b) => b.y > -20);
 
-  // --- Move the herd ---
-  // The fewer animals are left, the faster they go (classic tension!).
+  // --- Move the herd (or the boss) ---
   const aliveCount = invaders.filter((inv) => inv.alive).length;
   const totalCount = ROWS * COLS;
-  // Speed grows from 1x up to about 4x as the herd is wiped out.
-  const speedMult = 1 + (1 - aliveCount / totalCount) * 3;
-  const step = INVADER_SPEED * speedMult * speedScale;
+  const boss = theBoss();
+  let step;
+  if (boss) {
+    // The BIG CHICK sweeps on its own. It gets ANGRIER the more you hurt it:
+    // by the time it's nearly beaten it's charging back and forth.
+    const hurt = 1 - boss.hp / BOSS_HP;
+    step = BOSS_SPEED * (1 + hurt * BOSS_RAGE) * speedScale;
+  } else {
+    // The fewer animals are left, the faster they go (classic tension!).
+    // Speed grows from 1x up to about 4x as the herd is wiped out.
+    const speedMult = 1 + (1 - aliveCount / totalCount) * 3;
+    step = INVADER_SPEED * speedMult * speedScale;
+  }
 
   // Move them sideways. If any hits an edge, the whole herd drops and
-  // reverses direction.
+  // reverses direction. The boss is far too wide to use CELL here, so we
+  // measure each one by its own size.
   let hitEdge = false;
   for (const inv of invaders) {
     if (!inv.alive) continue;
     inv.x += step * invaderDir;
-    if (inv.x > W - CELL / 2 || inv.x < CELL / 2) hitEdge = true;
+    const half = sizeOf(inv) / 2;
+    if (inv.x > W - half || inv.x < half) hitEdge = true;
   }
   if (hitEdge) {
     invaderDir *= -1;
     for (const inv of invaders) {
-      if (inv.alive) inv.y += 20; // drop down a row
+      if (!inv.alive) continue;
+      // A row's drop for the herd; the boss only sags a little, or it would
+      // be on top of you before you'd got through its health.
+      inv.y += inv.boss ? BOSS_DROP : 20;
       // If the animals reach the bottom, it's game over.
-      if (inv.alive && inv.y > player.y - CELL) state = "lost";
+      if (inv.y + sizeOf(inv) / 2 > player.y - CELL / 2) state = "lost";
+    }
+  }
+
+  // --- The boss lays a clutch of exploding eggs ---
+  // The BIG CHICK doesn't shoot one thing at a time like the herd does. It
+  // lays a whole CLUTCH at once, spread out across its width, with the middle
+  // one aimed at you — so there's a gap to run to, but you have to pick it.
+  if (boss) {
+    if (shotTimer > 0) shotTimer--;
+    if (shotTimer === 0) {
+      const startY = boss.y + sizeOf(boss) / 2;
+      const fallTime = Math.max(1, (player.y - startY) / shotSpeed);
+      for (let i = 0; i < BOSS_CLUTCH; i++) {
+        // Spread the clutch out under its belly, and lean each egg a
+        // different way. The middle egg of an odd clutch goes for you.
+        const spread = BOSS_CLUTCH === 1 ? 0 : (i / (BOSS_CLUTCH - 1)) * 2 - 1;
+        const aimed = i === (BOSS_CLUTCH - 1) / 2;
+        // The outside eggs lean out by a different amount every clutch. Without
+        // that the boss lays exactly the same pattern every time and the fight
+        // becomes one memorised dance — and a pattern you happen to be caught
+        // on the wrong side of traps you every time it comes round.
+        let vx = aimed ? (player.x - boss.x) / fallTime
+                       : spread * SHOT_ANGLE * (0.5 + Math.random());
+        vx = Math.max(-AIM_MAX, Math.min(AIM_MAX, vx));
+        shots.push({
+          x: boss.x + spread * sizeOf(boss) * 0.3,
+          y: startY, emoji: boss.shot, vx: vx,
+          size: 34, explodes: true,   // an egg that goes off where it lands
+        });
+      }
+      // Its reload is NOT sped up by the stage the way the herd's is. The
+      // boss only ever turns up on stage 15 or later, where that multiplier
+      // is already nearly 3× — it would be laying eggs faster than they fall.
+      shotTimer = BOSS_RELOAD;
     }
   }
 
@@ -1128,8 +1269,8 @@ function update() {
   // once (MAX_SHOTS), and they come on a timer instead of all at the same
   // time. Only the FRONT animal in a column (the lowest one) can shoot,
   // and each animal throws its OWN thing (milk, eggs, mud, bananas, ice).
-  if (shotTimer > 0) shotTimer--;
-  if (shotTimer === 0 && shots.length < MAX_SHOTS) {
+  if (shotTimer > 0 && !boss) shotTimer--;
+  if (!boss && shotTimer === 0 && shots.length < MAX_SHOTS) {
     const shooter = pickShooter();
     if (shooter) {
       const startY = shooter.y + CELL / 2;
@@ -1176,36 +1317,58 @@ function update() {
   // powerful gun in the game can't make you lose by wrecking a shield.
   const beamGun = currentShip().beam;
   const beamOn = beamTimer > 0 && !!beamGun;
-  const reach = (CELL + (beamGun ? beamGun.width : BEAM_WIDTH)) / 2;
-  const inBeam = (x, y) => Math.abs(x - player.x) < reach && y < player.y;
-  // The ELECTRIC ARC throws the current out sideways as well, as far as `arc`
-  // either side of the beam. Those side jumps carry HALF the punch of the beam
-  // itself (`jump`), so an animal the current only reaches sideways takes twice
-  // as long to go as one the beam is right on top of.
-  const inArc = (x, y) => Math.abs(x - player.x) < beamGun.arc && y < player.y;
+  const beamHalf = (beamGun ? beamGun.width : BEAM_WIDTH) / 2;
+  // How close the beam has to be to catch something, measured from that
+  // thing's own middle — so the BIG CHICK is caught anywhere across its body,
+  // not just when you're lined up with its beak.
+  const reachTo = (size) => size / 2 + beamHalf;
+  const inBeam = (x, y, size) =>
+    Math.abs(x - player.x) < reachTo(size === undefined ? CELL : size) && y < player.y;
+  // The ELECTRIC ARC throws the current out sideways as well, and it WALKS
+  // out: one animal is `arc` pixels, and each hop keeps only `jump` of the
+  // punch the hop before it had. So the animals beside the beam take half, the
+  // ones past them a quarter, and the ones past THOSE an eighth — the current
+  // reaches deep into the herd but bites softer the further it goes.
+  // hopOf() says how many hops out an animal is, or 0 for out of reach.
+  const hopOf = (x, y) => {
+    if (!beamOn || !beamGun.arc || y >= player.y) return 0;
+    const hop = Math.ceil(Math.abs(x - player.x) / beamGun.arc);
+    return hop <= beamGun.hops ? hop : 0;
+  };
   bolts = [];                       // the jumps drawn this frame, if any
   let melted = 0;
   for (const inv of invaders) {
     if (!inv.alive) continue;
-    const onIt = beamOn && inBeam(inv.x, inv.y);
-    const beside = !onIt && beamOn && beamGun.arc > 0 && inArc(inv.x, inv.y);
-    if (onIt || beside) {
-      if (beside) {
-        // Half strength ON AVERAGE — the current gutters from frame to frame,
-        // so which of them goes first is never quite the same twice.
-        inv.heat += beamGun.jump * 2 * Math.random();
-        bolts.push({
-          x1: player.x, y1: inv.y, x2: inv.x, y2: inv.y,
-          bright: 0.35 + Math.random() * 0.65,  // its own crackle
-        });
+    const onIt = beamOn && inBeam(inv.x, inv.y, sizeOf(inv));
+    const hop = onIt ? 0 : hopOf(inv.x, inv.y);
+    if (onIt || hop > 0) {
+      if (hop > 0) {
+        // The current gutters, so `gutter` is how hard it bites THIS frame —
+        // anywhere from nothing to twice its share. That's why no two animals
+        // beside the beam ever go in the same order twice. The frames it
+        // gutters out to nothing are the frames no bolt is drawn, so what you
+        // see on the screen is exactly what the current is doing.
+        const gutter = Math.random();
+        inv.heat += gutter * 2 * Math.pow(beamGun.jump, hop);
+        if (gutter > 0.12) bolts.push(jumpBolt(inv, hop, gutter));
       } else {
         inv.heat++;
       }
+      // Held in it long enough, and the beam takes one animal's worth off it.
+      // That's the whole of an ordinary animal, so they melt exactly as they
+      // always did — but the BIG CHICK has sixty of them, so a beam has to be
+      // held on it over and over to see it off.
       if (inv.heat >= beamGun.burn) {
-        inv.alive = false;
-        spawnExplosion(inv.x, inv.y);
-        score += 10;
-        melted++;
+        inv.heat = 0;
+        inv.hp -= 1;
+        if (inv.hp <= 0) {
+          inv.alive = false;
+          spawnExplosion(inv.x, inv.y, inv.boss ? 5 : 1);
+          score += inv.boss ? BOSS_POINTS : 10;
+          melted++;
+        } else {
+          spawnExplosion(inv.x, inv.y + sizeOf(inv) / 4, 0.5); // scorched, not beaten
+        }
       }
     } else if (inv.heat > 0) {
       inv.heat--; // out of it — cool back down
@@ -1234,7 +1397,7 @@ function update() {
   // off a little spark, so you can see it landed.
   for (const b of bullets) {
     for (const inv of invaders) {
-      if (inv.alive && hit(b.x, b.y, inv.x, inv.y, CELL)) {
+      if (inv.alive && hit(b.x, b.y, inv.x, inv.y, sizeOf(inv))) {
         // A BLAST CANNON shell doesn't poke one animal — it goes off, and
         // the bang does all the damage to everything standing near it.
         if (b.bomb) {
@@ -1246,11 +1409,13 @@ function update() {
         b.y = -999;                 // send bullet off-screen so it's cleaned up
         if (inv.hp <= 0) {
           inv.alive = false;          // animal destroyed
-          spawnExplosion(inv.x, inv.y); // BOOM!
-          playExplosionSound();         // ...and the BOOM is heard
-          score += 10;                  // points!
+          spawnExplosion(inv.x, inv.y, inv.boss ? 5 : 1); // BOOM!
+          playExplosionSound(!!inv.boss);  // ...and the BOOM is heard
+          score += inv.boss ? BOSS_POINTS : 10; // points!
         } else {
-          spawnExplosion(b.x, inv.y + CELL / 4, 0.3); // winged it — just a spark
+          // Winged it — just a spark, thrown where the bullet actually
+          // struck, which on something the size of the boss matters.
+          spawnExplosion(b.x, b.y, 0.3);
         }
       }
     }
@@ -1259,19 +1424,33 @@ function update() {
   }
   bullets = bullets.filter((b) => b.y > -20);
 
-  // Animal shots crumbling the bases (your cover slowly wears down).
+  // Animal shots crumbling the bases (your cover slowly wears down). An
+  // ordinary shot chips off one block and stops there. The BIG CHICK's eggs
+  // don't chip — they go OFF, and take a hole out of the base with them.
   for (const m of shots) {
-    if (hitBase(m.x, m.y)) m.y = H + 999;
+    if (m.y > H + 20) continue;
+    if (m.explodes) {
+      // An egg lands on cover, or on the ground down at your level.
+      if (hitBase(m.x, m.y, true) || m.y > player.y + CELL / 2) {
+        eggBlast(m.x, m.y);
+        m.y = H + 999;
+      }
+    } else if (hitBase(m.x, m.y)) {
+      m.y = H + 999;
+    }
   }
 
   // Count down the "safe" flashing time after being hit.
   if (invuln > 0) invuln--;
 
   // Shots hitting the player. While you're flashing (invuln) you're safe,
-  // so one splash can't drain several lives at once.
+  // so one splash can't drain several lives at once. An egg that reaches you
+  // goes off instead, which is worse: the blast is far wider than the egg.
   for (const m of shots) {
+    if (m.y > H + 20) continue;
     if (invuln === 0 && hit(m.x, m.y, player.x, player.y, CELL)) {
       m.y = H + 999;       // remove this shot
+      if (m.explodes) { eggBlast(m.x, m.y); continue; }
       lives--;             // lose a life
       invuln = SAFE_TIME;  // brief flashing safety so you can recover
       spawnExplosion(player.x, player.y, 2.5); // a BIG blast where you got hit
@@ -1295,11 +1474,41 @@ function update() {
 
   // --- Lose a base, lose the game ---
   // If ANY base is completely wiped out, it's game over — protect them all!
-  if (bases.some((base) => base.blocks.every((blk) => !blk.alive))) state = "lost";
+  // EXCEPT against the boss. Blowing your cover apart is the whole point of
+  // its exploding eggs, and ending the run the moment it manages it would be
+  // no fun at all. On a boss stage you simply lose the cover, and have to get
+  // through the rest of the fight out in the open.
+  if (!isBossStage() && bases.some((base) => base.blocks.every((blk) => !blk.alive))) {
+    state = "lost";
+  }
 
   // --- Cleared the herd? On to the next (faster) stage! ---
   // Only if you're still alive, of course.
   if (state === "playing" && invaders.every((inv) => !inv.alive)) nextStage();
+}
+
+// ---------------------------------------------------------------------
+// jumpBolt(): work out where ONE of the ELECTRIC ARC's jumps should be
+// drawn. The current doesn't leap out of the ship — it walks through the
+// herd, animal to animal, so a jump starts at the nearest animal still
+// standing between this one and the beam. If nobody is left in between, it
+// comes straight off the beam column instead. `hop` is how far out the
+// animal is; `bright` is how hard the current is biting it this frame.
+// ---------------------------------------------------------------------
+function jumpBolt(inv, hop, bright) {
+  let from = null;
+  const out = Math.abs(inv.x - player.x);
+  for (const o of invaders) {
+    if (!o.alive || o === inv) continue;
+    if (Math.abs(o.y - inv.y) > 1) continue;                    // same row only
+    if ((o.x - player.x) * (inv.x - player.x) < 0) continue;    // same side only
+    if (Math.abs(o.x - player.x) >= out) continue;              // must be nearer in
+    if (!from || Math.abs(o.x - inv.x) < Math.abs(from.x - inv.x)) from = o;
+  }
+  return {
+    x1: from ? from.x : player.x, y1: from ? from.y : inv.y,
+    x2: inv.x, y2: inv.y, hop: hop, bright: bright,
+  };
 }
 
 // ---------------------------------------------------------------------
@@ -1347,16 +1556,44 @@ function isCarved(r, c) {
 // hitBase(): did a shot/bullet at (x, y) hit a base block? If so, that
 // block crumbles away and we return true (so the shot is used up).
 // ---------------------------------------------------------------------
-function hitBase(x, y) {
+function hitBase(x, y, peek) {
   for (const base of bases) {
     for (const blk of base.blocks) {
       if (blk.alive && hit(x, y, blk.x, blk.y, BASE_BLOCK)) {
-        blk.alive = false; // chip away this block
+        // `peek` asks "did it touch cover?" WITHOUT chipping anything —
+        // an exploding egg wants to know, but the blast does the damage.
+        if (!peek) blk.alive = false;
         return true;
       }
     }
   }
   return false;
+}
+
+// ---------------------------------------------------------------------
+// eggBlast(): one of the BIG CHICK's eggs goes off. Unlike your own
+// BLAST CANNON, this one leaves the animals alone and goes after your
+// side of the board: it blows a hole clean through a base, and if you're
+// standing inside the blast it costs you a life. Cover works against the
+// herd's ordinary shots, but not against these — an egg that lands on
+// your shield takes a piece of the shield with it.
+// ---------------------------------------------------------------------
+function eggBlast(x, y) {
+  spawnExplosion(x, y, EGG_BOOM);
+  shockwaves.push({ x: x, y: y, life: 0, radius: EGG_RADIUS, color: "#fff0b0" });
+  playExplosionSound(true);
+  for (const base of bases) {
+    for (const blk of base.blocks) {
+      if (blk.alive && Math.hypot(blk.x - x, blk.y - y) <= EGG_RADIUS) blk.alive = false;
+    }
+  }
+  // Caught in it? That's a life — the same as being hit head-on.
+  if (invuln === 0 && Math.hypot(player.x - x, player.y - y) <= EGG_RADIUS) {
+    lives--;
+    invuln = SAFE_TIME;
+    spawnExplosion(player.x, player.y, 2.5);
+    if (lives <= 0) state = "lost";
+  }
 }
 
 // ---------------------------------------------------------------------
@@ -1379,16 +1616,22 @@ function bombBlast(x, y) {
   playExplosionSound(true);
   for (const inv of invaders) {
     if (!inv.alive) continue;
-    const dist = Math.hypot(inv.x - x, inv.y - y);
+    // Measure to the nearest bit of the animal rather than to its middle. For
+    // ordinary animals those are the same place, so nothing changes — but on
+    // something the size of the BIG CHICK they're 110 pixels apart, and a
+    // shell that plainly went off against its side ought to hurt it.
+    const spare = (sizeOf(inv) - CELL) / 2;
+    const dist = Math.hypot(Math.max(0, Math.abs(inv.x - x) - spare),
+                            Math.max(0, Math.abs(inv.y - y) - spare));
     if (dist > BOMB_RADIUS) continue;
-    inv.hp -= dist <= BOMB_CORE ? 1 : 0.5;
+    inv.hp -= dist <= BOMB_CORE ? BOMB_DAMAGE : BOMB_DAMAGE / 2;
     // Nothing walks away from a shell half-standing: anything knocked to
     // half health or below is finished off by the shock. So the blast
     // clears its whole radius, rather than leaving wounded animals behind.
     if (inv.hp <= 0.5) {
       inv.alive = false;
-      spawnExplosion(inv.x, inv.y);
-      score += 10;
+      spawnExplosion(inv.x, inv.y, inv.boss ? 5 : 1);
+      score += inv.boss ? BOSS_POINTS : 10;
     }
   }
 }
@@ -1857,14 +2100,26 @@ function drawBoltColumn(x, bottomY, gun, flicker) {
   }
 }
 
-// One jump, from an animal in the beam to an animal beside it. `bright` is the
-// jump's own flicker, so the jumps crackle in and out one at a time instead of
-// all pulsing together.
-function drawBoltLine(x1, y1, x2, y2, gun, flicker, bright) {
-  const glow = flicker * (bright === undefined ? 1 : bright);
+// One link of the chain, from one animal to the next one out. `bright` is that
+// link's own flicker, so the chain crackles link by link instead of all pulsing
+// together, and `hop` is how far out it is — each hop is drawn thinner and
+// fainter than the one before, so you can SEE the current running out of puff
+// as it works its way into the herd.
+function drawBoltLine(x1, y1, x2, y2, gun, flicker, bright, hop) {
+  // A link that's drawn at all is always worth seeing, so `bright` is lifted
+  // off the floor here: it still crackles, but it never fades to a thread.
+  const glow = flicker * (0.45 + (bright === undefined ? 1 : bright) * 0.55);
+  const fade = 1 / (1 + Math.max(0, (hop || 1) - 1) * 0.6);
   const pts = jaggedPath(x1, y1, x2, y2, 9, 13);
-  strokeBolt(pts, gun.color, 9, 0.30 * glow);
-  strokeBolt(pts, "#eaffff", 2.5, 0.9 * glow);
+  strokeBolt(pts, gun.color, 17 * fade, 0.16 * glow);   // the halo around it
+  strokeBolt(pts, gun.color, 8 * fade, 0.50 * glow);    // the bolt
+  strokeBolt(pts, "#eaffff", 3.2 * fade, 0.95 * glow);  // the white-hot core
+  // A hot spot where it lands, so you can see which animal it has hold of.
+  ctx.globalAlpha = 0.6 * glow;
+  ctx.fillStyle = "#eaffff";
+  ctx.beginPath();
+  ctx.arc(x2, y2, 8 * fade, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 // drawReloadBar(): a little bar under the ship that fills back up as a
@@ -1932,6 +2187,25 @@ function draw() {
   ctx.textAlign = "right";
   ctx.fillText("LIVES: " + "❤️".repeat(lives), W - 12, 28);
 
+  // The BIG CHICK's health, so you can see you're getting somewhere. It's a
+  // long fight, and without this it would feel like nothing was happening.
+  const bossNow = state !== "start" ? theBoss() : null;
+  if (bossNow) {
+    const barW = 380, barX = (W - barW) / 2, barY = 40, barH = 14;
+    const left = Math.max(0, bossNow.hp / BOSS_HP);
+    ctx.fillStyle = "rgba(255,255,255,0.12)";
+    roundRectPath(barX, barY, barW, barH, 7);
+    ctx.fill();
+    // Yellow while it's fresh, red once it's nearly done for.
+    ctx.fillStyle = left > 0.3 ? "#ffd23d" : "#ff4d4d";
+    roundRectPath(barX, barY, Math.max(2, barW * left), barH, 7);
+    ctx.fill();
+    ctx.fillStyle = "#ffd23d";
+    ctx.font = "13px 'Courier New', monospace";
+    ctx.textAlign = "center";
+    ctx.fillText("THE BIG CHICK", W / 2, barY + barH + 15);
+  }
+
   // The sound and pause toggles, under the score at the top-left.
   drawIcons();
   ctx.globalAlpha = 1;
@@ -1942,10 +2216,13 @@ function draw() {
   if (state !== "start") {
     for (const inv of invaders) {
       if (!inv.alive) continue;
+      const size = sizeOf(inv);
       // An animal that's been winged but not downed (the RAPID FIRE ship's
-      // half-strength bullets take two) fades, so you can see it's hurt.
-      ctx.globalAlpha = inv.hp < 1 ? 0.5 : 1;
-      drawThing(inv.animal, inv.x, inv.y);
+      // half-strength bullets take two) fades, so you can see it's hurt. The
+      // boss doesn't fade — it has a health bar of its own up at the top, and
+      // it would spend the whole fight half see-through.
+      ctx.globalAlpha = !inv.boss && inv.hp < 1 ? 0.5 : 1;
+      drawThing(inv.animal, inv.x, inv.y, size);
       ctx.globalAlpha = 1;
       // An animal held in a beam glows brighter and brighter until it goes —
       // red under the LASER, electric blue under the ARC — so you can see the
@@ -1956,7 +2233,7 @@ function draw() {
         ctx.globalCompositeOperation = "lighter";
         ctx.globalAlpha = 0.75 * Math.min(1, inv.heat / heatGun.burn);
         ctx.fillStyle = heatGun.jagged ? "#5fd8ff" : "#ff3b3b";
-        ctx.fillRect(inv.x - CELL / 2, inv.y - CELL / 2, CELL, CELL);
+        ctx.fillRect(inv.x - size / 2, inv.y - size / 2, size, size);
         ctx.restore();
       }
     }
@@ -2006,7 +2283,7 @@ function draw() {
   }
 
   // Draw the falling shots — each one is its animal's own thing.
-  for (const m of shots) drawThing(m.emoji, m.x, m.y, 28);
+  for (const m of shots) drawThing(m.emoji, m.x, m.y, m.size || 28);
 
   // The beam: a soft glow with a white-hot core, running from the ship's nose
   // to the top of the screen. It's drawn in "lighter" mode so it ADDS light to
@@ -2057,22 +2334,26 @@ function draw() {
 
   // Draw the ELECTRIC ARC's jumps ON TOP of the animals, so you can see
   // which ones the current has hold of. (The beam column itself is drawn
-  // further up, behind them, the same as the RED LASER's.)
+  // further up, behind them, the same as the RED LASER's.) Nearest hops go
+  // down first, so the chain reads outward from the beam.
   if (beamTimer > 0 && currentShip().beam && currentShip().beam.jagged) {
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
     const gun2 = currentShip().beam;
     const flicker2 = 0.75 + Math.random() * 0.25;
-    for (const b of bolts) drawBoltLine(b.x1, b.y1, b.x2, b.y2, gun2, flicker2, b.bright);
+    for (const b of [...bolts].sort((p, q) => p.hop - q.hop)) {
+      drawBoltLine(b.x1, b.y1, b.x2, b.y2, gun2, flicker2, b.bright, b.hop);
+    }
     ctx.restore();
   }
 
-  // Draw the BLAST CANNON's shockwave rings. Each one sprints out to the
-  // edge of the blast and fades as it goes, so the ring you see is exactly
-  // the ground the shell cleared.
+  // Draw the blast rings — the BLAST CANNON's shells and the BIG CHICK's
+  // eggs both leave one. Each sprints out to the edge of its own blast and
+  // fades as it goes, so the ring you see is exactly the ground it cleared.
   for (const r of shockwaves) {
     const t = r.life / BOMB_RING;      // 0 → 1 as the ring grows
-    const radius = BOMB_RADIUS * (1 - (1 - t) * (1 - t)); // quick, then eases out
+    const reach = r.radius || BOMB_RADIUS;
+    const radius = reach * (1 - (1 - t) * (1 - t)); // quick, then eases out
     // A white-hot flash fills the blast for the first moment...
     if (t < 0.5) {
       ctx.globalAlpha = (1 - t * 2) * 0.55;
@@ -2083,7 +2364,7 @@ function draw() {
     }
     // ...and the ring races on ahead of it to the edge of the blast.
     ctx.globalAlpha = 1 - t * t;
-    ctx.strokeStyle = "#ffb02e";
+    ctx.strokeStyle = r.color || "#ffb02e";
     ctx.lineWidth = 14 * (1 - t) + 2;  // thick at the bang, thin at the edge
     ctx.beginPath();
     ctx.arc(r.x, r.y, radius, 0, Math.PI * 2);
@@ -2102,6 +2383,7 @@ function draw() {
   ctx.globalAlpha = 1;
 
   // "STAGE N" banner at the start of each wave (fades out, game keeps going).
+  // A boss stage gets told about properly — you deserve the warning.
   if (state === "playing" && stageBanner > 0) {
     ctx.save();
     ctx.globalAlpha = Math.min(1, stageBanner / 30); // fade out near the end
@@ -2109,6 +2391,11 @@ function draw() {
     ctx.textAlign = "center";
     ctx.font = "44px 'Courier New', monospace";
     ctx.fillText("STAGE " + stage, W / 2, H / 2);
+    if (isBossStage()) {
+      ctx.fillStyle = "#ffd23d";
+      ctx.font = "52px 'Courier New', monospace";
+      ctx.fillText("THE BIG CHICK!", W / 2, H / 2 + 60);
+    }
     ctx.restore();
   }
 

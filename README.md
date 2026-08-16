@@ -24,6 +24,48 @@ while you're not looking.
 Shoot all the cows to win. Dodge the milk bottles — if one hits you, you lose a
 life. Lose all 3 lives (or let the cows reach the bottom) and it's game over.
 
+## The Big Chick 🐣
+
+Get to **stage 15** and there's no herd at all. One ginormous baby chicken
+comes down on its own, still wearing the top of its egg as a hat — and it takes
+**45 hits** to see off, where an ordinary animal takes one. A bar across the top
+shows how much of it is left. It's back again on stage 30, 45, and so on.
+
+It lays **clutches of three eggs that EXPLODE.** The middle egg of every clutch
+is aimed at wherever you're standing, and wherever an egg lands it blows a hole
+in it — so hiding behind a base doesn't work for long. It will take your cover
+apart while you're standing under it.
+
+Two things make it a fair fight rather than a nasty one:
+
+- An aimed egg drifts sideways more slowly than you can fly, so **you can
+  always outrun the one that's coming for you.** Keep moving and you'll live;
+  stand still and you won't last half a minute.
+- On a boss stage, losing a whole base **doesn't** end the run the way it does
+  against the herd. Blowing your cover apart is the point of its eggs, and
+  ending the game the moment it manages it would be no fun. You just have to
+  finish the fight out in the open.
+
+It gets faster and faster as you wear it down, so the last few hits are the
+hardest. Beating it is worth **500 points**, plus the usual stage bonus.
+
+Different ships make very different work of it. Roughly, how long one chicken
+takes to beat:
+
+| Ship | How long |
+|------|----------|
+| Red Laser | ~16 s — a beam can't miss something that big |
+| Twin Blaster | ~23 s |
+| Electric Arc | ~24 s |
+| Blast Cannon | ~26–41 s |
+| Scout | ~32–43 s |
+| Rapid Fire | ~70–79 s |
+
+Rapid Fire is the slow way to do it, and that's its own trade-off: half-strength
+bullets are the worst possible thing to bring to something with real armour.
+The beams do best, because you never have to lead a target that's sweeping
+across the screen.
+
 ## The ship shop 🚀
 
 Better ships are **earned by scoring big in a single game**. Not added up over
@@ -42,7 +84,7 @@ back to exactly where you were — the new ship is in your hands immediately.
 | **Twin Blaster** | score 5,000 in one game | Two cannons — two bullets every shot, so you clear the herd twice as fast. |
 | **Blast Cannon** | score 7,500 in one game | Lobs a shell that **blows up** where it lands, clearing whatever it hits and the whole ring of animals around it — about seven at a time in the thick of the herd. Half a second to reload. |
 | **Red Laser** | score 10,000 in one game | A red beam that smashes clean through every animal it touches (and melts their shots). Burns for 3 seconds, then reloads for 1. |
-| **Electric Arc** | score 15,000 in one game | Lightning instead of a laser: the current **jumps sideways** to the animals beside the beam. Burns for 5 seconds, then reloads for 1. |
+| **Electric Arc** | score 15,000 in one game | Lightning instead of a laser: the current **jumps sideways** from animal to animal, up to three deep either side of the beam. Burns for 5 seconds, then reloads for 1. |
 
 Rapid Fire is the only ship you **hold** the button for; every other one fires
 once per press. An animal that's been hit but not finished off fades, so you can
@@ -54,17 +96,26 @@ best run has come.
 Neither beam is a delete key. Animals have to be **held in the beam** for a
 moment before they go — swing away too soon and they cool off — and a lit beam
 is heavy, so you steer slowly while it burns. Pick your column and hold your
-nerve. At best the Red Laser takes out about a third of a wave and the Electric
-Arc about two thirds, so you'll need more than one burn either way. Both pass
+nerve. At best the Red Laser takes out about half a wave and the Electric Arc
+about three quarters, so you'll need more than one burn either way. Both pass
 straight over your own bases, so they can't wreck your cover.
 
-The Electric Arc's current **jumps** to the animals either side of the beam,
-which is why it clears so much more. A side jump hits at **half the strength**
-of the beam itself, so anything the current only reaches sideways takes twice
-as long to go: the column you're aimed at drops first and the ones beside it
-follow. And the current gutters, so no two jumps land equally hard — which of
-the neighbours goes first is never the same twice. Hold still and watch the
-herd come apart sideways.
+The two beams want opposite things from you. The Red Laser likes to be **swept**
+— parked on one spot it manages only a column. The Electric Arc is the other way
+round: it pays best when you **park it** and let the current do the walking.
+
+That's because the Arc's current doesn't stop at the beam. It **walks out
+through the herd**, animal to animal, up to three deep on each side — and every
+hop keeps only half the punch of the hop before it. The animals beside the beam
+take half strength, the ones past them a quarter, the ones past THOSE an eighth.
+So the column you're aimed at drops first, the ones beside it follow, and the
+far ones take most of the burn to go. Reach deep, bite soft: that fall-off is
+what stops one burn taking the whole wave.
+
+And the current gutters. Each hop bites a different amount every single frame,
+so no two animals ever go in the same order twice — and the frames it gutters
+out to nothing are exactly the frames you see no bolt at all. What's on the
+screen is precisely what the lightning is doing.
 
 No two moments of it look the same. The bolt is torn into a fresh shape every
 frame, with branches forking off it and dying away, and every jump crackles at
@@ -77,6 +128,11 @@ device.
 
 Ships out of reach? Each one's `need` lives in the `SHIPS` list near the top of
 `index.html` — make the numbers smaller and the good ships arrive sooner.
+
+Want to meet the Big Chick without playing fifteen stages? Change `BOSS_EVERY`
+to `1` and it turns up straight away. `BOSS_HP` makes it tougher or softer,
+`BOSS_CLUTCH` is how many eggs it lays at once, and `BOSS_RELOAD` is how long
+it waits between clutches — a smaller number means more eggs.
 
 ## 4 easy things to try changing first
 
