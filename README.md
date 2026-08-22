@@ -53,13 +53,30 @@ colour of star is blurred one time and stamped as well. Altogether the game asks
 the browser to draw about **75,000** things a second where it used to ask for
 **646,000**, and the picture is the same to the pixel.
 
-Want to see what your phone is really doing? Put `?fps` on the end of the
-address (`index.html?fps`) and a small line under the buttons tells you the
-frames a second, the steps per frame and how long a frame takes. On a computer
-it says something like `60fps · 1.00 ticks · 16.7ms`; on a phone in Low Power
-Mode you should see `30fps · 2.00 ticks · 33.3ms` — half the frames, twice the
-steps in each, the same speed. `TICK_MS` is how long one step of game time is,
-and `MAX_CATCHUP` is how many steps one frame may make up.
+Want to see what your phone is really doing? **Tap the SCORE** while you are
+playing and a small line appears under the buttons: the frames a second, the
+steps per frame, and how long a frame takes. Tap it again to put it away. (On a
+computer you can also put `?fps` on the end of the address.)
+
+On a computer it says something like `60fps · 1.00 ticks · 16.7ms`. On a phone
+in Low Power Mode you should see `30fps · 2.00 ticks · 33.3ms` — half the
+frames, twice the steps in each, the same speed. `TICK_MS` is how long one step
+of game time is, and `MAX_CATCHUP` is how many steps one frame may make up.
+
+## Which copy am I playing? 🏷️
+
+The foot of the start screen shows a **build** in small grey text, like
+`build 2026-08-22 clock`.
+
+It is there for one job. The game is shared as a link, and a phone can hold on
+to an old copy of a web page for a long time — so "I changed it but nothing
+changed on my iPad" is nearly always the iPad still playing yesterday's game.
+Look at the build on the start screen: if it is not the one you expect, the
+device has an old copy and nothing you changed is running yet. Close the tab and
+open the link again.
+
+`BUILD` is near the top of `index.html`. Change it whenever you change something
+you need to see on another device.
 
 ## The sound of space 🌌
 

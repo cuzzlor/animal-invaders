@@ -541,6 +541,20 @@ const ctx = canvas.getContext("2d");
 const W = canvas.width;
 const H = canvas.height;
 
+// ---------------------------------------------------------------------
+// BUILD: which copy of the game this is. It is printed in small grey text
+// at the foot of the start screen.
+//
+// The game is shared as a link, and a phone can hold on to an old copy of a
+// web page for a long time — so "I changed it but nothing changed on my
+// iPad" is nearly always the iPad still running yesterday's game. This line
+// settles it in one look: if the start screen does not show the build you
+// expect, the device has an old copy and nothing you changed is running.
+//
+// Bump it whenever you change something you need to see on another device.
+// ---------------------------------------------------------------------
+const BUILD = "2026-08-22 clock";
+
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
 const FONT = CELL + "px serif"; // emoji are just text, so we pick a font size
@@ -1262,6 +1276,12 @@ document.getElementById("btn-fire").addEventListener("pointerdown", (e) => {
 // Where the two little toggles sit on the canvas (in game pixels), side by
 // side under the score, and a helper to turn a screen tap into game pixels
 // (the canvas is scaled to fit the screen).
+// And the SCORE text itself is a hidden switch for the frame-rate readout —
+// see countFrame() further down. A phone is where you need that reading, and a
+// phone is exactly where you cannot easily add ?fps to the address, so one tap
+// on the score turns it on. It sits above the row of buttons, and tapping it
+// does nothing else, so there is nothing to collide with.
+const SCORE_TAP    = { x: 0,   y: 6,  w: 210, h: 30 };
 const SOUND_ICON   = { x: 12,  y: 42, w: 36, h: 32 };
 const PAUSE_ICON   = { x: 56,  y: 42, w: 36, h: 32 };
 const RESTART_ICON = { x: 100, y: 42, w: 36, h: 32 };
@@ -1282,6 +1302,11 @@ canvas.addEventListener("pointerdown", (e) => {
   if (hitIcon(p, SOUND_ICON)) {
     e.stopPropagation();
     toggleSound();
+    return;
+  }
+  if (state === "playing" && hitIcon(p, SCORE_TAP)) {
+    e.stopPropagation();
+    toggleFpsReadout();
     return;
   }
   if (state === "playing" && hitIcon(p, PAUSE_ICON)) {
@@ -2600,6 +2625,11 @@ function draw() {
     ctx.font = "18px 'Courier New', monospace";
     ctx.fillText("Move with ← →   •   Shoot with Space", W / 2, 330);
     ctx.fillText("Flying: " + currentShip().name + "   •   best run: " + bestRun, W / 2, 360);
+    // Which copy of the game this is — see BUILD, up at the top. Small and
+    // grey, because it is only there for the day a phone will not update.
+    ctx.fillStyle = "#555";
+    ctx.font = "13px 'Courier New', monospace";
+    ctx.fillText("build " + BUILD, W / 2, 386);
     // The best games so far, right on the start screen.
     drawLeaderboard(W / 2, 410);
   }
@@ -2722,20 +2752,31 @@ function loop(now) {
 }
 
 // ---------------------------------------------------------------------
-// countFrame(): the frame-rate readout. Add ?fps to the end of the address
-// (…/index.html?fps) and a small line appears under the buttons, top left,
-// telling you how many frames a second this device is really managing, how
-// many sixtieths of game time each frame is worth, and how long a frame takes.
+// countFrame(): the frame-rate readout. TAP THE SCORE while you are playing —
+// or add ?fps to the end of the address — and a small line appears under the
+// buttons, top left, telling you how many frames a second this device is really
+// managing, how many sixtieths of game time each frame is worth, and how long a
+// frame takes. Tap the score again to put it away.
 //
 // It's for checking the game on a phone or a tablet: if it says 30 fps and
 // 2.0 ticks, the device is drawing half as often as a computer and the game is
 // making that up — which is exactly what it's supposed to do. Nothing shows
 // unless you ask for it, so opening the game the normal way is unchanged.
 // ---------------------------------------------------------------------
-const SHOW_FPS = (function () {
+let SHOW_FPS = (function () {
   try { return /(\?|&)fps\b/.test(location.search); } catch (e) { return false; }
 })();
 let fpsFrames = 0, fpsTicks = 0, fpsSince = 0, fpsShown = "";
+
+// Turn the readout on or off, and start its counting again from nothing so the
+// first reading is a true one rather than an average of the wait.
+function toggleFpsReadout() {
+  SHOW_FPS = !SHOW_FPS;
+  fpsFrames = 0;
+  fpsTicks = 0;
+  fpsSince = 0;
+  fpsShown = "";
+}
 
 function countFrame(now) {
   if (!SHOW_FPS) return;
