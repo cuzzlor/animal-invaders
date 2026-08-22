@@ -546,6 +546,47 @@ const CELL = 40;          // the size of one animal / the player
 const FONT = CELL + "px serif"; // emoji are just text, so we pick a font size
 
 // ---------------------------------------------------------------------
+// bakedSprite(): pixel art, painted ONCE onto a little picture of its own.
+//
+// A sprite is a grid of letters, and the plain way to draw it is one small
+// square per letter. That is 123 squares for one cow — and with a full herd,
+// the bases and your ship, the game was asking the browser to paint more than
+// 4000 squares in every single frame. A computer takes that in its stride, but
+// a phone or a tablet does not: each one of those is a separate instruction to
+// the browser, and on a phone the instructions cost more than the paint.
+//
+// So we paint each sprite one time onto its own small off-screen canvas and
+// then STAMP that, which is one instruction instead of 123. The picture is
+// exactly the same, to the pixel: the squares land in the same places, and a
+// stamp at whole-pixel positions copies them across untouched.
+//
+// Each sprite is only ever drawn at a few sizes (the herd at 40, the shots at
+// 28, the boss at 260, and so on), so we keep one baked picture per size on
+// the sprite itself and make it the first time it is asked for.
+// ---------------------------------------------------------------------
+function bakedSprite(thing, ps) {
+  const baked = thing.baked || (thing.baked = {});
+  if (baked[ps]) return baked[ps];
+  const rows = thing.rows;
+  const gh = rows.length;
+  const gw = rows[0].length;
+  const cv = document.createElement("canvas");
+  cv.width = gw * ps;
+  cv.height = gh * ps;
+  const c = cv.getContext("2d");
+  for (let r = 0; r < gh; r++) {
+    const line = rows[r];
+    for (let col = 0; col < gw; col++) {
+      const paint = SPRITE_PAL[line[col]];
+      if (!paint) continue; // "." = see-through, skip it
+      c.fillStyle = paint;
+      c.fillRect(col * ps, r * ps, ps, ps);
+    }
+  }
+  return (baked[ps] = cv);
+}
+
+// ---------------------------------------------------------------------
 // drawThing(): draws either an emoji (a string) OR a loaded picture,
 // centred at (x, y). This is the magic that makes the one-line PNG
 // swap above "just work" — every drawing goes through here.
@@ -561,24 +602,25 @@ function drawThing(thing, x, y, size, rotate) {
     ctx.translate(-x, -y);
   }
   if (thing && thing.isPixel) {
-    // It's pixel art: a grid of letters. Draw each letter as one fat,
-    // crisp square. We fit the grid into a size×size box and centre it.
-    // Block sizes are rounded to whole pixels so the art stays sharp.
+    // It's pixel art: a grid of letters, each letter one fat, crisp square.
+    // We fit the grid into a size×size box and centre it, with the block size
+    // rounded to whole pixels so the art stays sharp. The squares themselves
+    // were painted once by bakedSprite() up above, so all that is left here is
+    // to stamp that picture down — and we round where it lands, because a stamp
+    // on a whole pixel is copied across exactly, and one on a half pixel is
+    // smudged across two.
     const rows = thing.rows;
-    const gh = rows.length;
-    const gw = rows[0].length;
-    const ps = Math.max(1, Math.round(size / Math.max(gw, gh))); // pixel block size
-    const startX = Math.round(x - (gw * ps) / 2);
-    const startY = Math.round(y - (gh * ps) / 2);
-    for (let r = 0; r < gh; r++) {
-      const line = rows[r];
-      for (let c = 0; c < gw; c++) {
-        const col = SPRITE_PAL[line[c]];
-        if (!col) continue; // "." = see-through, skip it
-        ctx.fillStyle = col;
-        ctx.fillRect(startX + c * ps, startY + r * ps, ps, ps);
-      }
-    }
+    const ps = Math.max(1, Math.round(size / Math.max(rows[0].length, rows.length)));
+    const baked = bakedSprite(thing, ps);
+    // Nothing in the game spins pixel art — only an emoji ship needs turning —
+    // but if you ever do, this tells the browser not to smooth the picture as it
+    // turns it, which keeps the blocks much sharper (about a third as many soft,
+    // smudged edge pixels). Straight, unspun art is copied across pixel for
+    // pixel either way. The rotate branch above has already done ctx.save(),
+    // so this gets put back for us.
+    if (rotate) ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(baked, Math.round(x - baked.width / 2),
+                         Math.round(y - baked.height / 2));
   } else if (typeof thing === "string") {
     // It's an emoji / text. Draw it centred.
     ctx.font = size + "px serif";
@@ -2604,25 +2646,120 @@ function draw() {
 
 
 // ---------------------------------------------------------------------
-// THE GAME LOOP.
-// requestAnimationFrame asks the browser to call loop() again before
-// the next screen refresh (about 60 times a second). Each time we
-// update everything, then draw it. That's the whole game!
+// THE GAME LOOP — and why the game keeps its OWN clock.
+//
+// requestAnimationFrame asks the browser to call loop() again before the next
+// screen refresh. How often that is depends entirely on the device: a computer
+// usually draws 60 times a second, a new iPad up to 120, and a phone in Low
+// Power Mode (or one that has got warm) only 30.
+//
+// Everything in this game moves by so much A FRAME — your ship goes
+// PLAYER_SPEED pixels, a beam burns for BEAM_TIME frames, and so on. So if we
+// simply moved everything once per screen refresh, the device's refresh rate
+// WOULD BE the game's clock: a phone drawing 30 frames a second would play the
+// whole game in slow motion, and a 120Hz iPad would play it at double speed.
+//
+// Instead the game keeps its own clock. One update() is still worth exactly one
+// sixtieth of a second — every number in the game is tuned that way, and none
+// of them had to change. What changed is how often update() is called: we look
+// at how much real time has gone by since the last frame and run as many
+// sixtieths as we owe. A phone drawing 30 frames a second runs two each frame
+// and plays at exactly the same speed as a computer.
 // ---------------------------------------------------------------------
-function loop() {
-  update();
-  // The frame the game ends: deal with it once (save a high score, etc.).
-  if (state === "lost" && !gameOverHandled) {
-    gameOverHandled = true;
-    onGameOver();
+const TICK_MS     = 1000 / 60; // how much game time one update() is worth
+const MAX_CATCHUP = 5;         // most sixtieths we will make up in one frame
+let frameClock = 0;   // the clock reading at the last frame
+let tickDebt   = 0;   // game time we owe, in milliseconds
+let starDebt   = 0;   // and the same for the stars, which never stop
+let lastTicks  = 0;   // how many we ran last frame (for the ?fps readout)
+
+function loop(now) {
+  const gap = frameClock ? now - frameClock : 0;
+  frameClock = now;
+
+  // Nothing in the GAME moves on the start, shop, paused or game-over screens,
+  // so never put time by for them. Otherwise a game paused for a minute would
+  // owe a minute of moving and lurch forward the moment you came back.
+  tickDebt = (state !== "playing" || paused) ? 0 : tickDebt + gap;
+
+  // One long hitch — a tab left open, a phone that went to sleep — must not
+  // try to make up thousands of sixtieths at once, which would freeze the game
+  // solid. So we run at most MAX_CATCHUP of them and throw the rest away: past
+  // that much we let the game run slow rather than build up a backlog we could
+  // never work off.
+  let ticks = 0;
+  while (tickDebt >= TICK_MS && ticks < MAX_CATCHUP) {
+    update();
+    // The frame the game ends: deal with it once (save a high score, etc.).
+    if (state === "lost" && !gameOverHandled) {
+      gameOverHandled = true;
+      onGameOver();
+    }
+    tickDebt -= TICK_MS;
+    ticks++;
   }
+  if (ticks === MAX_CATCHUP) tickDebt = 0;
+  lastTicks = ticks;
+
+  // The stars keep their own time, and they drift on EVERY screen — you watch
+  // them go by on the start screen and while you're paused. Same clock, same
+  // reason: on a 120Hz iPad, one drift per frame would fly past twice as fast.
+  starDebt += gap;
+  let starTicks = 0;
+  while (starDebt >= TICK_MS && starTicks < MAX_CATCHUP) {
+    moveStars();
+    starDebt -= TICK_MS;
+    starTicks++;
+  }
+  if (starTicks === MAX_CATCHUP) starDebt = 0;
+
+  // Drawing happens once a frame however many sixtieths we just ran. There is
+  // no point painting a picture nobody will see.
   draw();
+  drawStars();
+  countFrame(now);
   requestAnimationFrame(loop);
 }
 
-// Build the first game and start the loop.
-setup();
-loop();
+// ---------------------------------------------------------------------
+// countFrame(): the frame-rate readout. Add ?fps to the end of the address
+// (…/index.html?fps) and a small line appears under the buttons, top left,
+// telling you how many frames a second this device is really managing, how
+// many sixtieths of game time each frame is worth, and how long a frame takes.
+//
+// It's for checking the game on a phone or a tablet: if it says 30 fps and
+// 2.0 ticks, the device is drawing half as often as a computer and the game is
+// making that up — which is exactly what it's supposed to do. Nothing shows
+// unless you ask for it, so opening the game the normal way is unchanged.
+// ---------------------------------------------------------------------
+const SHOW_FPS = (function () {
+  try { return /(\?|&)fps\b/.test(location.search); } catch (e) { return false; }
+})();
+let fpsFrames = 0, fpsTicks = 0, fpsSince = 0, fpsShown = "";
+
+function countFrame(now) {
+  if (!SHOW_FPS) return;
+  fpsFrames++;
+  fpsTicks += lastTicks;
+  if (!fpsSince) fpsSince = now;
+  const over = now - fpsSince;
+  if (over >= 500) {          // work it out twice a second
+    // Kept short so it fits in the gap to the left of the herd.
+    fpsShown = (fpsFrames * 1000 / over).toFixed(0) + "fps · " +
+               (fpsTicks / fpsFrames).toFixed(2) + " ticks · " +
+               (over / fpsFrames).toFixed(1) + "ms";
+    fpsFrames = 0; fpsTicks = 0; fpsSince = now;
+  }
+  // Top left, under the sound and pause buttons: clear of the score, clear of
+  // the boss's health bar, and — unlike the bottom of the screen — clear of the
+  // line of key hints the page prints under the game.
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = "#7ef9ff";
+  ctx.font = "16px 'Courier New', monospace";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText(fpsShown, 12, 96);
+}
 
 
 // =====================================================================
@@ -2655,6 +2792,36 @@ function resizeStars() {
 window.addEventListener("resize", resizeStars);
 resizeStars();
 
+// One soft glow per colour, painted once when the page opens.
+//
+// A star is a bright dot with a halo around it, and the plain way to get the
+// halo is to ask the browser to blur the dot as it paints. But a blur is slow
+// work, and there are 220 stars — so that was 220 blurs in every frame, all of
+// them blurring the very same little dot over and over. Instead we blur each
+// colour ONE time into a small picture, and then stamp those pictures. It looks
+// the same and costs a fraction as much, which is what a phone needs.
+const GLOW_ART   = 32;  // how big each pre-painted glow picture is, in pixels
+const GLOW_DOT   = 3;   // the star inside it
+const GLOW_SPREAD = 9;  // how far its halo reaches
+const starGlows = {};
+for (const colour of STAR_COLORS) {
+  if (starGlows[colour]) continue;   // the list repeats white; bake it once
+  const cv = document.createElement("canvas");
+  cv.width = GLOW_ART;
+  cv.height = GLOW_ART;
+  const c = cv.getContext("2d");
+  c.fillStyle = colour;
+  c.shadowColor = colour;
+  c.shadowBlur = GLOW_SPREAD;
+  // One fill paints the star AND its halo, which is exactly what the game used
+  // to ask for every frame — the same picture, made once instead of 13,200
+  // times a second. Filling twice would double the halo and wash the sky out.
+  c.beginPath();
+  c.arc(GLOW_ART / 2, GLOW_ART / 2, GLOW_DOT, 0, Math.PI * 2);
+  c.fill();
+  starGlows[colour] = cv;
+}
+
 // Make one star. Bigger stars drift a little faster, which makes the
 // field feel deep — like nearer stars zipping past farther ones.
 function makeStar(anywhere) {
@@ -2672,9 +2839,10 @@ function makeStar(anywhere) {
 }
 for (let i = 0; i < STAR_COUNT; i++) stars.push(makeStar(true));
 
-// Draw + move the stars, ~60 times a second, forever.
-function drawStars() {
-  starCtx.clearRect(0, 0, starCanvas.width, starCanvas.height);
+// moveStars(): drift them down the screen. This is called from the game loop's
+// own clock, once per sixtieth of a second, so the stars fly past at the same
+// speed on a phone as on a computer — the same reason the game itself does.
+function moveStars() {
   for (const s of stars) {
     // Drift downward; when a star falls off the bottom, send it back to
     // the top at a new spot so the field never runs out.
@@ -2684,25 +2852,34 @@ function drawStars() {
       s.x = Math.random() * starCanvas.width;
     }
     // Twinkling stars fade in and out; the rest stay steady.
-    let alpha = 1;
-    if (s.twinkle) {
-      s.phase += s.twinkleSpeed;
-      alpha = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(s.phase));
-    }
-    starCtx.globalAlpha = alpha;
-    starCtx.fillStyle = s.color;
-    // A soft glow in the star's own colour makes it twinkle nicely.
-    starCtx.shadowColor = s.color;
-    starCtx.shadowBlur = s.size * 3;
-    starCtx.beginPath();
-    starCtx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
-    starCtx.fill();
+    if (s.twinkle) s.phase += s.twinkleSpeed;
+  }
+}
+
+// drawStars(): paint them. One stamp of a pre-blurred glow per star.
+function drawStars() {
+  starCtx.clearRect(0, 0, starCanvas.width, starCanvas.height);
+  for (const s of stars) {
+    starCtx.globalAlpha = s.twinkle
+      ? 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(s.phase))
+      : 1;
+    const glow = starGlows[s.color];
+    const wide = s.size * (GLOW_ART / GLOW_DOT); // scaled to this star's size
+    starCtx.drawImage(glow, s.x - wide / 2, s.y - wide / 2, wide, wide);
   }
   starCtx.globalAlpha = 1;
-  starCtx.shadowBlur = 0;
-  requestAnimationFrame(drawStars);
 }
+
+
+// =====================================================================
+// =====  START EVERYTHING.  ===========================================
+// =====================================================================
+// Last of all, because the loop draws the stars as well as the game, and the
+// starfield above has to exist before it is asked to paint anything.
+setup();
+draw();          // paint the start screen straight away, not a frame late
 drawStars();
+requestAnimationFrame(loop);
 </script>
 </body>
 </html>

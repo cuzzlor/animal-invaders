@@ -21,6 +21,46 @@ nothing to install, no internet needed.
 The game pauses itself if you switch tabs or click away, so nothing happens
 while you're not looking.
 
+## The same speed on every device ⏱️
+
+The game keeps its own clock, so it plays at the same speed on a phone, a
+tablet and a computer.
+
+That used to be a problem. Everything in the game moves by so much **a frame** —
+your ship goes 4 pixels, a beam burns for 180 frames — and how many frames a
+second you get depends on the device. A computer usually draws 60. A new iPad
+draws up to 120. An iPhone in Low Power Mode, or one that has got warm, draws
+only 30 — and at 30 frames a second the whole game ran in slow motion. Half
+speed, but perfectly smooth, which is what made it hard to spot.
+
+Now the game looks at how much **real** time has gone by since the last frame
+and moves everything on by that much. One step is still a sixtieth of a second,
+exactly as before, so all the numbers in the game mean what they always meant.
+What changed is how many steps a frame gets: a phone drawing 30 frames a second
+takes two steps each frame and plays at exactly the same speed as a computer.
+
+If a device gets so slow that it cannot keep up — below about 12 frames a second
+— the game stops trying to catch up and runs slow instead. Stalling would be
+worse than slowing.
+
+The game also does much less work to draw a frame now, so a phone has a better
+chance of reaching its full frame rate. Every animal is a grid of little
+coloured squares, and each square used to be painted one at a time — about 4000
+squares a frame for a full herd, one cow alone being 123 of them. Now each
+animal is painted once when the game opens, and after that it is stamped down in
+one go. The stars behind the game were blurred 220 times a frame; now each
+colour of star is blurred one time and stamped as well. Altogether the game asks
+the browser to draw about **75,000** things a second where it used to ask for
+**646,000**, and the picture is the same to the pixel.
+
+Want to see what your phone is really doing? Put `?fps` on the end of the
+address (`index.html?fps`) and a small line under the buttons tells you the
+frames a second, the steps per frame and how long a frame takes. On a computer
+it says something like `60fps · 1.00 ticks · 16.7ms`; on a phone in Low Power
+Mode you should see `30fps · 2.00 ticks · 33.3ms` — half the frames, twice the
+steps in each, the same speed. `TICK_MS` is how long one step of game time is,
+and `MAX_CATCHUP` is how many steps one frame may make up.
+
 ## The sound of space 🌌
 
 Underneath the pews and the bangs there's a drone — the sound of being out
