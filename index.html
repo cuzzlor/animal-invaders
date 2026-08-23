@@ -43,17 +43,43 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    /* Centre the game in the space you can SEE — same reason as the dvh on
+       #game below. On an iPhone or iPad, 100% here is the taller page with
+       Safari's bar hidden, which pushes the game down out of view. */
     height: 100%;
+    height: 100dvh;
   }
   #game {
     /* Fit the game inside the screen on ANY device, keeping its shape.
-       91.67vh = 100vh × (880 ÷ 960) — the canvas's width-to-height ratio.
-       So on wide screens it fills the height, and on narrow phones it
-       shrinks to fit the width instead — never squashed, never cut off.
+
+       We let the BROWSER do the fitting. A <canvas> already knows it is
+       880 by 960, so giving it a largest width and a largest height and
+       leaving both sizes on "auto" makes the browser shrink it until it
+       fits inside both — keeping its shape exactly, the way a photo fits
+       in a frame. Never squashed, never cut off.
+
+       This used to be worked out by hand, as min(100vw, 91.67vh), and it
+       cut the top off the game on an iPad. 91.67vh is 100vh × (880 ÷ 960),
+       so the game came out EXACTLY 100vh tall on any screen wider than it
+       is tall — not a pixel to spare. And on an iPhone or an iPad, 100vh
+       is not what you can see: it is how tall the page would be if
+       Safari's address bar were hidden. With the bar showing, the game was
+       taller than the space for it, and the score along the top was cut
+       off the screen. "dvh" is the honest one — d for dynamic — and it
+       means the height you can actually see right now. Plain vh is left in
+       first for older browsers, which ignore the dvh line below it.
+
        Transparent background so the moving stars show through behind it. */
     display: block;
-    width: min(100vw, 91.67vh);
+    width: auto;
     height: auto;
+    max-width: 100vw;
+    /* The 6px is deliberate breathing room. What broke this on the iPad was a
+       fit with NOTHING to spare, where a fraction of a pixel of rounding was
+       enough to cut the score off the top. Three pixels above and three below
+       costs nothing you can see and cannot be rounded away. */
+    max-height: calc(100vh - 6px);
+    max-height: calc(100dvh - 6px);
     background: transparent;
     /* The 880px canvas is scaled to fit your screen. By default the browser
        BLURS that scaling; "pixelated" keeps the pixel-art sprites crisp. */
@@ -553,7 +579,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-08-22 clock";
+const BUILD = "2026-08-22 fit";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
@@ -2627,9 +2653,14 @@ function draw() {
     ctx.fillText("Flying: " + currentShip().name + "   •   best run: " + bestRun, W / 2, 360);
     // Which copy of the game this is — see BUILD, up at the top. Small and
     // grey, because it is only there for the day a phone will not update.
+    // The build, and the frames a second this device is really managing. Both
+    // are here, on the screen you land on, so that working out "is my phone
+    // running the new game, and is it keeping up?" needs nothing tapped and
+    // nothing typed into the address bar.
     ctx.fillStyle = "#555";
     ctx.font = "13px 'Courier New', monospace";
-    ctx.fillText("build " + BUILD, W / 2, 386);
+    ctx.fillText("build " + BUILD + (fpsRate ? "   ·   " + fpsRate + " fps" : ""),
+                 W / 2, 386);
     // The best games so far, right on the start screen.
     drawLeaderboard(W / 2, 410);
   }
@@ -2766,7 +2797,7 @@ function loop(now) {
 let SHOW_FPS = (function () {
   try { return /(\?|&)fps\b/.test(location.search); } catch (e) { return false; }
 })();
-let fpsFrames = 0, fpsTicks = 0, fpsSince = 0, fpsShown = "";
+let fpsFrames = 0, fpsTicks = 0, fpsSince = 0, fpsShown = "", fpsRate = 0;
 
 // Turn the readout on or off, and start its counting again from nothing so the
 // first reading is a true one rather than an average of the wait.
@@ -2779,18 +2810,21 @@ function toggleFpsReadout() {
 }
 
 function countFrame(now) {
-  if (!SHOW_FPS) return;
+  // Counted on every frame whether or not the line is showing, because the
+  // start screen prints the frame rate beside the build with nothing tapped.
   fpsFrames++;
   fpsTicks += lastTicks;
   if (!fpsSince) fpsSince = now;
   const over = now - fpsSince;
   if (over >= 500) {          // work it out twice a second
+    fpsRate = Math.round(fpsFrames * 1000 / over);
     // Kept short so it fits in the gap to the left of the herd.
-    fpsShown = (fpsFrames * 1000 / over).toFixed(0) + "fps · " +
+    fpsShown = fpsRate + "fps · " +
                (fpsTicks / fpsFrames).toFixed(2) + " ticks · " +
                (over / fpsFrames).toFixed(1) + "ms";
     fpsFrames = 0; fpsTicks = 0; fpsSince = now;
   }
+  if (!SHOW_FPS) return;
   // Top left, under the sound and pause buttons: clear of the score, clear of
   // the boss's health bar, and — unlike the bottom of the screen — clear of the
   // line of key hints the page prints under the game.
