@@ -386,6 +386,31 @@ const ANIMALS = [
   { animal: PENGUIN_ART, shot: ICE_ART    }, // penguin shoots ice
 ];
 const PLAYER     = ROCKET_ART;   // your starting ship (or an emoji)
+
+// HOW FAST THE WHOLE GAME PLAYS. 1 is the speed it was designed at; 2 plays it
+// at double speed, 0.5 at half. Try 3 if you're feeling brave.
+//
+// This is one number for the pace of EVERYTHING — the herd, your ship, the
+// bullets, how quickly guns reload, how long a beam burns. That is exactly why
+// it is safe to change: it speeds up the whole game together, so nothing gets
+// easier or harder RELATIVE to anything else. Only the clock moves.
+//
+// (2 is here because for a long time the game ran at double speed on a 120Hz
+// screen by accident — one step per screen refresh — and that turned out to be
+// the pace everybody liked. Now every device plays at it.)
+const GAME_SPEED = 2;
+
+// Every gun in the game is timed in steps, and the shop tells you what that is
+// in seconds. These two work the seconds out from the steps, so that turning
+// GAME_SPEED up can never leave the shop telling you a beam burns for three
+// seconds when it burns for one and a half.
+function secs(steps) {
+  const t = steps / 60 / GAME_SPEED;
+  return (t < 1 ? t.toFixed(2).replace(/0+$/, "").replace(/\.$/, "") : +t.toFixed(1)) + "s";
+}
+function aSecond(everySteps) {
+  return Math.round(60 * GAME_SPEED / everySteps);
+}
 const BULLET_COLOR  = "#7ef9ff"; // colour of YOUR laser streaks — try "#ff5", "#f6f"
 const BULLET_LENGTH = 22;  // how long your shots look (bigger = longer streaks)
 
@@ -396,8 +421,8 @@ const BULLET_LENGTH = 22;  // how long your shots look (bigger = longer streaks)
 // reach the good ships sooner!
 // How often each gun can shoot, in frames (60 frames = one second), and
 // how far the BLAST CANNON's explosion reaches.
-const RAPID_EVERY = 12;  // between RAPID FIRE shots (12 = five a second)
-const BOMB_RELOAD = 30;  // between BLAST CANNON shells (30 = half a second)
+const RAPID_EVERY = 12;  // between RAPID FIRE shots (12 = five a second at GAME_SPEED 1)
+const BOMB_RELOAD = 30;  // between BLAST CANNON shells (30 = half a second at GAME_SPEED 1)
 const BOMB_RADIUS = 95;  // how far the blast reaches, in pixels
 const BOMB_CORE   = 44;  // inside this it's full strength; past it, half
 const BOMB_BOOM   = 3.4; // how big the bang LOOKS (bigger = more flying bits)
@@ -414,7 +439,7 @@ const BOMB_RING   = 20;  // frames the shockwave ring takes to reach full size
 // soon as you swing away. `drag` is how slowly you steer while it's lit, and
 // `arc` is how far the current jumps sideways to animals beside the beam
 // (0 = it doesn't jump at all).
-const BEAM_TIME    = 180;  // frames the red beam burns for (180 = 3 seconds)
+const BEAM_TIME    = 180;  // steps the red beam burns for (180 = 3s at GAME_SPEED 1)
 const BEAM_RELOAD  = 60;   // frames it reloads for afterwards (60 = 1 second)
 const BEAM_WIDTH   = 18;   // how wide the beam's bright core is, in pixels
 const BEAM_BURN    = 16;   // frames an animal must be held in the beam before it melts
@@ -433,7 +458,7 @@ const LASER_BEAM = {
 // hop would be too weak to finish anything, so it would be all show and no
 // bite. That fall-off is what stops one burn taking the whole wave. This is
 // also the heaviest gun in the game to steer.
-const BOLT_TIME    = 300;  // frames the electric beam burns for (300 = 5 seconds)
+const BOLT_TIME    = 300;  // steps the electric beam burns for (300 = 5s at GAME_SPEED 1)
 const BOLT_RELOAD  = 60;   // frames it reloads for afterwards (60 = 1 second)
 const BOLT_ARC     = 76;   // how far the current jumps in one hop, in pixels
 const BOLT_JUMP    = 0.5;  // how much of the last hop's punch the next one keeps
@@ -455,7 +480,8 @@ const SHIPS = [
   {
     id: "rapid", name: "RAPID FIRE", art: RAPID_ROCKET_ART, need: 2500, fire: "single",
     damage: 0.5, reload: RAPID_EVERY, auto: true, // `auto` = keeps firing while held
-    blurb: ["HOLD to pour out five shots a second,", "but each one hits only half as hard."],
+    blurb: ["HOLD to pour out " + aSecond(RAPID_EVERY) + " shots a second,",
+            "but each one hits only half as hard."],
   },
   {
     id: "twin", name: "TWIN BLASTER", art: TWIN_ROCKET_ART, need: 5000, fire: "twin", damage: 1, reload: 0,
@@ -464,17 +490,20 @@ const SHIPS = [
   {
     id: "bomb", name: "BLAST CANNON", art: BOMB_ROCKET_ART, need: 7500, fire: "bomb",
     damage: 1, reload: BOMB_RELOAD,
-    blurb: ["A shell that BLOWS UP where it lands,", "wiping out all nearby. Reloads 0.5s."],
+    blurb: ["A shell that BLOWS UP where it lands,",
+            "wiping out all nearby. Reloads " + secs(BOMB_RELOAD) + "."],
   },
   {
     id: "laser", name: "RED LASER", art: LASER_ROCKET_ART, need: 10000, fire: "laser", damage: 1, reload: 0,
     beam: LASER_BEAM,
-    blurb: ["A beam that smashes clean through", "them all. Burns 3s, reloads 1s."],
+    blurb: ["A beam that smashes clean through",
+            "them all. Burns " + secs(BEAM_TIME) + ", reloads " + secs(BEAM_RELOAD) + "."],
   },
   {
     id: "volt", name: "ELECTRIC ARC", art: VOLT_ROCKET_ART, need: 15000, fire: "bolt", damage: 1, reload: 0,
     beam: VOLT_BEAM,
-    blurb: ["Lightning that WALKS through the herd,", "animal to animal. Burns 5s, reloads 1s."],
+    blurb: ["Lightning that WALKS through the herd,",
+            "animal to animal. Burns " + secs(BOLT_TIME) + ", reloads " + secs(BOLT_RELOAD) + "."],
   },
 ];
 
@@ -579,7 +608,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-08-22 fit";
+const BUILD = "2026-08-22 speed2";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
@@ -2727,8 +2756,13 @@ function draw() {
 // sixtieths as we owe. A phone drawing 30 frames a second runs two each frame
 // and plays at exactly the same speed as a computer.
 // ---------------------------------------------------------------------
-const TICK_MS     = 1000 / 60; // how much game time one update() is worth
-const MAX_CATCHUP = 5;         // most sixtieths we will make up in one frame
+// One step of game time, and how many of them one frame may make up. Both are
+// divided by GAME_SPEED, so turning the game's speed up shortens the step
+// rather than changing any of the numbers the game is tuned with — and the
+// catch-up allowance grows with it, so the frame rate the game can hold full
+// speed down to (about 12 a second) stays the same however fast you set it.
+const TICK_MS     = 1000 / 60 / GAME_SPEED;
+const MAX_CATCHUP = 5 * GAME_SPEED;
 let frameClock = 0;   // the clock reading at the last frame
 let tickDebt   = 0;   // game time we owe, in milliseconds
 let starDebt   = 0;   // and the same for the stars, which never stop

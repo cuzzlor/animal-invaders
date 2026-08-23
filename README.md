@@ -34,14 +34,33 @@ only 30 — and at 30 frames a second the whole game ran in slow motion. Half
 speed, but perfectly smooth, which is what made it hard to spot.
 
 Now the game looks at how much **real** time has gone by since the last frame
-and moves everything on by that much. One step is still a sixtieth of a second,
-exactly as before, so all the numbers in the game mean what they always meant.
-What changed is how many steps a frame gets: a phone drawing 30 frames a second
-takes two steps each frame and plays at exactly the same speed as a computer.
+and moves everything on by that much. What changed is how many steps a frame
+gets: a phone drawing 30 frames a second takes two steps each frame, and plays
+at exactly the same speed as a computer.
 
 If a device gets so slow that it cannot keep up — below about 12 frames a second
 — the game stops trying to catch up and runs slow instead. Stalling would be
 worse than slowing.
+
+### How fast is "the same speed"? 🏃
+
+`GAME_SPEED`, near the top of `index.html`, is the pace of the whole game. It is
+set to **2**, which means double the speed the numbers in the game were first
+written for.
+
+There is a story behind that. Before the game kept its own clock it took one
+step per screen refresh — so on a 120Hz screen, like a recent Mac or iPad Pro,
+it took 120 steps a second instead of 60 and played at **double speed**. That
+turned out to be the pace everybody liked, and it is why the game felt slow on
+a plain 60Hz iPhone: the phone was right and the Mac was fast. So double speed
+is now simply what the game is, on every device.
+
+`GAME_SPEED` is a safe number to play with, and the most fun one in the file. It
+moves the herd, your ship, the bullets, the reloads and the beams all together,
+so nothing becomes easier or harder **relative** to anything else — only the
+clock moves. Try 3. Try 0.5 for slow motion. The shop works its seconds out from
+it, so the cards never tell you a beam burns for three seconds when it burns for
+one and a half.
 
 The game also does much less work to draw a frame now, so a phone has a better
 chance of reaching its full frame rate. Every animal is a grid of little
@@ -58,15 +77,20 @@ playing and a small line appears under the buttons: the frames a second, the
 steps per frame, and how long a frame takes. Tap it again to put it away. (On a
 computer you can also put `?fps` on the end of the address.)
 
-On a computer it says something like `60fps · 1.00 ticks · 16.7ms`. On a phone
-in Low Power Mode you should see `30fps · 2.00 ticks · 33.3ms` — half the
-frames, twice the steps in each, the same speed. `TICK_MS` is how long one step
-of game time is, and `MAX_CATCHUP` is how many steps one frame may make up.
+On a 60Hz screen at `GAME_SPEED` 2 it says something like
+`60fps · 2.00 ticks · 16.7ms`; on a 120Hz screen, `120fps · 1.00 ticks · 8.3ms`.
+Different frame rates, the same steps a second, the same game. On a phone in Low
+Power Mode you should see `30fps · 4.00 ticks · 33.3ms` — a quarter of the
+frames of that iPad, four times the steps in each, still the same speed.
+
+`TICK_MS` is how long one step of game time is and `MAX_CATCHUP` is how many
+steps one frame may make up; both are worked out from `GAME_SPEED`, so the
+12-frames-a-second floor stays put however fast you set it.
 
 ## Which copy am I playing? 🏷️
 
 The foot of the start screen shows a **build** in small grey text, like
-`build 2026-08-22 clock`.
+`build 2026-08-22 speed2` — a date, and a word for what changed.
 
 It is there for one job. The game is shared as a link, and a phone can hold on
 to an old copy of a web page for a long time — so "I changed it but nothing
@@ -118,7 +142,7 @@ Two things make it a fair fight rather than a nasty one:
 
 - An aimed egg drifts sideways more slowly than you can fly, so **you can
   always outrun the one that's coming for you.** Keep moving and you'll live;
-  stand still and you won't last half a minute.
+  stand still and you won't last twenty seconds.
 - On a boss stage, losing a whole base **doesn't** end the run the way it does
   against the herd. Blowing your cover apart is the point of its eggs, and
   ending the game the moment it manages it would be no fun. You just have to
@@ -128,16 +152,16 @@ It gets faster and faster as you wear it down, so the last few hits are the
 hardest. Beating it is worth **500 points**, plus the usual stage bonus.
 
 Different ships make very different work of it. Roughly, how long one chicken
-takes to beat:
+takes to beat at the default `GAME_SPEED` of 2 — double these if you set it to 1:
 
 | Ship | How long |
 |------|----------|
-| Red Laser | ~16 s — a beam can't miss something that big |
-| Twin Blaster | ~23 s |
-| Electric Arc | ~24 s |
-| Blast Cannon | ~26–41 s |
-| Scout | ~32–43 s |
-| Rapid Fire | ~70–79 s |
+| Red Laser | ~8 s — a beam can't miss something that big |
+| Twin Blaster | ~12 s |
+| Electric Arc | ~12 s |
+| Blast Cannon | ~13–21 s |
+| Scout | ~16–22 s |
+| Rapid Fire | ~35–40 s |
 
 Rapid Fire is the slow way to do it, and that's its own trade-off: half-strength
 bullets are the worst possible thing to bring to something with real armour.
@@ -152,8 +176,8 @@ hits where one used to do — and Rapid Fire's half-strength bullets need four.
 An animal you've hurt but not finished fades, and the fainter it is the less of
 it is left, so you can always see which ones need another.
 
-There's still plenty of time: a wave takes about 90 seconds to reach the bottom,
-and the slowest ship clears one in about half that.
+There's still time, though less of it than it sounds: a wave takes about 45
+seconds to reach the bottom, and the slowest ship clears one in about half that.
 
 | Ship | What changes |
 |------|--------------|
@@ -185,11 +209,11 @@ back to exactly where you were — the new ship is in your hands immediately.
 | Ship | To earn it | What it does |
 |------|------------|--------------|
 | **Scout** | yours already | The rocket you start with. One shot at a time. |
-| **Rapid Fire** | score 2,500 in one game | **Hold** the button and it pours out five shots a second — but each one only hits half as hard, so most animals take two. |
+| **Rapid Fire** | score 2,500 in one game | **Hold** the button and it pours out ten shots a second — but each one only hits half as hard, so most animals take two. |
 | **Twin Blaster** | score 5,000 in one game | Two cannons — two bullets every shot, so you clear the herd twice as fast. |
-| **Blast Cannon** | score 7,500 in one game | Lobs a shell that **blows up** where it lands, clearing whatever it hits and the whole ring of animals around it — about seven at a time in the thick of the herd. Half a second to reload. |
-| **Red Laser** | score 10,000 in one game | A red beam that smashes clean through every animal it touches (and melts their shots). Burns for 3 seconds, then reloads for 1. |
-| **Electric Arc** | score 15,000 in one game | Lightning instead of a laser: the current **jumps sideways** from animal to animal, up to three deep either side of the beam. Burns for 5 seconds, then reloads for 1. |
+| **Blast Cannon** | score 7,500 in one game | Lobs a shell that **blows up** where it lands, clearing whatever it hits and the whole ring of animals around it — about seven at a time in the thick of the herd. A quarter of a second to reload. |
+| **Red Laser** | score 10,000 in one game | A red beam that smashes clean through every animal it touches (and melts their shots). Burns for 1.5 seconds, then reloads for half a second. |
+| **Electric Arc** | score 15,000 in one game | Lightning instead of a laser: the current **jumps sideways** from animal to animal, up to three deep either side of the beam. Burns for 2.5 seconds, then reloads for half a second. |
 
 Rapid Fire is the only ship you **hold** the button for; every other one fires
 once per press. An animal that's been hit but not finished off fades, so you can
