@@ -22,6 +22,18 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<!-- Add the game to an iPad or iPhone Home Screen and these make it open as a
+     game rather than a web page: no address bar, no toolbar. That matters for
+     more than tidiness — Safari's bar eats about a tenth of the height, and
+     the game is as big as the height allows, so losing the bar makes
+     everything on screen about a tenth bigger. The status bar is left black
+     and opaque (not "black-translucent") so the clock never sits on top of
+     your score. Ignored completely when the game is opened as a normal tab. -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Animal Invaders">
+<meta name="theme-color" content="#000000">
 <title>Animal Invaders</title>
 <style>
   /* Simple retro look. Black space background, white pixel-y text. */
@@ -74,12 +86,8 @@
     width: auto;
     height: auto;
     max-width: 100vw;
-    /* The 6px is deliberate breathing room. What broke this on the iPad was a
-       fit with NOTHING to spare, where a fraction of a pixel of rounding was
-       enough to cut the score off the top. Three pixels above and three below
-       costs nothing you can see and cannot be rounded away. */
-    max-height: calc(100vh - 6px);
-    max-height: calc(100dvh - 6px);
+    max-height: 100vh;
+    max-height: 100dvh;
     background: transparent;
     /* The 880px canvas is scaled to fit your screen. By default the browser
        BLURS that scaling; "pixelated" keeps the pixel-art sprites crisp. */
@@ -608,7 +616,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-08-22 restart";
+const BUILD = "2026-08-22 bigger";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player

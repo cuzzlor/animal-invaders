@@ -21,6 +21,18 @@ nothing to install, no internet needed.
 The game pauses itself if you switch tabs or click away, so nothing happens
 while you're not looking.
 
+### Make it bigger on an iPad or iPhone 📱
+
+The game is drawn as big as the height of the screen allows, and on a phone or
+tablet Safari's address bar takes about a tenth of that height away. **Add the
+game to your Home Screen** and it opens with no address bar and no toolbar — so
+everything is about a tenth bigger, and it looks like a game instead of a web
+page. Tap the share button, then "Add to Home Screen".
+
+(In portrait the game is limited by the WIDTH of the screen instead, so the bar
+costs you nothing there and the space above and below is simply the shape of the
+board. Turn the tablet sideways for the biggest picture.)
+
 The **⏮ button** starts your whole run again: back to stage 1, no score, all
 three lives, a fresh board. It is the "I have had enough of this run, let me
 begin again" button — not a way to retry the wave you are on. A ship you earned
@@ -98,7 +110,7 @@ steps one frame may make up; both are worked out from `GAME_SPEED`, so the
 ## Which copy am I playing? 🏷️
 
 The foot of the start screen shows a **build** in small grey text, like
-`build 2026-08-22 restart` — a date, and a word for what changed.
+`build 2026-08-22 bigger` — a date, and a word for what changed.
 
 It is there for one job. The game is shared as a link, and a phone can hold on
 to an old copy of a web page for a long time — so "I changed it but nothing
