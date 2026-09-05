@@ -198,7 +198,7 @@
 <canvas id="stars"></canvas>
 <div id="wrap">
   <canvas id="game" width="880" height="960"></canvas>
-  <p>Move: ← →  (or A / D) &nbsp;•&nbsp; Shoot: Space &nbsp;•&nbsp; Pause: P &nbsp;•&nbsp; Restart stage: R &nbsp;•&nbsp; Play again: Enter &nbsp;•&nbsp; Shop: S &nbsp;•&nbsp; Sound: M</p>
+  <p>Move: ← →  (or A / D) &nbsp;•&nbsp; Shoot: Space &nbsp;•&nbsp; Pause: P &nbsp;•&nbsp; Start over: R &nbsp;•&nbsp; Play again: Enter &nbsp;•&nbsp; Shop: S &nbsp;•&nbsp; Sound: M</p>
 </div>
 
 <!-- Pops up only when you make the high-score top 20. See the CSS above. -->
@@ -608,7 +608,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-08-22 speed2";
+const BUILD = "2026-08-22 restart";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
@@ -731,8 +731,6 @@ let gunTimer;      // frames until this ship's gun has finished reloading
 let invuln;        // frames left of "just got hit, can't be hit again yet"
 let stage;         // which wave you're on (1, 2, 3, ...) — everything speeds up
 let stageBanner;   // frames left to show the "STAGE N" banner
-let stageStartScore; // the score and lives you had when this stage began —
-let stageStartLives; // what the ⏮ restart button winds you back to
 let gameOverHandled; // did we already deal with this game over (save score etc.)?
 let enteringName;  // true while the "new high score!" name box is open
 let lastEntry;     // the run you just saved, so we can highlight it gold
@@ -841,10 +839,6 @@ function buildLevel() {
   beamCooldown = 0;
   gunTimer = 0;
   stageBanner = BANNER_TIME;
-  // Remember where you stood as this wave began, so the ⏮ button can put
-  // you back exactly here.
-  stageStartScore = score;
-  stageStartLives = lives;
 }
 
 // ---------------------------------------------------------------------
@@ -920,17 +914,26 @@ function closeShop() {
 }
 
 // ---------------------------------------------------------------------
-// restartStage(): put the current wave back exactly as it began — a full
-// herd, fresh bases, and the score and lives you had when the stage
-// started. You keep your stage number (and the speed that comes with it);
-// only what you did THIS stage is rewound. Winding the score back too is
-// what stops it being a way to farm points off a half-cleared wave.
+// restartGame(): start the whole run again from the beginning — stage 1,
+// no score, all your lives back, a fresh board. It is the "I have had
+// enough of this run, let me begin again" button, not a way to retry one
+// wave: the stage number goes back to 1 along with everything else, and
+// the speed the herd had built up over the stages goes with it.
+//
+// The one thing it does NOT throw away is a ship you earned along the way.
+// Ships are unlocked by the best score you have ever reached in a single
+// run, so a run worth remembering is banked before the score is wiped —
+// otherwise pressing this at 16,000 points would quietly cost you the
+// ELECTRIC ARC you had just earned. It leaves the high-score board alone,
+// though: that is for runs you played out to the end.
 // ---------------------------------------------------------------------
-function restartStage() {
+function restartGame() {
   if (state !== "playing") return;
-  score = stageStartScore;
-  lives = stageStartLives;
-  buildLevel(); // re-lays the wave, and re-takes the same snapshot
+  if (score > bestRun) {
+    bestRun = score;
+    saveShop();
+  }
+  newGame("playing"); // stage 1, score 0, full lives, fresh board, un-paused
 }
 
 // togglePause(): freeze / un-freeze a game in progress. Everything stops
@@ -992,8 +995,8 @@ document.addEventListener("keydown", (e) => {
     if (state === "shop") closeShop(); else togglePause();
     return;
   }
-  // R starts the stage you're on again, from the top.
-  if (e.key === "r" || e.key === "R") { restartStage(); return; }
+  // R starts the whole run again, from stage 1.
+  if (e.key === "r" || e.key === "R") { restartGame(); return; }
   // S opens the shop from the start or game-over screen (and shuts it again).
   if (e.key === "s" || e.key === "S") {
     if (state === "shop") closeShop(); else openShop();
@@ -1371,7 +1374,7 @@ canvas.addEventListener("pointerdown", (e) => {
   }
   if (state === "playing" && hitIcon(p, RESTART_ICON)) {
     e.stopPropagation();
-    restartStage();
+    restartGame();
     return;
   }
   if (state === "playing" && hitIcon(p, SHOP_ICON)) {
@@ -2391,9 +2394,9 @@ function drawIcons() {
   ctx.globalAlpha = soundOn ? 1 : 0.45;
   ctx.fillText(soundOn ? "🔊" : "🔇", SOUND_ICON.x, SOUND_ICON.y + SOUND_ICON.h / 2);
   // Pause: shows ⏸ while the game is running and ▶ while it's paused —
-  // i.e. what the button will DO next. Then ⏮, which starts the stage you're
-  // on again. Both only appear mid-game, since there's nothing to pause or
-  // restart on the start and game-over screens.
+  // i.e. what the button will DO next. Then ⏮, which starts the whole run
+  // again from stage 1. Both only appear mid-game, since there's nothing to
+  // pause or restart on the start and game-over screens.
   ctx.globalAlpha = 1;
   if (state === "playing") {
     ctx.fillText(paused ? "▶️" : "⏸️", PAUSE_ICON.x, PAUSE_ICON.y + PAUSE_ICON.h / 2);

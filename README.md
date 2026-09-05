@@ -15,11 +15,19 @@ nothing to install, no internet needed.
 | Shoot | `Spacebar` |
 | Pause / un-pause | `P` (or tap the ⏸ button, top-left) |
 | Play again after you win or lose | `Enter` |
-| Restart the stage you're on | `R` (or tap the ⏮ button, top-left) |
+| Start the whole run again | `R` (or tap the ⏮ button, top-left) |
 | Open the ship shop | `S` (or tap the 🛒 button / SHOP button) |
 
 The game pauses itself if you switch tabs or click away, so nothing happens
 while you're not looking.
+
+The **⏮ button** starts your whole run again: back to stage 1, no score, all
+three lives, a fresh board. It is the "I have had enough of this run, let me
+begin again" button — not a way to retry the wave you are on. A ship you earned
+along the way is kept: the best score you reached is banked before the run is
+wiped, so pressing it at 16,000 points does not quietly cost you the Electric
+Arc. It leaves the high-score board alone, though; that is for runs you play out
+to the end.
 
 ## The same speed on every device ⏱️
 
@@ -90,7 +98,7 @@ steps one frame may make up; both are worked out from `GAME_SPEED`, so the
 ## Which copy am I playing? 🏷️
 
 The foot of the start screen shows a **build** in small grey text, like
-`build 2026-08-22 speed2` — a date, and a word for what changed.
+`build 2026-08-22 restart` — a date, and a word for what changed.
 
 It is there for one job. The game is shared as a link, and a phone can hold on
 to an old copy of a web page for a long time — so "I changed it but nothing
