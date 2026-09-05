@@ -17,9 +17,19 @@ nothing to install, no internet needed.
 | Play again after you win or lose | `Enter` |
 | Start the whole run again | `R` (or tap the ⏮ button, top-left) |
 | Open the ship shop | `S` (or tap the 🛒 button / SHOP button) |
+| Fill the screen | `F` (computers) |
 
 The game pauses itself if you switch tabs or click away, so nothing happens
 while you're not looking.
+
+### Make it bigger 🔍
+
+The game is drawn as big as the **height** of the screen allows, keeping its
+shape. So the way to make it bigger is to give it more height.
+
+On a computer, press **`F`** for full screen. Your browser's tabs, address bar
+and bookmarks can easily eat a third of the window, and full screen hands all of
+it back. Press `F` again to come out.
 
 ### Make it bigger on an iPad or iPhone 📱
 
@@ -32,6 +42,10 @@ page. Tap the share button, then "Add to Home Screen".
 (In portrait the game is limited by the WIDTH of the screen instead, so the bar
 costs you nothing there and the space above and below is simply the shape of the
 board. Turn the tablet sideways for the biggest picture.)
+
+On a big screen the game grows past the 880×960 it is drawn at, rather than
+sitting at that size in the middle of an empty window — so a full-screen laptop
+gets about 900 across, and a large monitor about 1300.
 
 The **⏮ button** starts your whole run again: back to stage 1, no score, all
 three lives, a fresh board. It is the "I have had enough of this run, let me
@@ -110,7 +124,7 @@ steps one frame may make up; both are worked out from `GAME_SPEED`, so the
 ## Which copy am I playing? 🏷️
 
 The foot of the start screen shows a **build** in small grey text, like
-`build 2026-08-22 bigger` — a date, and a word for what changed.
+`build 2026-08-22 fullscreen` — a date, and a word for what changed.
 
 It is there for one job. The game is shared as a link, and a phone can hold on
 to an old copy of a web page for a long time — so "I changed it but nothing

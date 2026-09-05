@@ -83,11 +83,23 @@
 
        Transparent background so the moving stars show through behind it. */
     display: block;
-    width: auto;
+    /* Work the width out from the height, and let the height be all of the
+       screen you can see. Written as a min() of the two so whichever runs out
+       first decides: on a wide screen the height does, and on a narrow phone
+       the width does. 11/12 is 880/960 exactly — the shape of the board.
+
+       It has to be done this way round rather than with max-width/max-height,
+       because a canvas has a natural size (880 by 960) and those only ever
+       shrink it to fit — never grow it. On a big screen that left the game
+       stuck at 880 across with the rest of the screen empty.
+
+       The 2px is the whole safety margin. A fit with NOTHING spare is what cut
+       the score off the top of the iPad before: this arithmetic lands on
+       exactly the height of the screen, and a fraction of a pixel of rounding
+       is enough to tip it over the edge and have it clipped. */
+    width: min(100vw, calc((100vh - 2px) * 11 / 12));
+    width: min(100vw, calc((100dvh - 2px) * 11 / 12));
     height: auto;
-    max-width: 100vw;
-    max-height: 100vh;
-    max-height: 100dvh;
     background: transparent;
     /* The 880px canvas is scaled to fit your screen. By default the browser
        BLURS that scaling; "pixelated" keeps the pixel-art sprites crisp. */
@@ -206,7 +218,7 @@
 <canvas id="stars"></canvas>
 <div id="wrap">
   <canvas id="game" width="880" height="960"></canvas>
-  <p>Move: ← →  (or A / D) &nbsp;•&nbsp; Shoot: Space &nbsp;•&nbsp; Pause: P &nbsp;•&nbsp; Start over: R &nbsp;•&nbsp; Play again: Enter &nbsp;•&nbsp; Shop: S &nbsp;•&nbsp; Sound: M</p>
+  <p>Move: ← →  (or A / D) &nbsp;•&nbsp; Shoot: Space &nbsp;•&nbsp; Pause: P &nbsp;•&nbsp; Start over: R &nbsp;•&nbsp; Play again: Enter &nbsp;•&nbsp; Shop: S &nbsp;•&nbsp; Sound: M &nbsp;•&nbsp; Full screen: F</p>
 </div>
 
 <!-- Pops up only when you make the high-score top 20. See the CSS above. -->
@@ -616,7 +628,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-08-22 bigger";
+const BUILD = "2026-08-22 fullscreen";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
@@ -944,6 +956,23 @@ function restartGame() {
   newGame("playing"); // stage 1, score 0, full lives, fresh board, un-paused
 }
 
+// toggleFullScreen(): fill the whole screen, or go back to a window. The
+// browser only allows this from a key press or a tap, which is why it hangs off
+// the F key rather than happening on its own. Safari wants its own spelling of
+// both calls, and if the browser will not do it at all we just carry on in a
+// window — there is nothing to tell the player, and nothing to break.
+function toggleFullScreen() {
+  try {
+    const el = document.documentElement;
+    const isFull = document.fullscreenElement || document.webkitFullscreenElement;
+    if (isFull) {
+      (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+    } else {
+      (el.requestFullscreen || el.webkitRequestFullscreen).call(el);
+    }
+  } catch (e) { /* not allowed here — stay in the window */ }
+}
+
 // togglePause(): freeze / un-freeze a game in progress. Everything stops
 // moving (update() bails out) but the screen keeps being drawn, so you see
 // the board exactly as you left it under a "PAUSED" sign. Only means
@@ -1005,6 +1034,12 @@ document.addEventListener("keydown", (e) => {
   }
   // R starts the whole run again, from stage 1.
   if (e.key === "r" || e.key === "R") { restartGame(); return; }
+  // F fills the screen. On a computer this is where the size is: the game is
+  // drawn as big as the height allows, and the browser's own tabs, address bar
+  // and bookmarks can easily eat a third of it. Full screen hands all of it
+  // back. (A phone has no F key, and on an iPad you add the game to the Home
+  // Screen instead — see the meta tags at the top of the file.)
+  if (e.key === "f" || e.key === "F") { toggleFullScreen(); return; }
   // S opens the shop from the start or game-over screen (and shuts it again).
   if (e.key === "s" || e.key === "S") {
     if (state === "shop") closeShop(); else openShop();
