@@ -13,14 +13,28 @@ nothing to install, no internet needed.
 |--------|------|
 | Move left / right | ← →  (or `A` / `D`) |
 | Shoot | `Spacebar` |
-| Pause / un-pause | `P` (or tap the ⏸ button, top-left) |
+| Pause / un-pause | `P` (or tap the two bars, top-left) |
 | Play again after you win or lose | `Enter` |
-| Start the whole run again | `R` (or tap the ⏮ button, top-left) |
-| Open the ship shop | `S` (or tap the 🛒 button / SHOP button) |
+| Start the whole run again | `R` (or tap the arrows that point back, top-left) |
+| Open the ship shop | `S` (or tap the trolley, top-left, or the SHOP button) |
 | Fill the screen | `F` (computers) |
 
 The game pauses itself if you switch tabs or click away, so nothing happens
 while you're not looking.
+
+### The four buttons in the corner 🕹️
+
+Under the score there is a row of four: a **speaker** to turn the sound off and
+on, **two bars** to pause (they become an arrow to start again), **arrows that
+point back** to begin the whole run afresh, and a **trolley** for the ship shop.
+The last three only appear while you are playing.
+
+They are drawn from the same fat pixels as the animals and the ships, out of the
+same kind of letter grid — look for `SOUND_ON_ART`, `PAUSE_ART`, `PLAY_ART`,
+`RESTART_ART` and `SHOP_ART` near the animals in `index.html`. Change a letter to
+change a button. They were emoji before, and an emoji is drawn by the device, not
+by the game: an iPad drew one picture, a computer drew another, and neither one
+was made of the same square pixels as the rest of the screen. These are.
 
 ### Make it bigger 🔍
 
@@ -52,7 +66,8 @@ On a big screen the game grows past the 880×960 it is drawn at, rather than
 sitting at that size in the middle of an empty window — so a full-screen laptop
 gets about 900 across, and a large monitor about 1300.
 
-The **⏮ button** starts your whole run again: back to stage 1, no score, all
+The **start-again button** — the two arrows that point back to a bar, third
+along the top-left — begins your whole run again: back to stage 1, no score, all
 three lives, a fresh board. It is the "I have had enough of this run, let me
 begin again" button — not a way to retry the wave you are on. A ship you earned
 along the way is kept: the best score you reached is banked before the run is
@@ -159,7 +174,7 @@ over the noise on a twenty-second breath, so it never quite repeats.
 
 It fades up when you start playing and fades away again when you pause, mute,
 open the shop, or click off to another tab — so it's never droning at you when
-you've stopped. Press `M` (or the 🔊 button) to turn all the sound off. Want it
+you've stopped. Press `M` (or the speaker button) to turn all the sound off. Want it
 louder or quieter? `SPACE_LEVEL` near the sound code in `index.html`.
 
 Shoot all the cows to win. Dodge the milk bottles — if one hits you, you lose a
@@ -241,7 +256,7 @@ lots of games — all in one run. Manage it once and the ship is yours forever,
 however badly the next game goes.
 
 Visit the **SHOP** to fly what you've earned: from the start screen, from the
-game-over screen, or mid-game with the 🛒 button next to the pause button. Going
+game-over screen, or mid-game with the trolley button along the top-left. Going
 in mid-game freezes your run and pauses it, so you swap ships and come straight
 back to exactly where you were — the new ship is in your hands immediately.
 

@@ -395,6 +395,55 @@ const ICE_ART = spr([
   ".CCCCCCC.", "CCCCCCCCC", "CCWWCCCCC", "CCWCCCCCC", "CCCCCCCCC",
   "CCCCCCCCC", "CCCCCCCCC", ".CCCCCCC.", ".........",
 ]);
+// The four little buttons at the top-left corner: sound, pause, start-again
+// and shop. They are pixel art too, drawn from the same letter grids as the
+// animals and the ships, so the whole screen is made of the same fat pixels.
+// Each grid is 15 x 15, which puts the middle of the picture on the middle
+// square. Change a letter here to change a button.
+const SOUND_ON_ART = spr([
+  "...............", "...............",
+  "......W....C...", ".....WW....CC..", "....WWW.C...C..", "...WWWW.CC..CC.",
+  "WWWWWWW..C...C.", "WWWWWWW..C...C.", "WWWWWWW..C...C.", "...WWWW.CC..CC.",
+  "....WWW.C...C..", ".....WW....CC..", "......W....C...",
+  "...............", "...............",
+]);
+const SOUND_OFF_ART = spr([
+  "...............", "...............",
+  "......W........", ".....WW........", "....WWW........", "...WWWW..R...R.",
+  "WWWWWWW...R.R..", "WWWWWWW....R...", "WWWWWWW...R.R..", "...WWWW..R...R.",
+  "....WWW........", ".....WW........", "......W........",
+  "...............", "...............",
+]);
+const PAUSE_ART = spr([
+  "...............", "...............", "...............",
+  "...WWW...WWW...", "...WWW...WWW...", "...WWW...WWW...", "...WWW...WWW...",
+  "...WWW...WWW...", "...WWW...WWW...", "...WWW...WWW...", "...WWW...WWW...",
+  "...WWW...WWW...",
+  "...............", "...............", "...............",
+]);
+const PLAY_ART = spr([
+  "...............", "...............", "...............",
+  "...W...........", "...WWW.........", "...WWWWW.......", "...WWWWWWW.....",
+  "...WWWWWWWWW...", "...WWWWWWW.....", "...WWWWW.......", "...WWW.........",
+  "...W...........",
+  "...............", "...............", "...............",
+]);
+const RESTART_ART = spr([
+  "...............", "...............", "...............",
+  ".WW.....W....W.", ".WW....WW...WW.", ".WW...WWW..WWW.", ".WW..WWWW.WWWW.",
+  ".WW.WWWWWWWWWW.", ".WW..WWWW.WWWW.", ".WW...WWW..WWW.", ".WW....WW...WW.",
+  ".WW.....W....W.",
+  "...............", "...............", "...............",
+]);
+const SHOP_ART = spr([
+  "...............",
+  "WW.............", ".W.............", ".WW............",
+  "..WWWWWWWWWWWW.",
+  "..W..G..G...W..", "...W..G..G..W..", "...WYYYYYYYYW..", "....WWWWWWWW...",
+  ".....W....W....", ".....W....W....",
+  "....GG...GG....", "....GG...GG....",
+  "...............", "...............",
+]);
 
 // =====================================================================
 // =====  CHANGE THESE TO CUSTOMISE YOUR GAME!  ========================
@@ -637,7 +686,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-08-22 zoom";
+const BUILD = "2026-08-22 buttons";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
@@ -753,7 +802,7 @@ let invaderDir;    // +1 moving right, -1 moving left
 let score;
 let lives;
 let state;         // "start" (waiting), "playing", "lost", or "shop"
-let paused;        // true while the game is frozen by the ⏸ button (or P)
+let paused;        // true while the game is frozen by the pause button (or P)
 let beamTimer;     // frames left of the RED LASER's beam (0 = not firing)
 let beamCooldown;  // frames left before the beam can be fired again
 let gunTimer;      // frames until this ship's gun has finished reloading
@@ -920,7 +969,7 @@ function startOrRestart() {
 // openShop() / closeShop(): pop into the ship shop and back out again.
 // You can get there from the start screen, from the game-over screen once
 // you've dealt with the name box, or straight out of a game in progress
-// with the 🛒 button. shopCameFrom remembers which screen sent you, so
+// with the trolley button. shopCameFrom remembers which screen sent you, so
 // BACK returns you to the right one.
 //   Opening it mid-game freezes everything (update() only runs while the
 // state is "playing") and pauses you, so you come back to the PAUSED
@@ -1090,7 +1139,7 @@ document.addEventListener("keyup", (e) => {
 // only allow sound to start after the player interacts with the page).
 let audioCtx = null;
 
-// Sound starts ON. Tap the 🔊 button (top-left) or press M to mute; the
+// Sound starts ON. Tap the speaker button (top-left) or press M to mute; the
 // choice is remembered for next time. Every sound checks this first.
 let soundOn = true;
 try { soundOn = localStorage.getItem("ai-sound") !== "off"; } catch (e) {}
@@ -2433,27 +2482,38 @@ function drawReloadBar(done, color) {
 }
 
 // ---------------------------------------------------------------------
-// drawIcons(): the two little toggles tucked under the score at the
-// top-left — sound and pause. Drawn as their own step because the PAUSED
-// screen dims everything and then paints them back on top, so the ▶ you
-// need in order to un-pause stays bright and tappable.
+// drawIcons(): the four little buttons tucked under the score at the
+// top-left — sound, pause, start-again and shop. Drawn as their own step
+// because the PAUSED screen dims everything and then paints them back on
+// top, so the play button you need in order to un-pause stays bright and
+// tappable.
+//
+// The pictures are pixel art from up above, not emoji, so the buttons are
+// made of the same fat pixels as the animals and the ships — and they look
+// the same on a computer, a phone and a tablet, which emoji do not.
 // ---------------------------------------------------------------------
+const ICON_ART = 30; // how big each button picture is, in game pixels
+
+// drawIcon(): puts one button picture in the middle of its tap box, so the
+// picture you see and the square you can hit are the same square.
+function drawIcon(art, box) {
+  drawThing(art, box.x + box.w / 2, box.y + box.h / 2, ICON_ART);
+}
+
 function drawIcons() {
-  ctx.textAlign = "left";
-  ctx.textBaseline = "middle";
-  ctx.font = "26px serif";
   // Sound: tap it (or press M) to mute/un-mute. Dimmed when sound is off.
   ctx.globalAlpha = soundOn ? 1 : 0.45;
-  ctx.fillText(soundOn ? "🔊" : "🔇", SOUND_ICON.x, SOUND_ICON.y + SOUND_ICON.h / 2);
-  // Pause: shows ⏸ while the game is running and ▶ while it's paused —
-  // i.e. what the button will DO next. Then ⏮, which starts the whole run
-  // again from stage 1. Both only appear mid-game, since there's nothing to
-  // pause or restart on the start and game-over screens.
+  drawIcon(soundOn ? SOUND_ON_ART : SOUND_OFF_ART, SOUND_ICON);
+  // Pause: shows two bars while the game is running and a play arrow while
+  // it's paused — i.e. what the button will DO next. Then the start-again
+  // button, which begins the whole run afresh from stage 1, and the shop
+  // trolley. These three only appear mid-game, since there's nothing to
+  // pause, restart or spend on the start and game-over screens.
   ctx.globalAlpha = 1;
   if (state === "playing") {
-    ctx.fillText(paused ? "▶️" : "⏸️", PAUSE_ICON.x, PAUSE_ICON.y + PAUSE_ICON.h / 2);
-    ctx.fillText("⏮️", RESTART_ICON.x, RESTART_ICON.y + RESTART_ICON.h / 2);
-    ctx.fillText("🛒", SHOP_ICON.x, SHOP_ICON.y + SHOP_ICON.h / 2);
+    drawIcon(paused ? PLAY_ART : PAUSE_ART, PAUSE_ICON);
+    drawIcon(RESTART_ART, RESTART_ICON);
+    drawIcon(SHOP_ART, SHOP_ICON);
   }
 }
 
@@ -2466,7 +2526,7 @@ function draw() {
   ctx.clearRect(0, 0, W, H);
 
   // The shop is a screen all of its own — no game board behind it. (The
-  // 🔊 still comes along, so you can mute while you're browsing.)
+  // speaker still comes along, so you can mute while you're browsing.)
   if (state === "shop") {
     drawShop();
     drawIcons();
@@ -2689,6 +2749,7 @@ function draw() {
     ctx.globalAlpha = Math.min(1, stageBanner / 30); // fade out near the end
     ctx.fillStyle = "#fff";
     ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
     ctx.font = "44px 'Courier New', monospace";
     ctx.fillText("STAGE " + stage, W / 2, H / 2);
     if (isBossStage()) {
@@ -2706,6 +2767,7 @@ function draw() {
     ctx.fillRect(0, 0, W, H);
     ctx.fillStyle = "#fff";
     ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
     ctx.font = "52px 'Courier New', monospace";
     ctx.fillText("PAUSED", W / 2, H / 2);
     ctx.fillStyle = "#7ef9ff";
@@ -2720,6 +2782,7 @@ function draw() {
     ctx.fillRect(0, 0, W, H);
     ctx.fillStyle = "#fff";
     ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
     ctx.font = "52px 'Courier New', monospace";
     ctx.fillText("ANIMAL INVADERS", W / 2, 150);
     // A row of the actual pixel animals (one of each kind), centred.
@@ -2755,6 +2818,7 @@ function draw() {
     ctx.fillRect(0, 0, W, H);
     ctx.fillStyle = "#fff";
     ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
     ctx.font = "48px 'Courier New', monospace";
     ctx.fillText("GAME OVER", W / 2, 150);
     ctx.font = "22px 'Courier New', monospace";
