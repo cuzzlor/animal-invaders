@@ -49,6 +49,13 @@
      background would paint OVER the star canvas (which sits at z-index -1)
      and hide it. The root background paints furthest back, behind the stars. */
   html { background: #000; }
+  :root {
+    /* HOW MUCH OF THE SCREEN THE GAME FILLS. 1 means right to the edges;
+       0.96 leaves a little space around it. This is the zoom knob — make it
+       smaller to stand further back, bigger to lean in. Above about 1 the
+       game starts to run off the screen, so 1 is the sensible ceiling. */
+    --zoom: 0.96;
+  }
   /* Centre the game on the screen. */
   #wrap {
     display: flex;
@@ -96,9 +103,11 @@
        The 2px is the whole safety margin. A fit with NOTHING spare is what cut
        the score off the top of the iPad before: this arithmetic lands on
        exactly the height of the screen, and a fraction of a pixel of rounding
-       is enough to tip it over the edge and have it clipped. */
-    width: min(100vw, calc((100vh - 2px) * 11 / 12));
-    width: min(100vw, calc((100dvh - 2px) * 11 / 12));
+       is enough to tip it over the edge and have it clipped. It still matters
+       even though --zoom leaves room of its own, because --zoom can be set
+       back to 1. */
+    width: calc(min(100vw, (100vh - 2px) * 11 / 12) * var(--zoom));
+    width: calc(min(100vw, (100dvh - 2px) * 11 / 12) * var(--zoom));
     height: auto;
     background: transparent;
     /* The 880px canvas is scaled to fit your screen. By default the browser
@@ -628,7 +637,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-08-22 fullscreen";
+const BUILD = "2026-08-22 zoom";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player

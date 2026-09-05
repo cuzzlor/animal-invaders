@@ -31,6 +31,11 @@ On a computer, press **`F`** for full screen. Your browser's tabs, address bar
 and bookmarks can easily eat a third of the window, and full screen hands all of
 it back. Press `F` again to come out.
 
+Want it a little bigger or smaller than it comes? `--zoom` at the top of
+`index.html` is how much of the screen the game fills. It is **0.96**, which
+leaves a bit of space around the edges. Put it up to `1` to go right to the
+edges, or down to `0.9` to stand further back.
+
 ### Make it bigger on an iPad or iPhone 📱
 
 The game is drawn as big as the height of the screen allows, and on a phone or
@@ -124,7 +129,7 @@ steps one frame may make up; both are worked out from `GAME_SPEED`, so the
 ## Which copy am I playing? 🏷️
 
 The foot of the start screen shows a **build** in small grey text, like
-`build 2026-08-22 fullscreen` — a date, and a word for what changed.
+`build 2026-08-22 zoom` — a date, and a word for what changed.
 
 It is there for one job. The game is shared as a link, and a phone can hold on
 to an old copy of a web page for a long time — so "I changed it but nothing
