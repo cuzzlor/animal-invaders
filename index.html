@@ -717,7 +717,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-09-12 modes";
+const BUILD = "2026-09-12 pick";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
@@ -832,7 +832,7 @@ let bolts;         // ELECTRIC ARC jumps drawn this frame: array of {x1,y1,x2,y2
 let invaderDir;    // +1 moving right, -1 moving left
 let score;
 let lives;
-let state;         // "start", "playing", "lost", "won" or "shop"
+let state;         // "start", "pick", "playing", "lost", "won" or "shop"
 let paused;        // true while the game is frozen by the pause button (or P)
 let beamTimer;     // frames left of the RED LASER's beam (0 = not firing)
 let beamCooldown;  // frames left before the beam can be fired again
@@ -846,16 +846,22 @@ let plan;          // the numbers for the wave on the board — see levelPlan()
 // the game comes back the way you left it.
 const MODE_KEY = "ai-mode";  // "levels" or "endless"
 const RUNG_KEY = "ai-rung";  // the highest level you have ever reached
+const DONE_KEY = "ai-done";  // set once you have BEATEN the last level
 // ENDLESS is the default, so opening the game does exactly what it has
 // always done. Change this to "levels" to land on the level game instead.
 let mode = "endless";
 try { if (localStorage.getItem(MODE_KEY) === "levels") mode = "levels"; } catch (e) {}
 let bestLevel = 1;
 try { bestLevel = Math.max(1, Number(localStorage.getItem(RUNG_KEY)) || 1); } catch (e) {}
+// Reaching the last level and BEATING it are not the same thing, and one
+// number cannot say both — so finishing gets a flag of its own.
+let finished = false;
+try { finished = localStorage.getItem(DONE_KEY) === "1"; } catch (e) {}
 
 function inLevels() { return mode === "levels"; }
 function saveMode() { try { localStorage.setItem(MODE_KEY, mode); } catch (e) {} }
 function saveRung() { try { localStorage.setItem(RUNG_KEY, String(bestLevel)); } catch (e) {} }
+function saveDone() { try { localStorage.setItem(DONE_KEY, finished ? "1" : "0"); } catch (e) {} }
 
 // Swap games. The board behind the start screen is rebuilt so the herd you
 // can see is the one you are about to play.
@@ -865,6 +871,12 @@ function setMode(which) {
   saveMode();
   newGame("start");
 }
+
+// Which levels you may play: every one up to the furthest you have ever
+// reached. Level 1 is always open, because bestLevel never goes below 1.
+// You do NOT open a level by starting on it — only by clearing the one
+// before it — or picking level 5 once would open the whole game.
+function levelOpen(n) { return n <= bestLevel; }
 let stageBanner;   // frames left to show the "STAGE N" banner
 let gameOverHandled; // did we already deal with this game over (save score etc.)?
 let enteringName;  // true while the "new high score!" name box is open
@@ -1051,8 +1063,53 @@ function begin() {
 // startOrRestart(): what a tap / click / Enter does when you're NOT mid-game
 // — begin from the start screen, or play again after game over.
 function startOrRestart() {
-  if (state === "start") begin();
+  if (state === "start") {
+    // In LEVELS you choose which level to play, so the first tap opens the
+    // list. In ENDLESS there is nothing to choose — it just begins.
+    if (inLevels()) openPicker(); else begin();
+  }
   else if (state === "lost" || state === "won" || state === "shop") newGame("playing");
+}
+
+// ---------------------------------------------------------------------
+// THE LEVEL LIST — choose which level to play.
+//   In LEVELS you pick a level instead of always beginning at the first
+// one, so dying on level 4 does not mean playing levels 1 to 3 again to get
+// back to it. You can only pick a level you have reached, so the course
+// still has to be walked once, in order.
+//   It is a screen of its own, like the shop: the game underneath is frozen
+// (update() only runs while the state is "playing") and a tap that misses a
+// card does nothing, rather than flinging you into a game.
+// ---------------------------------------------------------------------
+let pickCameFrom = "start"; // which screen sent you here, for BACK
+
+function openPicker() {
+  if (state !== "start" && state !== "lost" && state !== "won") return;
+  if (enteringName) return; // deal with the high-score box first
+  // Asking for the levels IS asking for the level game.
+  if (!inLevels()) { mode = "levels"; saveMode(); }
+  pickCameFrom = state;
+  state = "pick";
+  updateSpace();
+}
+
+function closePicker() {
+  if (state !== "pick") return;
+  state = pickCameFrom;
+  // Back on the start screen, the board behind it should be the game you
+  // are now in — you may have arrived here out of the endless one.
+  if (state === "start") newGame("start"); else updateSpace();
+}
+
+// startLevel(): play from this level, with a fresh score and all your lives.
+// It does not count as reaching the level — see levelOpen().
+function startLevel(n) {
+  if (!levelOpen(n)) return;      // not reached yet — nothing happens
+  if (!inLevels()) { mode = "levels"; saveMode(); }
+  newGame("playing");             // fresh score, full lives, un-paused
+  stage = Math.max(1, Math.min(LEVELS.length, n));
+  buildLevel();                   // lay THAT level out, and flash its banner
+  updateSpace();
 }
 
 // ---------------------------------------------------------------------
@@ -1069,7 +1126,7 @@ function startOrRestart() {
 let shopCameFrom = "start";
 function openShop() {
   if (state !== "start" && state !== "lost" && state !== "won" &&
-      state !== "playing") return;
+      state !== "pick" && state !== "playing") return;
   if (enteringName) return; // deal with the high-score box first
   if (state === "playing") paused = true;
   shopCameFrom = state;
@@ -1185,7 +1242,9 @@ document.addEventListener("keydown", (e) => {
   // P (or Escape) pauses / un-pauses a game in progress — and backs you
   // out of the shop, where there's nothing to pause.
   if (e.key === "p" || e.key === "P" || e.key === "Escape") {
-    if (state === "shop") closeShop(); else togglePause();
+    if (state === "shop") closeShop();
+    else if (state === "pick") closePicker();
+    else togglePause();
     return;
   }
   // R starts the whole run again, from stage 1.
@@ -1205,6 +1264,11 @@ document.addEventListener("keydown", (e) => {
   // (The same thing the row's button does when tapped.)
   if (state === "shop" && e.key >= "1" && e.key <= String(SHIPS.length)) {
     equipShip(SHIPS[Number(e.key) - 1]);
+    return;
+  }
+  // ...and on the level list they pick a level.
+  if (state === "pick" && e.key >= "1" && e.key <= String(LEVELS.length)) {
+    startLevel(Number(e.key));
     return;
   }
   // On the start / game-over / shop screens, Enter/Space begins (or restarts).
@@ -1596,7 +1660,7 @@ canvas.addEventListener("pointerdown", (e) => {
 // browsing shouldn't fling you into a game; that screen has its own buttons.
 document.addEventListener("pointerdown", () => {
   if (enteringName) return; // don't restart while typing your name
-  if (state === "shop") return;
+  if (state === "shop" || state === "pick") return;
   if (state !== "playing") startOrRestart();
 });
 
@@ -2252,10 +2316,11 @@ function onGameOver() {
   beamCooldown = 0;         // over the game-over screen
   bolts = [];               // and no lightning left forking over it either
   // Ships this run just earned: ones the run reached but your old best hadn't.
-  // Finishing the course counts as reaching the end of it.
-  if (inLevels() && state === "won" && LEVELS.length > bestLevel) {
-    bestLevel = LEVELS.length;
-    saveRung();
+  // Finishing the course counts as reaching the end of it — and is worth
+  // remembering in its own right.
+  if (inLevels() && state === "won") {
+    if (LEVELS.length > bestLevel) { bestLevel = LEVELS.length; saveRung(); }
+    if (!finished) { finished = true; saveDone(); }
   }
   justUnlocked = SHIPS.filter((s) => s.need > 0 && bestRun < s.need && score >= s.need);
   if (score > bestRun) {
@@ -2350,10 +2415,35 @@ function screenButtons() {
     ]);
   }
   if (state === "lost" || state === "won") {
+    // In LEVELS, PLAY AGAIN starts the course from the top — so there is a
+    // way back to the list as well, because dying on level 4 should not
+    // mean playing 1, 2 and 3 again to have another go at it.
+    if (inLevels()) {
+      return buttonRow(600, 210, [
+        { label: "PLAY AGAIN", action: () => newGame("playing") },
+        { label: "CHOOSE LEVEL", action: openPicker },
+        { label: "SHOP", action: openShop, style: "quiet" },
+      ]);
+    }
     return buttonRow(600, 240, [
       { label: "PLAY AGAIN", action: () => newGame("playing") },
       { label: "SHOP", action: openShop },
     ]);
+  }
+  if (state === "pick") {
+    // One button per level: PLAY on the ones you have reached, and a dead
+    // LOCKED box on the ones you have not.
+    const rows = LEVELS.map((L, i) => {
+      const open = levelOpen(i + 1);
+      const style = !open ? "locked" : (i + 1 === bestLevel ? "gold" : "normal");
+      return button(PICK_BTN_X, pickCardY(i) + (PICK_CARD_H - BTN_H) / 2, 198,
+                    open ? "PLAY" : "LOCKED",
+                    open ? () => startLevel(i + 1) : null, style);
+    });
+    return rows.concat(buttonRow(782, 210, [
+      { label: "BACK", action: closePicker, style: "quiet" },
+      { label: "SHOP", action: openShop, style: "quiet" },
+    ]));
   }
   if (state === "shop") {
     // One button per ship: fly the ones you've earned, and a dead LOCKED
@@ -2407,6 +2497,110 @@ function drawButtons() {
     ctx.fillStyle = s.text;
     ctx.fillText(b.label, b.x + b.w / 2, b.y + b.h / 2 + 1);
   }
+}
+
+// ---------------------------------------------------------------------
+// drawPicker(): the level list — one card per level, saying what waits on
+// it and whether you have got that far yet.
+// ---------------------------------------------------------------------
+const PICK_CARD_TOP = 150; // where the first level card starts
+const PICK_CARD_H   = 112; // how tall each card is
+const PICK_CARD_GAP = 10;  // the space between two cards
+function pickCardY(i) { return PICK_CARD_TOP + i * (PICK_CARD_H + PICK_CARD_GAP); }
+const PICK_TEXT_L   = 198; // where a card's writing starts
+const PICK_STATUS_R = 608; // ...and the wall the status is backed up against
+const PICK_BTN_X    = 616; // where the card's own button begins
+
+// A face for each card, so the levels do not all look the same. The boss
+// level shows the chicken itself, which is fair warning.
+function levelFace(i) {
+  return LEVELS[i].boss ? BIG_CHICK_ART : ANIMALS[i % ANIMALS.length].animal;
+}
+
+// What is waiting on this level, in a few words.
+function levelBlurb(L) {
+  if (L.boss) return "The BIG CHICK on its own — " + (L.bossHp || BOSS_HP) + " hits";
+  return L.rows + " rows of " + L.cols + "  =  " + (L.rows * L.cols) + " animals";
+}
+
+// How hard it is, drawn as a row of pips rather than a number, because a
+// number like 0.62 means nothing to anyone who has not read the code.
+function levelPips(L) {
+  const n = Math.max(1, Math.min(5, Math.round(L.speed * 5)));
+  return "●".repeat(n) + "○".repeat(5 - n);
+}
+
+function drawPicker() {
+  ctx.fillStyle = "rgba(0,0,0,0.82)";
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "#7ef9ff";
+  ctx.font = "42px 'Courier New', monospace";
+  ctx.fillText("CHOOSE A LEVEL", W / 2, 70);
+  ctx.fillStyle = "#888";
+  ctx.font = "17px 'Courier New', monospace";
+  ctx.fillText("Clear a level to open the next one", W / 2, 104);
+
+  for (let i = 0; i < LEVELS.length; i++) {
+    const L = LEVELS[i];
+    const y = pickCardY(i);
+    const open = levelOpen(i + 1);
+    const furthest = i + 1 === bestLevel;
+
+    // Gold edge for the furthest you have got, a plain edge for the ones
+    // behind it, and a dim one for what you have not reached.
+    roundRectPath(50, y, 780, PICK_CARD_H, 12);
+    ctx.fillStyle = furthest ? "rgba(255,211,77,0.08)" : "rgba(255,255,255,0.05)";
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = furthest ? "#ffd34d" : open ? "#7ef9ff" : "#444";
+    ctx.stroke();
+
+    // The number you can press on a keyboard, then a face from the level.
+    ctx.fillStyle = "#666";
+    ctx.font = "19px 'Courier New', monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(String(i + 1), 76, y + PICK_CARD_H / 2);
+    // A level you have not reached is shown as a dark shape, not a picture:
+    // what is on it is part of what you are playing for.
+    ctx.globalAlpha = open ? 1 : 0.22;
+    drawThing(levelFace(i), 140, y + PICK_CARD_H / 2, L.boss ? 84 : 68);
+    ctx.globalAlpha = 1;
+
+    // Its name, and what is waiting on it.
+    ctx.textAlign = "left";
+    ctx.fillStyle = open ? "#fff" : "#bbb";
+    ctx.font = "23px 'Courier New', monospace";
+    ctx.fillText("LEVEL " + (i + 1) + " — " + L.name, 198, y + 28);
+    ctx.fillStyle = "#9aa6b2";
+    ctx.font = "16px 'Courier New', monospace";
+    ctx.fillText(open ? levelBlurb(L) : "Clear level " + i + " to see what is here",
+                 198, y + 56);
+    // How fast it is, as pips.
+    ctx.fillStyle = open ? "#7ef9ff" : "#555";
+    ctx.font = "15px 'Courier New', monospace";
+    ctx.fillText("speed " + levelPips(L) +
+                 (open && L.hp > 1 ? "   ·   two hits each" : ""), 198, y + 82);
+    // And where you stand on it — tucked against the right of the writing
+    // area, so it cannot run into the speed line sharing this row however
+    // long either of them gets. PICK_STATUS_R is the wall they meet at.
+    ctx.textAlign = "right";
+    ctx.font = "14px 'Courier New', monospace";
+    ctx.fillStyle = furthest ? "#ffd34d" : open ? "#5fd66f" : "#777";
+    ctx.fillText(finished && i === LEVELS.length - 1 ? "✓ FINISHED"
+                 : furthest ? "★ YOU ARE HERE"
+                 : open ? "✓ BEATEN"
+                 : "LOCKED", PICK_STATUS_R, y + 82);
+    ctx.textAlign = "left";
+  }
+
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#888";
+  ctx.font = "17px 'Courier New', monospace";
+  ctx.fillText("Tap a level you have reached (or press 1–" + LEVELS.length + ")" +
+               "   •   Esc goes back", W / 2, 922);
 }
 
 // ---------------------------------------------------------------------
@@ -2646,6 +2840,15 @@ function draw() {
   // speaker still comes along, so you can mute while you're browsing.)
   if (state === "shop") {
     drawShop();
+    drawIcons();
+    ctx.globalAlpha = 1;
+    drawButtons();
+    return;
+  }
+
+  // ...and so is the level list.
+  if (state === "pick") {
+    drawPicker();
     drawIcons();
     ctx.globalAlpha = 1;
     drawButtons();
@@ -2920,11 +3123,13 @@ function draw() {
     ctx.fillStyle = "#ffd34d";
     ctx.font = "17px 'Courier New', monospace";
     ctx.fillText(inLevels()
-      ? "LEVELS — " + LEVELS.length + " to beat  ·  best so far: level " + bestLevel
+      ? (finished ? "LEVELS — all " + LEVELS.length + " beaten!  ·  play any of them"
+                  : "LEVELS — " + LEVELS.length + " to beat  ·  best so far: level " + bestLevel)
       : "ENDLESS — the waves never stop", W / 2, 263);
     ctx.fillStyle = "#7ef9ff";
     ctx.font = "30px 'Courier New', monospace";
-    ctx.fillText("▶  TAP or CLICK to START", W / 2, 290);
+    ctx.fillText(inLevels() ? "▶  TAP or CLICK to CHOOSE A LEVEL"
+                            : "▶  TAP or CLICK to START", W / 2, 290);
     ctx.fillStyle = "#888";
     ctx.font = "18px 'Courier New', monospace";
     ctx.fillText("Move with ← →   •   Shoot with Space", W / 2, 330);

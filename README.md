@@ -14,6 +14,7 @@ nothing to install, no internet needed.
 | Move left / right | ← →  (or `A` / `D`) |
 | Shoot | `Spacebar` |
 | Pause / un-pause | `P` (or tap the two bars, top-left) |
+| Choose a level (LEVELS) | tap a card, or press `1`–`5` |
 | Play again after you win or lose | `Enter` |
 | Start the whole run again | `R` (or tap the arrows that point back, top-left) |
 | Open the ship shop | `S` (or tap the trolley, top-left, or the SHOP button) |
@@ -48,6 +49,24 @@ animals on the screen, moves them faster, and lets them shoot more often. Level
 
 "How fast" is measured against the endless game's FIRST wave, which is 1. So the
 animals in level 1 move at a bit under half that speed.
+
+### Choosing a level 🗺️
+
+In LEVELS you pick the level you want. Tap **LEVELS** on the start screen and
+the list comes up: one card for each level, with its name, what is waiting on
+it, and how fast it is. Tap a card to play that level, or press its number.
+
+You can only pick a level you have **reached**. Clear level 1 and level 2
+opens, and so on — so the course still has to be walked once, in order. A
+level you have not reached shows a dark shape instead of its animals, because
+what is on it is part of what you are playing for. Starting on a level never
+opens the next one; only clearing it does.
+
+This is here so that dying on level 4 does not mean playing levels 1, 2 and 3
+again to have another go at it. The game-over screen has a **CHOOSE LEVEL**
+button for exactly that.
+
+`Esc` goes back. The level you have reached is remembered on this device.
 
 The two games keep **separate high-score boards**. A 5-level run is worth a few
 thousand points, and an endless run can climb for ever — one board would mean a
