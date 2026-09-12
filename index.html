@@ -631,6 +631,37 @@ const BOSS_RELOAD  = 110; // frames between clutches (smaller = more eggs)
 const EGG_RADIUS   = 60;  // how far an exploding egg's blast reaches, in pixels
 const EGG_BOOM     = 2.6; // how big the bang LOOKS
 
+// --- TWO WAYS TO PLAY: LEVELS, and ENDLESS ---
+// ENDLESS is the game as it has always been: wave after wave, each one
+// STAGE_SPEEDUP faster than the one before, for as long as you can stay
+// alive. It has no end. You play it for a score.
+//
+// LEVELS is a set course with a finish. Level 1 is gentle — a small herd,
+// slow, and they hardly ever shoot back. Each level puts more animals on
+// the screen, moves them faster and lets them shoot more often, and the
+// last one is the BIG CHICK. Beat that and you have FINISHED the game.
+//
+// TO ADD A LEVEL, ADD A LINE TO THIS TABLE. Nothing else needs touching:
+// the screens count the table themselves, so LEVEL 3/5 becomes LEVEL 3/6.
+//   name    what the banner calls it
+//   rows    how many rows of animals, cols how many in each row
+//   speed   how fast they slide and shoot, where 1 is the endless game's
+//           FIRST wave — so 0.45 is a bit under half that speed
+//   reload  frames between their shots (bigger = they shoot less often)
+//   aim     chance (0-1) a shot is aimed AT you instead of simply dropped
+//   hp      hits one animal takes (2 is the tough herd)
+//   boss    a BIG CHICK on its own instead of a herd, bossHp hits to beat
+//           — a boss level has no herd, so rows, cols, reload, aim and hp
+//           do nothing on it. The chicken lays eggs on its own BOSS_RELOAD
+//           and only `speed` reaches it, as how fast it sweeps.
+const LEVELS = [
+  { name: "THE FARMYARD",  rows: 2, cols: 5, speed: 0.45, reload: 115, aim: 0.10, hp: 1 },
+  { name: "THE MEADOW",    rows: 3, cols: 6, speed: 0.62, reload:  90, aim: 0.25, hp: 1 },
+  { name: "THE HILLTOP",   rows: 3, cols: 8, speed: 0.80, reload:  70, aim: 0.40, hp: 1 },
+  { name: "THE STORM",     rows: 4, cols: 8, speed: 1.00, reload:  52, aim: 0.55, hp: 2 },
+  { name: "THE BIG CHICK", boss: true,       speed: 1.00, bossHp: 30 },
+];
+
 // --- The bases (shields) you can hide behind ---
 const BASE_COUNT   = 3;    // how many bases there are
 const BASE_COLOR   = "#5fd66f"; // their colour — try "#7ec8ff" or "#ffd34d"
@@ -686,7 +717,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-08-22 buttons";
+const BUILD = "2026-09-12 modes";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
@@ -801,13 +832,39 @@ let bolts;         // ELECTRIC ARC jumps drawn this frame: array of {x1,y1,x2,y2
 let invaderDir;    // +1 moving right, -1 moving left
 let score;
 let lives;
-let state;         // "start" (waiting), "playing", "lost", or "shop"
+let state;         // "start", "playing", "lost", "won" or "shop"
 let paused;        // true while the game is frozen by the pause button (or P)
 let beamTimer;     // frames left of the RED LASER's beam (0 = not firing)
 let beamCooldown;  // frames left before the beam can be fired again
 let gunTimer;      // frames until this ship's gun has finished reloading
 let invuln;        // frames left of "just got hit, can't be hit again yet"
-let stage;         // which wave you're on (1, 2, 3, ...) — everything speeds up
+let stage;         // which wave or level you're on (1, 2, 3, ...)
+let plan;          // the numbers for the wave on the board — see levelPlan()
+
+// --- Which of the two games you are playing, and how far you have got ---
+// Both are remembered on this device, the same way the high scores are, so
+// the game comes back the way you left it.
+const MODE_KEY = "ai-mode";  // "levels" or "endless"
+const RUNG_KEY = "ai-rung";  // the highest level you have ever reached
+// ENDLESS is the default, so opening the game does exactly what it has
+// always done. Change this to "levels" to land on the level game instead.
+let mode = "endless";
+try { if (localStorage.getItem(MODE_KEY) === "levels") mode = "levels"; } catch (e) {}
+let bestLevel = 1;
+try { bestLevel = Math.max(1, Number(localStorage.getItem(RUNG_KEY)) || 1); } catch (e) {}
+
+function inLevels() { return mode === "levels"; }
+function saveMode() { try { localStorage.setItem(MODE_KEY, mode); } catch (e) {} }
+function saveRung() { try { localStorage.setItem(RUNG_KEY, String(bestLevel)); } catch (e) {} }
+
+// Swap games. The board behind the start screen is rebuilt so the herd you
+// can see is the one you are about to play.
+function setMode(which) {
+  if (mode === which) return;
+  mode = which;
+  saveMode();
+  newGame("start");
+}
 let stageBanner;   // frames left to show the "STAGE N" banner
 let gameOverHandled; // did we already deal with this game over (save score etc.)?
 let enteringName;  // true while the "new high score!" name box is open
@@ -825,17 +882,50 @@ let shotTimer = 0;
 // buildLevel(): lay out a fresh wave of animals and brand-new bases, and
 // clear anything left flying around. Used at the start of every stage.
 // ---------------------------------------------------------------------
-// Is this a boss stage? And if there's a BIG CHICK on the board, which one is
-// it? Almost everything else in the game treats it as just another animal.
-function isBossStage() { return stage % BOSS_EVERY === 0; }
+// levelPlan(): the numbers for the wave you are on — how big the herd is,
+// how fast it moves, how often it shoots and how much it takes to put an
+// animal down. ENDLESS works them out from a formula that keeps getting
+// harder; LEVELS reads them straight out of the LEVELS table, so a level is
+// exactly as hard as it was written to be, today and every day.
+//   Worked out ONCE, when the wave is built, and kept in `plan` — the game
+// asks for these numbers many times a frame.
+function levelPlan() {
+  if (inLevels()) {
+    // Past the end of the table (which cannot happen in play — the last
+    // level wins the game) hold on the last level rather than break.
+    const L = LEVELS[Math.min(stage, LEVELS.length) - 1];
+    return {
+      rows: L.rows || 0, cols: L.cols || 0,
+      speed: L.speed,
+      // A boss level leaves these out, so fall back to the ordinary numbers
+      // rather than letting an `undefined` loose in the shooting maths.
+      reload: L.reload || SHOT_RELOAD,
+      aim: L.aim === undefined ? AIM_CHANCE : L.aim,
+      hp: L.hp || 1, boss: !!L.boss, bossHp: L.bossHp || BOSS_HP,
+      title: L.name,
+    };
+  }
+  return {
+    rows: ROWS, cols: COLS,
+    speed: 1 + (stage - 1) * STAGE_SPEEDUP,
+    reload: SHOT_RELOAD, aim: AIM_CHANCE,
+    hp: stage > TOUGH_AFTER ? TOUGH_HP : 1,
+    boss: stage % BOSS_EVERY === 0, bossHp: BOSS_HP,
+    title: null,
+  };
+}
+
+// Is there a BIG CHICK this time? And if there's one on the board, which one
+// is it? Almost everything else in the game treats it as just another animal.
+function isBossStage() { return !!(plan && plan.boss); }
 function theBoss() { return invaders.find((inv) => inv.alive && inv.boss); }
-// How much health an ordinary animal has on this stage. Once you're past the
-// first boss they're twice as hard to put down.
-function herdHp() { return stage > TOUGH_AFTER ? TOUGH_HP : 1; }
+// How much health an ordinary animal has this time.
+function herdHp() { return plan ? plan.hp : 1; }
 // How wide across a thing is. Everything is one CELL except the boss.
 function sizeOf(inv) { return inv.size || CELL; }
 
 function buildLevel() {
+  plan = levelPlan(); // settle this wave's numbers before anything reads them
   invaders = [];
   if (isBossStage()) {
     // No herd this time — just the BIG CHICK, on its own, in the middle.
@@ -848,8 +938,8 @@ function buildLevel() {
       animal: BIG_CHICK_ART,
       shot: BOSS_EGG_ART,
       heat: 0,
-      hp: BOSS_HP,
-      maxHp: BOSS_HP,
+      hp: plan.bossHp,
+      maxHp: plan.bossHp,
       size: BOSS_SIZE,     // everything else is CELL (40) across
       boss: true,
     });
@@ -857,10 +947,10 @@ function buildLevel() {
     // Build the grid of animals, centred across the screen.
     const gapX = 70;     // space between animals across
     const gapY = 60;     // space between rows
-    const startX = (W - (COLS - 1) * gapX) / 2; // centre the grid horizontally
+    const startX = (W - (plan.cols - 1) * gapX) / 2; // centre the grid across
     const startY = 80;   // top of the grid
-    for (let row = 0; row < ROWS; row++) {
-      for (let col = 0; col < COLS; col++) {
+    for (let row = 0; row < plan.rows; row++) {
+      for (let col = 0; col < plan.cols; col++) {
         // Pick a random animal for this spot, so the herd is a mixed bunch.
         const kind = ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
         invaders.push({
@@ -962,7 +1052,7 @@ function begin() {
 // — begin from the start screen, or play again after game over.
 function startOrRestart() {
   if (state === "start") begin();
-  else if (state === "lost" || state === "shop") newGame("playing");
+  else if (state === "lost" || state === "won" || state === "shop") newGame("playing");
 }
 
 // ---------------------------------------------------------------------
@@ -978,7 +1068,8 @@ function startOrRestart() {
 // ---------------------------------------------------------------------
 let shopCameFrom = "start";
 function openShop() {
-  if (state !== "start" && state !== "lost" && state !== "playing") return;
+  if (state !== "start" && state !== "lost" && state !== "won" &&
+      state !== "playing") return;
   if (enteringName) return; // deal with the high-score box first
   if (state === "playing") paused = true;
   shopCameFrom = state;
@@ -1066,11 +1157,18 @@ window.addEventListener("blur", pauseOnLeave);
 // ---------------------------------------------------------------------
 function nextStage() {
   score += STAGE_BONUS * stage; // reward for clearing the wave
-  stage++;
   // Whatever was still in the air belonged to the wave you just beat. This
   // matters most after the boss: being blown up by the last egg of a chicken
   // you've already beaten would be a rotten way to lose a life.
   shots = [];
+  // ENDLESS never runs out of waves. LEVELS does: clear the last one and you
+  // have WON — the only way this game is ever finished on purpose.
+  if (inLevels() && stage >= LEVELS.length) {
+    state = "won";
+    return;
+  }
+  stage++;
+  if (inLevels() && stage > bestLevel) { bestLevel = stage; saveRung(); }
   buildLevel();
 }
 
@@ -1511,9 +1609,10 @@ function update() {
   if (state !== "playing") return; // frozen on the game-over screen
   if (paused) return;              // ...and frozen while paused
 
-  // Each stage speeds the animals up a little. speedScale is 1 on stage 1,
-  // 1.12 on stage 2, and so on. shotSpeed is how fast their shots fall now.
-  const speedScale = 1 + (stage - 1) * STAGE_SPEEDUP;
+  // How fast this wave is. In ENDLESS each stage adds STAGE_SPEEDUP, so it
+  // is 1 on stage 1, 1.12 on stage 2, and so on; in LEVELS it is whatever
+  // the level says. shotSpeed is how fast their shots fall now.
+  const speedScale = plan.speed;
   const shotSpeed = SHOT_SPEED * speedScale;
   if (stageBanner > 0) stageBanner--; // count down the "STAGE N" banner
 
@@ -1623,7 +1722,7 @@ function update() {
     if (shooter) {
       const startY = shooter.y + CELL / 2;
       let vx;
-      if (Math.random() < AIM_CHANCE) {
+      if (Math.random() < plan.aim) {
         // AIMED shot: work out the sideways drift needed to land where the
         // player is right now (how far across ÷ how long it takes to fall),
         // then cap it so the shot can't fly almost sideways.
@@ -1635,8 +1734,9 @@ function update() {
         vx = Math.random() < 0.5 ? 0 : (Math.random() * 2 - 1) * SHOT_ANGLE;
       }
       shots.push({ x: shooter.x, y: startY, emoji: shooter.shot, vx: vx });
-      // Reload a bit faster as the herd thins out — and faster each stage.
-      shotTimer = Math.round(SHOT_RELOAD / speedScale * (0.4 + 0.6 * aliveCount / totalCount));
+      // Reload a bit faster as the herd thins out — and faster the quicker
+      // this wave is.
+      shotTimer = Math.round(plan.reload / speedScale * (0.4 + 0.6 * aliveCount / totalCount));
     }
   }
   // Move shots down (and sideways for angled ones); drop ones that leave the screen.
@@ -2063,19 +2163,24 @@ function equipShip(ship) {
 // there's no internet server, so it doesn't sync between people.
 // Each entry is { name, score, stage }.
 // ---------------------------------------------------------------------
-const LB_KEY = "ai-scores"; // where the board is saved
-const LB_MAX = 20;          // keep only the best 20
+// A board each. A 5-level run tops out at a few thousand points while an
+// endless run can climb for ever, so putting them on one board would mean a
+// level game never appeared on it.
+const LB_KEY = "ai-scores";        // the ENDLESS board (the original one)
+const LB_KEY_LEVELS = "ai-scores-l"; // the LEVELS board
+const LB_MAX = 20;                 // keep only the best 20
+function boardKey() { return inLevels() ? LB_KEY_LEVELS : LB_KEY; }
 
 // Read the saved board back into an array (sorted best-first). If nothing
 // is saved yet, or it's somehow broken, we just start with an empty board.
 function loadScores() {
   try {
-    const arr = JSON.parse(localStorage.getItem(LB_KEY)) || [];
+    const arr = JSON.parse(localStorage.getItem(boardKey())) || [];
     return arr.filter((e) => e && typeof e.score === "number");
   } catch (e) { return []; }
 }
 function saveScores(arr) {
-  try { localStorage.setItem(LB_KEY, JSON.stringify(arr)); } catch (e) {}
+  try { localStorage.setItem(boardKey(), JSON.stringify(arr)); } catch (e) {}
 }
 
 // Does this score earn a place on the board? (Any score > 0 does while
@@ -2147,6 +2252,11 @@ function onGameOver() {
   beamCooldown = 0;         // over the game-over screen
   bolts = [];               // and no lightning left forking over it either
   // Ships this run just earned: ones the run reached but your old best hadn't.
+  // Finishing the course counts as reaching the end of it.
+  if (inLevels() && state === "won" && LEVELS.length > bestLevel) {
+    bestLevel = LEVELS.length;
+    saveRung();
+  }
   justUnlocked = SHIPS.filter((s) => s.need > 0 && bestRun < s.need && score >= s.need);
   if (score > bestRun) {
     bestRun = score;
@@ -2230,9 +2340,16 @@ function screenButtons() {
   if (state === "start") {
     // Tucked into the gap between the bottom of the leaderboard and the
     // tops of the bases, so it never sits on top of the board or the game.
-    return buttonRow(678, 200, [{ label: "SHOP", action: openShop, style: "quiet" }]);
+    // The game you are set to is the gold one.
+    return buttonRow(678, 200, [
+      { label: "LEVELS",  action: () => setMode("levels"),
+        style: inLevels() ? "gold" : "quiet" },
+      { label: "ENDLESS", action: () => setMode("endless"),
+        style: inLevels() ? "quiet" : "gold" },
+      { label: "SHOP",    action: openShop, style: "quiet" },
+    ]);
   }
-  if (state === "lost") {
+  if (state === "lost" || state === "won") {
     return buttonRow(600, 240, [
       { label: "PLAY AGAIN", action: () => newGame("playing") },
       { label: "SHOP", action: openShop },
@@ -2542,7 +2659,10 @@ function draw() {
   ctx.textBaseline = "alphabetic";
   ctx.fillText("SCORE: " + score, 12, 28);
   ctx.textAlign = "center";
-  ctx.fillText("STAGE " + stage, W / 2, 28);
+  // ENDLESS counts up for ever, so it just says which wave. LEVELS has a
+  // finish, so it says how far along the course you are.
+  ctx.fillText(inLevels() ? "LEVEL " + stage + "/" + LEVELS.length
+                          : "STAGE " + stage, W / 2, 28);
   ctx.textAlign = "right";
   ctx.fillText("LIVES: " + "❤️".repeat(lives), W - 12, 28);
 
@@ -2751,11 +2871,14 @@ function draw() {
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.font = "44px 'Courier New', monospace";
-    ctx.fillText("STAGE " + stage, W / 2, H / 2);
-    if (isBossStage()) {
+    ctx.fillText(inLevels() ? "LEVEL " + stage : "STAGE " + stage, W / 2, H / 2);
+    // A level has a name, so say it. An endless wave has not, so the only
+    // thing worth shouting about there is the BIG CHICK — which you deserve
+    // the warning about either way.
+    if (plan.title || isBossStage()) {
       ctx.fillStyle = "#ffd23d";
       ctx.font = "52px 'Courier New', monospace";
-      ctx.fillText("THE BIG CHICK!", W / 2, H / 2 + 60);
+      ctx.fillText(plan.title || "THE BIG CHICK!", W / 2, H / 2 + 60);
     }
     ctx.restore();
   }
@@ -2789,8 +2912,16 @@ function draw() {
     const previewGap = 64;
     const previewStart = W / 2 - (ANIMALS.length - 1) * previewGap / 2;
     for (let i = 0; i < ANIMALS.length; i++) {
-      drawThing(ANIMALS[i].animal, previewStart + i * previewGap, 225, 48);
+      drawThing(ANIMALS[i].animal, previewStart + i * previewGap, 219, 48);
     }
+    // Which of the two games the buttons at the bottom have you set to, and
+    // how you are doing at it. Said as a sentence as well as shown by the
+    // gold button, because a gold button on its own is easy to miss.
+    ctx.fillStyle = "#ffd34d";
+    ctx.font = "17px 'Courier New', monospace";
+    ctx.fillText(inLevels()
+      ? "LEVELS — " + LEVELS.length + " to beat  ·  best so far: level " + bestLevel
+      : "ENDLESS — the waves never stop", W / 2, 263);
     ctx.fillStyle = "#7ef9ff";
     ctx.font = "30px 'Courier New', monospace";
     ctx.fillText("▶  TAP or CLICK to START", W / 2, 290);
@@ -2808,7 +2939,8 @@ function draw() {
     ctx.font = "13px 'Courier New', monospace";
     ctx.fillText("build " + BUILD + (fpsRate ? "   ·   " + fpsRate + " fps" : ""),
                  W / 2, 386);
-    // The best games so far, right on the start screen.
+    // The best games so far, right on the start screen. One board for each
+    // game, so this changes when you change games.
     drawLeaderboard(W / 2, 410);
   }
 
@@ -2822,7 +2954,8 @@ function draw() {
     ctx.font = "48px 'Courier New', monospace";
     ctx.fillText("GAME OVER", W / 2, 150);
     ctx.font = "22px 'Courier New', monospace";
-    ctx.fillText("Reached stage " + stage, W / 2, 190);
+    ctx.fillText(inLevels() ? "Reached level " + stage + " of " + LEVELS.length
+                            : "Reached stage " + stage, W / 2, 190);
     ctx.fillText("Score: " + score, W / 2, 222);
     // Did this run earn you a ship? That's the big news if so; otherwise
     // just show the best run you've ever had to measure yourself against.
@@ -2839,6 +2972,39 @@ function draw() {
     // While the name box is up, that HTML pop-up covers the middle — don't
     // draw the board or the buttons behind it. Once you've saved (or if you
     // didn't make the board), show the leaderboard and where to go next.
+    if (!enteringName) {
+      drawLeaderboard(W / 2, 290, lastEntry);
+      ctx.fillStyle = "#888";
+      ctx.textAlign = "center";
+      ctx.font = "17px 'Courier New', monospace";
+      ctx.fillText("Enter plays again   •   S opens the shop", W / 2, 684);
+    }
+  }
+
+  // You finished the course. This screen only ever appears in LEVELS —
+  // ENDLESS has no end to reach.
+  if (state === "won") {
+    ctx.fillStyle = "rgba(0,0,0,0.7)";
+    ctx.fillRect(0, 0, W, H);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#ffd34d";
+    ctx.font = "52px 'Courier New', monospace";
+    ctx.fillText("YOU WIN!", W / 2, 148);
+    ctx.fillStyle = "#fff";
+    ctx.font = "22px 'Courier New', monospace";
+    ctx.fillText("All " + LEVELS.length + " levels beaten", W / 2, 192);
+    ctx.fillText("Score: " + score, W / 2, 224);
+    if (justUnlocked.length > 0) {
+      ctx.fillStyle = "#ffd34d";
+      ctx.font = "22px 'Courier New', monospace";
+      ctx.fillText("★ NEW SHIP UNLOCKED: " + justUnlocked.map((s) => s.name).join(" + ") + " ★",
+                   W / 2, 256);
+    } else {
+      ctx.fillStyle = "#888";
+      ctx.font = "20px 'Courier New', monospace";
+      ctx.fillText("Now try it with a harder ship — or go ENDLESS", W / 2, 256);
+    }
     if (!enteringName) {
       drawLeaderboard(W / 2, 290, lastEntry);
       ctx.fillStyle = "#888";
@@ -2905,7 +3071,7 @@ function loop(now) {
   while (tickDebt >= TICK_MS && ticks < MAX_CATCHUP) {
     update();
     // The frame the game ends: deal with it once (save a high score, etc.).
-    if (state === "lost" && !gameOverHandled) {
+    if ((state === "lost" || state === "won") && !gameOverHandled) {
       gameOverHandled = true;
       onGameOver();
     }

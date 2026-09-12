@@ -22,6 +22,56 @@ nothing to install, no internet needed.
 The game pauses itself if you switch tabs or click away, so nothing happens
 while you're not looking.
 
+## Two ways to play 🎮
+
+There are two games here. The buttons along the bottom of the start screen
+choose between them. The gold button is the game you are set to, and the game
+remembers your choice.
+
+**ENDLESS** is the game as it has always been. Wave after wave, and each wave is
+12% faster than the one before. It never ends. You play it for a score, and the
+Big Chick turns up every 15 stages.
+
+**LEVELS** is a set course with a finish. There are **5 levels**. Level 1 is
+gentle: ten animals, slow, and they hardly ever shoot back. Each level puts more
+animals on the screen, moves them faster, and lets them shoot more often. Level
+5 is the Big Chick — a kinder one than the endless game's, 30 hits instead of
+45. Beat it and you have **finished the game**.
+
+| Level | Name | What comes at you | How fast |
+|-------|------|-------------------|----------|
+| 1 | THE FARMYARD | 2 rows of 5 | 0.45 |
+| 2 | THE MEADOW | 3 rows of 6 | 0.62 |
+| 3 | THE HILLTOP | 3 rows of 8 | 0.80 |
+| 4 | THE STORM | 4 rows of 8, and two hits each | 1.00 |
+| 5 | THE BIG CHICK | the boss, 30 hits | 1.00 |
+
+"How fast" is measured against the endless game's FIRST wave, which is 1. So the
+animals in level 1 move at a bit under half that speed.
+
+The two games keep **separate high-score boards**. A 5-level run is worth a few
+thousand points, and an endless run can climb for ever — one board would mean a
+level game never got onto it. Your **ships are shared**: a good level run earns
+them the same way an endless run does.
+
+### Add a level, or change one 🛠️
+
+Find `const LEVELS` in `index.html`. Each level is one line. Add a line and you
+have six levels. Nothing else needs changing, because the screens count the
+table themselves: `LEVEL 3/5` becomes `LEVEL 3/6` on its own.
+
+| In the line | What it does |
+|-------------|--------------|
+| `rows`, `cols` | how many animals, and in what shape |
+| `speed` | how fast they slide across, and how fast their shots fall |
+| `reload` | frames between their shots — **bigger** means they shoot **less** |
+| `aim` | the chance (0 to 1) that a shot is aimed AT you |
+| `hp` | hits one animal takes |
+| `boss` | `true` puts a Big Chick there instead of a herd, with `bossHp` hits |
+
+A boss level has no herd, so `rows`, `cols`, `reload`, `aim` and `hp` do nothing
+on that line. Only `speed` reaches the chicken, as how fast it sweeps.
+
 ### The four buttons in the corner 🕹️
 
 Under the score there is a row of four: a **speaker** to turn the sound off and
@@ -182,7 +232,8 @@ life. Lose all 3 lives (or let the cows reach the bottom) and it's game over.
 
 ## The Big Chick 🐣
 
-Get to **stage 15** and there's no herd at all. One ginormous baby chicken
+Get to **stage 15** in the endless game — or **level 5** in the level game —
+and there's no herd at all. One ginormous baby chicken
 comes down on its own, still wearing the top of its egg as a hat — and it takes
 **45 hits** to see off, where an ordinary animal takes one. A bar across the top
 shows how much of it is left. It's back again on stage 30, 45, and so on.
