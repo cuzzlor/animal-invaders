@@ -717,7 +717,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-09-12 list";
+const BUILD = "2026-09-12 welldone";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
@@ -832,7 +832,7 @@ let bolts;         // ELECTRIC ARC jumps drawn this frame: array of {x1,y1,x2,y2
 let invaderDir;    // +1 moving right, -1 moving left
 let score;
 let lives;
-let state;         // "start", "playing", "lost", "won" or "shop"
+let state;         // "start", "playing", "cleared", "lost", "won" or "shop"
 let paused;        // true while the game is frozen by the pause button (or P)
 let beamTimer;     // frames left of the RED LASER's beam (0 = not firing)
 let beamCooldown;  // frames left before the beam can be fired again
@@ -1069,6 +1069,8 @@ function startOrRestart() {
     // anywhere else must do nothing at all.
     if (!inLevels()) begin();
   }
+  // WELL DONE is on its way back to the list anyway; a tap says "now".
+  else if (state === "cleared") goToLevels();
   else if (state === "lost" || state === "won" || state === "shop") newGame("playing");
 }
 
@@ -1206,15 +1208,58 @@ function nextStage() {
   // matters most after the boss: being blown up by the last egg of a chicken
   // you've already beaten would be a rotten way to lose a life.
   shots = [];
-  // ENDLESS never runs out of waves. LEVELS does: clear the last one and you
-  // have WON — the only way this game is ever finished on purpose.
-  if (inLevels() && stage >= LEVELS.length) {
+  // ENDLESS rolls straight on into the next, faster wave, and never stops.
+  if (!inLevels()) {
+    stage++;
+    buildLevel();
+    return;
+  }
+  // LEVELS stops at the end of every level. Clearing the LAST one finishes
+  // the whole game; clearing any other says WELL DONE, opens the one after
+  // it, and puts you back on the list to choose what to play next.
+  if (stage >= LEVELS.length) {
     state = "won";
     return;
   }
-  stage++;
-  if (inLevels() && stage > bestLevel) { bestLevel = stage; saveRung(); }
-  buildLevel();
+  const opened = stage + 1;
+  if (opened > bestLevel) { bestLevel = opened; saveRung(); }
+  levelCleared();   // `stage` is left on the level you just beat, to show it
+}
+
+// ---------------------------------------------------------------------
+// WELL DONE — the screen between one level and the next.
+//   Beating a level ends that go at it. The game says well done, tells you
+// which level that just opened, and puts you back on the list so you choose
+// what to play next rather than being dropped straight into a harder level
+// you did not ask for.
+//   It takes itself away after CLEARED_MS, and a tap takes it away sooner.
+// The wait is measured on the WALL CLOCK, not in frames: frames come twice
+// as fast on a 120Hz iPad, and "well done" should last the same two and a
+// half seconds on every device, the same as everything else in this game.
+// ---------------------------------------------------------------------
+const CLEARED_MS = 2600; // how long WELL DONE stays up on its own
+let clearedAt = 0;       // when it went up, by the wall clock
+
+function nowMs() {
+  try { return performance.now(); } catch (e) { return Date.now(); }
+}
+
+function levelCleared() {
+  // A level is a go in its own right, so bank what it was worth. Without
+  // this a level player could never earn a ship, since the score goes back
+  // to nothing the moment you pick the next level.
+  justUnlocked = SHIPS.filter((s) => s.need > 0 && bestRun < s.need && score >= s.need);
+  if (score > bestRun) { bestRun = score; saveShop(); }
+  state = "cleared";
+  clearedAt = nowMs();
+  updateSpace();
+}
+
+// Called once a frame, whatever the screen: put the WELL DONE screen away
+// again once it has been up long enough.
+function tickCleared(now) {
+  if (state !== "cleared") return;
+  if (now - clearedAt >= CLEARED_MS) goToLevels();
 }
 
 // ---------------------------------------------------------------------
@@ -2510,6 +2555,15 @@ function levelFace(i) {
 }
 
 // Where you stand on a level, in two or three words.
+// What to shout when a run earns you a ship. Naming them all looks fine for
+// one and runs clean off the screen for five, so past one we say how many.
+function unlockedLine() {
+  if (justUnlocked.length === 1) {
+    return "★ NEW SHIP UNLOCKED: " + justUnlocked[0].name + " ★";
+  }
+  return "★ " + justUnlocked.length + " NEW SHIPS UNLOCKED! ★";
+}
+
 function levelStanding(i) {
   if (finished && i === LEVELS.length - 1) return "✓ FINISHED";
   if (i + 1 === bestLevel) return "★ YOU ARE HERE";
@@ -3121,8 +3175,7 @@ function draw() {
     if (justUnlocked.length > 0) {
       ctx.fillStyle = "#ffd34d";
       ctx.font = "22px 'Courier New', monospace";
-      ctx.fillText("★ NEW SHIP UNLOCKED: " + justUnlocked.map((s) => s.name).join(" + ") + " ★",
-                   W / 2, 256);
+      ctx.fillText(unlockedLine(), W / 2, 256);
     } else {
       ctx.fillStyle = "#888";
       ctx.font = "20px 'Courier New', monospace";
@@ -3138,6 +3191,38 @@ function draw() {
       ctx.font = "17px 'Courier New', monospace";
       ctx.fillText("Enter plays again   •   S opens the shop", W / 2, 684);
     }
+  }
+
+  // You beat a level. Not the whole game — that is the "won" screen below.
+  if (state === "cleared") {
+    ctx.fillStyle = "rgba(0,0,0,0.72)";
+    ctx.fillRect(0, 0, W, H);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#ffd34d";
+    ctx.font = "56px 'Courier New', monospace";
+    ctx.fillText("WELL DONE!", W / 2, 320);
+    ctx.fillStyle = "#fff";
+    ctx.font = "26px 'Courier New', monospace";
+    ctx.fillText("LEVEL " + stage + " — " + LEVELS[stage - 1].name, W / 2, 382);
+    ctx.font = "22px 'Courier New', monospace";
+    ctx.fillText("Score: " + score, W / 2, 418);
+    // Which level that just opened, which is the reason to go back and pick.
+    const opened = stage + 1;
+    if (opened <= LEVELS.length) {
+      ctx.fillStyle = "#7ef9ff";
+      ctx.font = "22px 'Courier New', monospace";
+      ctx.fillText("LEVEL " + opened + " — " + LEVELS[opened - 1].name +
+                   " is open now", W / 2, 466);
+    }
+    if (justUnlocked.length > 0) {
+      ctx.fillStyle = "#ffd34d";
+      ctx.font = "21px 'Courier New', monospace";
+      ctx.fillText(unlockedLine(), W / 2, 506);
+    }
+    ctx.fillStyle = "#888";
+    ctx.font = "17px 'Courier New', monospace";
+    ctx.fillText("Back to the levels   •   tap to go now", W / 2, 556);
   }
 
   // You finished the course. This screen only ever appears in LEVELS —
@@ -3157,8 +3242,7 @@ function draw() {
     if (justUnlocked.length > 0) {
       ctx.fillStyle = "#ffd34d";
       ctx.font = "22px 'Courier New', monospace";
-      ctx.fillText("★ NEW SHIP UNLOCKED: " + justUnlocked.map((s) => s.name).join(" + ") + " ★",
-                   W / 2, 256);
+      ctx.fillText(unlockedLine(), W / 2, 256);
     } else {
       ctx.fillStyle = "#888";
       ctx.font = "20px 'Courier New', monospace";
@@ -3239,6 +3323,10 @@ function loop(now) {
   }
   if (ticks === MAX_CATCHUP) tickDebt = 0;
   lastTicks = ticks;
+
+  // WELL DONE counts down on the wall clock, not on game ticks — no game
+  // time passes on that screen, so there are no ticks to count.
+  tickCleared(now);
 
   // The stars keep their own time, and they drift on EVERY screen — you watch
   // them go by on the start screen and while you're paused. Same clock, same
