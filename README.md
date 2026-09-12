@@ -62,11 +62,16 @@ you have not reached shows a dark shape instead of its animals, because what is
 on it is part of what you are playing for. Starting on a level never opens the
 next one; only clearing it does.
 
-**When you beat a level the game says WELL DONE**, tells you which level that
-just opened, and takes you back to the list to choose what to play next. It
-goes back on its own after a couple of seconds, and a tap sends you back at
-once. So a level is a go in its own right: the score starts again each time,
-and a level worth a lot still counts towards the ships.
+**When you beat a level the game says WELL DONE** and tells you which level
+that just opened. There are two ways on from there, and you choose by doing
+something or by doing nothing:
+
+- **Tap** — and you go straight into the level it just named.
+- **Wait** — and after four seconds it takes you back to the list, where you
+  can pick any level you have reached.
+
+So a level is a go in its own right: the score starts again each time, and a
+level worth a lot still counts towards the ships.
 
 Beating the **last** level is different — that finishes the whole game, and you
 get the YOU WIN screen instead.

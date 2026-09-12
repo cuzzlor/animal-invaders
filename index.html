@@ -717,7 +717,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-09-12 welldone";
+const BUILD = "2026-09-12 carryon";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
@@ -1069,8 +1069,9 @@ function startOrRestart() {
     // anywhere else must do nothing at all.
     if (!inLevels()) begin();
   }
-  // WELL DONE is on its way back to the list anyway; a tap says "now".
-  else if (state === "cleared") goToLevels();
+  // On WELL DONE, a tap carries you straight into the level it just named.
+  // Waiting instead takes you to the list — see tickCleared().
+  else if (state === "cleared") nextLevelNow();
   else if (state === "lost" || state === "won" || state === "shop") newGame("playing");
 }
 
@@ -1232,12 +1233,16 @@ function nextStage() {
 // which level that just opened, and puts you back on the list so you choose
 // what to play next rather than being dropped straight into a harder level
 // you did not ask for.
-//   It takes itself away after CLEARED_MS, and a tap takes it away sooner.
-// The wait is measured on the WALL CLOCK, not in frames: frames come twice
-// as fast on a 120Hz iPad, and "well done" should last the same two and a
-// half seconds on every device, the same as everything else in this game.
+//   There are two ways on from it, and you choose by doing nothing or by
+// doing something. TAP and you go straight into the level it has just told
+// you about, which is what you want most of the time. WAIT and it takes
+// itself back to the list, where you can pick any level you have reached.
+//   The wait is measured on the WALL CLOCK, not in frames: frames come
+// twice as fast on a 120Hz iPad, and well done should last the same few
+// seconds on every device, the same as everything else in this game.
 // ---------------------------------------------------------------------
-const CLEARED_MS = 2600; // how long WELL DONE stays up on its own
+const CLEARED_MS = 4000; // how long WELL DONE stays up before the list —
+                         // long enough to read it and decide to tap
 let clearedAt = 0;       // when it went up, by the wall clock
 
 function nowMs() {
@@ -1256,10 +1261,22 @@ function levelCleared() {
 }
 
 // Called once a frame, whatever the screen: put the WELL DONE screen away
-// again once it has been up long enough.
+// again once it has been up long enough. Doing nothing takes you to the
+// list; see nextLevelNow() for what a tap does instead.
 function tickCleared(now) {
   if (state !== "cleared") return;
   if (now - clearedAt >= CLEARED_MS) goToLevels();
+}
+
+// nextLevelNow(): what a tap on the WELL DONE screen does — go straight
+// into the level it just told you was open. There is always one, because
+// clearing the LAST level wins the game instead of coming here; the guard
+// is there so a future change cannot walk off the end of the table.
+function nextLevelNow() {
+  if (state !== "cleared") return;
+  const next = stage + 1;
+  if (next <= LEVELS.length && levelOpen(next)) startLevel(next);
+  else goToLevels();
 }
 
 // ---------------------------------------------------------------------
@@ -3220,9 +3237,12 @@ function draw() {
       ctx.font = "21px 'Courier New', monospace";
       ctx.fillText(unlockedLine(), W / 2, 506);
     }
+    ctx.fillStyle = "#7ef9ff";
+    ctx.font = "19px 'Courier New', monospace";
+    ctx.fillText("▶  TAP to play it now", W / 2, 552);
     ctx.fillStyle = "#888";
     ctx.font = "17px 'Courier New', monospace";
-    ctx.fillText("Back to the levels   •   tap to go now", W / 2, 556);
+    ctx.fillText("...or wait, and choose a level instead", W / 2, 586);
   }
 
   // You finished the course. This screen only ever appears in LEVELS —
