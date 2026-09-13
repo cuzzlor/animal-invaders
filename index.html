@@ -590,9 +590,13 @@ const VOLT_BEAM = {
 // ---------------------------------------------------------------------
 const FLAME_TANK   = stepsFor(3.5); // a full tank is 3.5 seconds of fire
 const FLAME_FILL   = 1;    // frames of fire the tank wins back each frame
-const FLAME_REACH  = 300;  // how far up the screen the flame licks, in pixels
+// REACH is the length of the flame, and MOUTH and SPREAD together are the
+// ANGLE it opens out at. So these two go up and down TOGETHER: to make the
+// flame longer without making it thinner, both have to double. (26 stays
+// put: that is the width at the nose, which the length has no say over.)
+const FLAME_REACH  = 600;  // how far up the screen the flame licks, in pixels
 const FLAME_MOUTH  = 26;   // how wide the flame is where it leaves the nose
-const FLAME_SPREAD = 132;  // how wide it has grown by the end of its reach
+const FLAME_SPREAD = 238;  // how wide it has grown by the end of its reach
 const FLAME_BURN   = 20;   // heat an animal must take before it goes
 const FLAME_DRAG   = 0.8;  // how much of your usual speed you keep while burning
 const FLAME_PRICE  = 100000; // what it costs — paid into the bank, not in one game
@@ -645,8 +649,8 @@ const SHIPS = [
   {
     id: "flame", name: "FLAMETHROWER", art: FLAME_ROCKET_ART, bank: FLAME_PRICE,
     fire: "flame", damage: 1, reload: 0, flame: FLAME_GUN,
-    blurb: ["HOLD to pour out fire. Deadly up close,",
-            "useless far off. " + secs(FLAME_TANK) + " of fuel a tank."],
+    blurb: ["HOLD to pour out fire. Hottest up close,",
+            "and it stops halfway. " + secs(FLAME_TANK) + " of fuel a tank."],
   },
 ];
 
@@ -799,7 +803,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-09-13 flame";
+const BUILD = "2026-09-13 longflame";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
@@ -3203,9 +3207,12 @@ const FLAME_COATS = [
   { wide: 0.44, far: 0.70, color: "#ffd23d", alpha: 0.52 },
   { wide: 0.22, far: 0.42, color: "#fff3c4", alpha: 0.62 },
 ];
-const FUEL_BAR     = 90; // how wide the fuel gauge is, in pixels
-const FLAME_STEPS  = 7;  // how many steps each torn edge is drawn in
-const FLAME_PUFFS  = 9;  // loose lumps of fire riding up inside the cone
+const FUEL_BAR = 90; // how wide the fuel gauge is, in pixels
+// How finely the fire is drawn. Both are worked out from the flame's length,
+// so a longer flame is torn into more pieces and carries more lumps rather
+// than being the same nine blobs stretched thin.
+const FLAME_STEPS = Math.max(7, Math.round(FLAME_REACH / 60)); // steps in each torn edge
+const FLAME_PUFFS = Math.max(9, Math.round(FLAME_REACH / 45)); // lumps riding up inside
 
 function drawFlame(x, noseY, gun) {
   ctx.save();
