@@ -603,18 +603,35 @@ const FLAME_MOUTH  = 26;       // how wide the flame is where it leaves the nose
 const FLAME_TAPER  = 106 / 300; // width it gains for each pixel it climbs
 const FLAME_REACH  = 780;      // how far up the screen the flame licks, in pixels
 const FLAME_SPREAD = FLAME_MOUTH + FLAME_TAPER * FLAME_REACH; // width at the tip
-// How much heat sees an animal off. The flame puts in 2 a step right at the
-// nose and 1 a step at the very tip, so this is 15 steps of holding it on
-// something close and 30 steps out at the end of its reach. Both beams are
-// quicker than that over most of the flame's length: the RED LASER takes 16
-// and the ELECTRIC ARC 26. The flame's answer is that it covers five columns
-// at once, and theirs is that they reach the top of the screen.
-const FLAME_BURN   = 30;   // heat an animal must take before it goes
+// ---------------------------------------------------------------------
+// THE FLAME BURNS THINGS, AND IT SETS THEM ALIGHT.
+//   Hold the flame on an animal and it takes heat, the same as it does in
+// a beam. When the heat is full, two things happen at once: the flame
+// takes a BITE out of it, and it CATCHES FIRE.
+//   The bite is small. A beam takes a whole animal every time its heat
+// fills; the flame takes a QUARTER of one. On its own that makes this much
+// the weakest gun in the game.
+//   The fire is what gives it back. Once something is alight it goes on
+// burning on its own, a quarter of an animal at a time, wherever it goes
+// and long after you have swung the flame somewhere else. Nothing puts it
+// out. One lighting is three animals' worth of fire — more than enough to
+// finish anything in the herd, if it is left alone to burn.
+//   Held on one animal at the nose it takes about 60 steps to finish it,
+// where the old flame took 15 and a RED LASER takes 16. So this gun is slow
+// on any ONE animal and frightening on a HERD: you sweep across twenty of
+// them, and all twenty burn down at once behind you while you go and light
+// the next lot.
+// ---------------------------------------------------------------------
+const FLAME_CATCH  = 40;   // heat before the flame bites and lights (20 steps at the nose)
+const FLAME_BITE   = 0.25; // health the flame itself takes at each bite
+const FIRE_TIME    = stepsFor(2); // how long a thing stays alight once lit
+const FIRE_TICK    = 20;   // steps between one bite of the fire and the next
+const FIRE_BITE    = 0.25; // health the fire takes at each bite
 const FLAME_DRAG   = 0.8;  // how much of your usual speed you keep while burning
 const FLAME_PRICE  = 100000; // what it costs — paid into the bank, not in one game
 const FLAME_GUN = {
   tank: FLAME_TANK, fill: FLAME_FILL, reach: FLAME_REACH, mouth: FLAME_MOUTH,
-  spread: FLAME_SPREAD, burn: FLAME_BURN, drag: FLAME_DRAG,
+  spread: FLAME_SPREAD, catchAt: FLAME_CATCH, drag: FLAME_DRAG,
 };
 
 // `damage` is how much of an animal one bullet takes off. Animals have 1
@@ -661,8 +678,8 @@ const SHIPS = [
   {
     id: "flame", name: "FLAMETHROWER", art: FLAME_ROCKET_ART, bank: FLAME_PRICE,
     fire: "flame", damage: 1, reload: 0, flame: FLAME_GUN,
-    blurb: ["HOLD to pour out fire. Hottest up close,",
-            "and the top row is safe. " + secs(FLAME_TANK) + " of fuel a tank."],
+    blurb: ["HOLD: it burns them AND sets them ALIGHT.",
+            "The fire eats on. " + secs(FLAME_TANK) + " of fuel a tank."],
   },
 ];
 
@@ -815,7 +832,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-09-13 slowflame";
+const BUILD = "2026-09-13 onfire";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
@@ -1071,6 +1088,8 @@ function buildLevel() {
       heat: 0,
       hp: plan.bossHp,
       maxHp: plan.bossHp,
+      fire: 0,             // steps of burning left, once something sets it alight
+      fireTick: 0,         // steps until the fire takes its next bite
       size: BOSS_SIZE,     // everything else is CELL (40) across
       boss: true,
     });
@@ -1096,6 +1115,8 @@ function buildLevel() {
           // past stage TOUGH_AFTER they have twice that and take two.
           hp: herdHp(),
           maxHp: herdHp(),     // what it started with, so we can show it fading
+          fire: 0,             // steps of burning left, once the FLAMETHROWER lights it
+          fireTick: 0,         // steps until the fire takes its next bite
         });
       }
     }
@@ -2130,7 +2151,7 @@ function update() {
     const licked = (onIt || hop > 0) ? 0 : flameHeat(inv.x, inv.y, sizeOf(inv));
     if (onIt || hop > 0 || licked > 0) {
       // How much heat sees this animal off, for whichever gun has hold of it.
-      const limit = licked > 0 ? flameGun.burn : beamGun.burn;
+      const limit = licked > 0 ? flameGun.catchAt : beamGun.burn;
       if (hop > 0) {
         // The current gutters, so `gutter` is how hard it bites THIS frame —
         // anywhere from nothing to twice its share. That's why no two animals
@@ -2151,13 +2172,23 @@ function update() {
       // held on it over and over to see it off.
       if (inv.heat >= limit) {
         inv.heat = 0;
-        inv.hp -= 1;
+        if (licked > 0) {
+          // The flame takes its small bite AND sets the animal alight, both
+          // at once. Something already alight is simply re-lit, so its fire
+          // never runs down while you are still pointing at it.
+          if (inv.fire <= 0) inv.fireTick = FIRE_TICK; // a new fire waits one tick
+          inv.fire = FIRE_TIME;
+          inv.hp -= FLAME_BITE;
+        } else {
+          inv.hp -= 1;   // a beam takes a whole animal where the flame takes a quarter
+        }
         if (inv.hp <= 0) {
           inv.alive = false;
+          inv.fire = 0;
           spawnExplosion(inv.x, inv.y, inv.boss ? 5 : 1);
           score += inv.boss ? BOSS_POINTS : 10;
           melted++;
-        } else {
+        } else if (licked === 0) {
           spawnExplosion(inv.x, inv.y + sizeOf(inv) / 4, 0.5); // scorched, not beaten
         }
       }
@@ -2273,6 +2304,32 @@ function update() {
   if (!isBossStage() && bases.some((base) => base.blocks.every((blk) => !blk.alive))) {
     state = "lost";
   }
+
+  // --- Animals that are ON FIRE ---
+  // This runs every frame whatever you are flying and whatever you are
+  // doing. An animal the FLAMETHROWER lit goes on burning while you sweep
+  // away to light the next one, while you reload, while you dodge. Nothing
+  // puts it out: it burns for FIRE_TIME and then goes out by itself, having
+  // taken FIRE_BITE off at every FIRE_TICK along the way.
+  //   One lighting is FIRE_TIME / FIRE_TICK bites — three animals' worth
+  // all told, which finishes anything in the herd if it is left to burn. So
+  // lighting something IS beating it. What it is not is quick.
+  let burnedUp = 0;
+  for (const inv of invaders) {
+    if (!inv.alive || inv.fire <= 0) continue;
+    inv.fire--;
+    if (--inv.fireTick > 0) continue;
+    inv.fireTick = FIRE_TICK;
+    inv.hp -= FIRE_BITE;
+    if (inv.hp <= 0) {
+      inv.alive = false;
+      inv.fire = 0;
+      spawnExplosion(inv.x, inv.y, inv.boss ? 5 : 1);
+      score += inv.boss ? BOSS_POINTS : 10;
+      burnedUp++;
+    }
+  }
+  if (burnedUp > 0) playExplosionSound();
 
   // --- Cleared the herd? On to the next (faster) stage! ---
   // Only if you're still alive, of course.
@@ -3199,6 +3256,41 @@ function drawShop() {
 }
 
 // ---------------------------------------------------------------------
+// drawBurning(): the little tongues of fire licking off something the
+// FLAMETHROWER has set alight. Thrown about fresh every frame, and added
+// to the light already there rather than painted over it, so they read as
+// fire on the animal and not as a hat.
+//   They shrink as the fire runs down, so a thing that has nearly burnt
+// itself out looks it.
+// ---------------------------------------------------------------------
+const FIRE_TONGUES = 4;   // tongues of fire drawn on a burning animal
+
+function drawBurning(inv, size) {
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  const half = size / 2;
+  const left = Math.max(0.35, inv.fire / FIRE_TIME); // dying down as it runs out
+  for (let i = 0; i < FIRE_TONGUES; i++) {
+    const x = inv.x + (Math.random() * 2 - 1) * half * 0.85;
+    // The tongues stand ON the animal, not over its head: a foot anywhere
+    // from a little below the middle to a little above it. Started at the
+    // top edge they read as a hat rather than as something burning.
+    const foot = inv.y + half * (0.35 - Math.random());
+    const tall = size * (0.3 + Math.random() * 0.4) * left;
+    const wide = size * 0.12;
+    ctx.globalAlpha = 0.3 + Math.random() * 0.4;
+    ctx.fillStyle = i === 0 ? "#fff3c4" : (i % 2 ? "#ffd23d" : "#ff8c1a");
+    ctx.beginPath();
+    ctx.moveTo(x - wide, foot);
+    ctx.lineTo(x + (Math.random() - 0.5) * wide, foot - tall);
+    ctx.lineTo(x + wide, foot);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+// ---------------------------------------------------------------------
 // drawFlame(): the FLAMETHROWER's fire.
 //   Not a straight column like the beams — a CONE, narrow where it leaves
 // the nose and wider the further it climbs, stopping dead at the end of its
@@ -3485,15 +3577,26 @@ function draw() {
       ctx.globalAlpha = inv.boss ? 1 : Math.max(0.4, inv.hp / (inv.maxHp || 1));
       drawThing(inv.animal, inv.x, inv.y, size);
       ctx.globalAlpha = 1;
+      // Something the FLAMETHROWER has lit carries its own fire about with
+      // it. It is drawn on TOP of the animal, so one look tells you what is
+      // already burning down and what still needs the flame — which is the
+      // whole skill of that gun.
+      if (inv.fire > 0) drawBurning(inv, size);
       // An animal held in a beam glows brighter and brighter until it goes —
       // red under the LASER, electric blue under the ARC — so you can see the
       // beam working, and see it cool off again if you swing away too soon.
       if (inv.heat > 0) {
-        const heatGun = currentShip().beam || LASER_BEAM;
+        // How close this animal is to catching — measured against whichever
+        // gun is heating it, so the glow fills up just as the thing is about
+        // to go (or, with the FLAMETHROWER, just as it takes light).
+        const heatGun = currentShip().beam || currentShip().flame || LASER_BEAM;
         ctx.save();
         ctx.globalCompositeOperation = "lighter";
-        ctx.globalAlpha = 0.75 * Math.min(1, inv.heat / heatGun.burn);
-        ctx.fillStyle = heatGun.jagged ? "#5fd8ff" : "#ff3b3b";
+        // A beam says how much heat downs a thing in `burn`; the flame says
+        // how much LIGHTS one in `catchAt`. Either way it is the number the
+        // glow has to fill up against.
+        ctx.globalAlpha = 0.75 * Math.min(1, inv.heat / (heatGun.burn || heatGun.catchAt));
+        ctx.fillStyle = heatGun.jagged ? "#5fd8ff" : heatGun.catchAt ? "#ff8c1a" : "#ff3b3b";
         ctx.fillRect(inv.x - size / 2, inv.y - size / 2, size, size);
         ctx.restore();
       }

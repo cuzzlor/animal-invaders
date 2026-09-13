@@ -412,7 +412,7 @@ back to exactly where you were — the new ship is in your hands immediately.
 | **Blast Cannon** | score 7,500 in one game | Lobs a shell that **blows up** where it lands, clearing whatever it hits and the whole ring of animals around it — about seven at a time in the thick of the herd. A quarter of a second to reload. |
 | **Red Laser** | score 10,000 in one game | A red beam that smashes clean through every animal it touches (and melts their shots). Burns for 1.5 seconds, then reloads for half a second. |
 | **Electric Arc** | score 15,000 in one game | Lightning instead of a laser: the current **jumps sideways** from animal to animal, up to three deep either side of the beam. Burns for 2.5 seconds, then reloads for half a second. |
-| **Flamethrower** | fill the bank to 100,000 | **Hold** the button and it pours out fire. It reaches almost to the top of the screen, and it burns hotter the nearer a thing is. It is **slow**, though: both beams see an animal off quicker over most of the flame's length. What it has instead is width — it holds five columns of the herd at once. Three and a half seconds of fuel in a tank. |
+| **Flamethrower** | fill the bank to 100,000 | **Hold** the button and it pours out fire. It burns what it touches **and sets it alight**, and the fire goes on eating long after you have swung away. Slow on any one animal, frightening on a herd. Three and a half seconds of fuel in a tank. |
 
 Rapid Fire and the Flamethrower are the two ships you **hold** the button for;
 every other one fires once per press. An animal that's been hit but not finished off fades, so you can
@@ -457,11 +457,13 @@ slow it is, are the bargain of it, and they change how you play:
   which is **800** above your ship's nose. The flame stops at 780, so the top row
   of a fresh wave is out of it by 20 pixels. **One drop** of the herd brings it
   in.
-- **It is slower than either beam.** An animal takes **15 steps** to burn right
-  at the mouth of the flame and **30** out at the tip. The Red Laser sees one off
-  in 16 and the Electric Arc in 26, so only at point-blank range does the flame
-  beat a beam. It works by holding a lot of the herd at once, not by being quick
-  with any one animal.
+- **It sets things alight.** This is the whole gun. Every time the flame's heat
+  fills, two things happen at once: the flame takes a **bite** out of the animal,
+  and the animal **catches fire**. See below.
+- **It is far slower than either beam.** Held on one animal at the mouth of the
+  flame it takes about **60 steps** to finish it. The Red Laser sees one off in
+  16 and the Electric Arc in 26. It works by holding a lot of the herd at once,
+  not by being quick with any one animal.
 - **It bites harder the closer they are.** An animal at the mouth of the flame
   takes heat twice as fast as one at the tip — that is where the 15 and the 30
   come from.
@@ -470,6 +472,27 @@ slow it is, are the bargain of it, and they change how you play:
   herd — so the further away a thing is, the wider a sweep you have.
 - **Their falling shots burn up in it** — but only the ones that have come down
   far enough to be inside it. One still high up sails straight through.
+
+#### The fire it leaves behind
+
+The flame's own bite is small: a **quarter** of an animal, where a beam takes a
+whole one. That on its own would make it the feeblest gun in the game.
+
+The fire is what gives it back. Once something is alight:
+
+- It burns for **two seconds**, and takes a **quarter** of an animal every sixth
+  of a second — **three animals' worth** of damage in all, which is more than
+  enough to finish anything in the herd.
+- It burns **on its own**. You can swing the flame away, reload, or run for your
+  life, and it goes on eating.
+- **Nothing puts it out.** It burns for its two seconds and then dies down by
+  itself. Point the flame at it again and the two seconds start over.
+- You can see it: an animal that is alight carries little tongues of fire, and
+  fades as the fire eats into it.
+
+So the way to use this gun is **not** to hold it on one animal. It is to sweep
+across as many as you can reach, set the lot of them alight, and go and light the
+next lot while the first ones burn down behind you.
 
 And it is the only gun with a **tank**. Holding the button drains it, letting go
 fills it up again, and **running it dry means no fire at all until the tank is
@@ -500,9 +523,13 @@ Two numbers to keep an eye on:
 - Keep `FLAME_REACH` **short of 800**. That is how far the top row of a fresh
   herd sits above your ship, and a flame that reaches it is a flame that clears a
   wave from where you are standing. A test holds that line.
-- `FLAME_BURN` is how much heat sees an animal off. The flame puts in 2 a step at
-  the nose and 1 at the tip, so the number is **half** that many steps close up
-  and **all** of them at the far end. Make it smaller and the gun gets fiercer.
+- `FLAME_CATCH` is how much heat it takes before the flame bites and lights. The
+  flame puts in 2 a step at the nose and 1 at the tip, so the number is **half**
+  that many steps close up and **all** of them at the far end.
+- `FLAME_BITE` is what the flame itself takes each time; `FIRE_BITE`, `FIRE_TICK`
+  and `FIRE_TIME` are what the fire takes, how often, and for how long. Keep them
+  to **quarters and halves**: a computer holds those exactly, and a size like 0.2
+  can leave an animal standing on a sliver of health it should not have.
 
 Neither beam is a delete key. Animals have to be **held in the beam** for a
 moment before they go — swing away too soon and they cool off — and a lit beam
