@@ -594,9 +594,9 @@ const FLAME_FILL   = 1;    // frames of fire the tank wins back each frame
 // ANGLE it opens out at. So these two go up and down TOGETHER: to make the
 // flame longer without making it thinner, both have to double. (26 stays
 // put: that is the width at the nose, which the length has no say over.)
-const FLAME_REACH  = 600;  // how far up the screen the flame licks, in pixels
+const FLAME_REACH  = 750;  // how far up the screen the flame licks, in pixels
 const FLAME_MOUTH  = 26;   // how wide the flame is where it leaves the nose
-const FLAME_SPREAD = 238;  // how wide it has grown by the end of its reach
+const FLAME_SPREAD = 291;  // how wide it has grown by the end of its reach
 const FLAME_BURN   = 20;   // heat an animal must take before it goes
 const FLAME_DRAG   = 0.8;  // how much of your usual speed you keep while burning
 const FLAME_PRICE  = 100000; // what it costs — paid into the bank, not in one game
@@ -650,7 +650,7 @@ const SHIPS = [
     id: "flame", name: "FLAMETHROWER", art: FLAME_ROCKET_ART, bank: FLAME_PRICE,
     fire: "flame", damage: 1, reload: 0, flame: FLAME_GUN,
     blurb: ["HOLD to pour out fire. Hottest up close,",
-            "and it stops halfway. " + secs(FLAME_TANK) + " of fuel a tank."],
+            "and the top row is safe. " + secs(FLAME_TANK) + " of fuel a tank."],
   },
 ];
 
@@ -803,7 +803,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-09-13 longflame";
+const BUILD = "2026-09-13 longflame2";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
@@ -3213,6 +3213,7 @@ const FUEL_BAR = 90; // how wide the fuel gauge is, in pixels
 // than being the same nine blobs stretched thin.
 const FLAME_STEPS = Math.max(7, Math.round(FLAME_REACH / 60)); // steps in each torn edge
 const FLAME_PUFFS = Math.max(9, Math.round(FLAME_REACH / 45)); // lumps riding up inside
+const FLAME_CROWN = Math.max(3, Math.round(FLAME_SPREAD / 45)); // tongues across the tip
 
 function drawFlame(x, noseY, gun) {
   ctx.save();
@@ -3229,8 +3230,16 @@ function drawFlame(x, noseY, gun) {
       const t = i / FLAME_STEPS;
       ctx.lineTo(x - flameHalf(gun, t) * coat.wide * torn(), noseY - far * t);
     }
-    ctx.lineTo(x + (Math.random() - 0.5) * gun.mouth,   // a tongue off the tip
-               noseY - far * (1 + 0.08 * Math.random()));
+    // Across the top, in steps, with the height thrown about — so the flame
+    // ends in a ragged crown of tongues instead of a flat lid. One tongue was
+    // enough when the flame was short; across 291 pixels of tip it is not.
+    // The tongues sit either side of the true reach, so what is painted still
+    // says where the flame stops.
+    for (let i = 0; i <= FLAME_CROWN; i++) {
+      const across = (i / FLAME_CROWN) * 2 - 1;                  // -1 out to +1
+      ctx.lineTo(x + flameHalf(gun, 1) * coat.wide * across,
+                 noseY - far * (0.9 + 0.16 * Math.random()));
+    }
     for (let i = FLAME_STEPS; i >= 1; i--) {            // and back down the right
       const t = i / FLAME_STEPS;
       ctx.lineTo(x + flameHalf(gun, t) * coat.wide * torn(), noseY - far * t);

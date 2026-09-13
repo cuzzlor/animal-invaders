@@ -412,7 +412,7 @@ back to exactly where you were — the new ship is in your hands immediately.
 | **Blast Cannon** | score 7,500 in one game | Lobs a shell that **blows up** where it lands, clearing whatever it hits and the whole ring of animals around it — about seven at a time in the thick of the herd. A quarter of a second to reload. |
 | **Red Laser** | score 10,000 in one game | A red beam that smashes clean through every animal it touches (and melts their shots). Burns for 1.5 seconds, then reloads for half a second. |
 | **Electric Arc** | score 15,000 in one game | Lightning instead of a laser: the current **jumps sideways** from animal to animal, up to three deep either side of the beam. Burns for 2.5 seconds, then reloads for half a second. |
-| **Flamethrower** | fill the bank to 100,000 | **Hold** the button and it pours out fire. It reaches two thirds of the way up the screen and stops there, and it burns hotter the nearer a thing is — so it is at its best against a herd that has come down to meet you. Three and a half seconds of fuel in a tank. |
+| **Flamethrower** | fill the bank to 100,000 | **Hold** the button and it pours out fire. It reaches almost to the top of the screen and stops 50 pixels short of a fresh herd's top row, and it burns hotter the nearer a thing is. Three and a half seconds of fuel in a tank. |
 
 Rapid Fire and the Flamethrower are the two ships you **hold** the button for;
 every other one fires once per press. An animal that's been hit but not finished off fades, so you can
@@ -450,16 +450,17 @@ sooner.
 ### The Flamethrower 🔥
 
 It is the only gun in the game that **stops**. Every other one reaches the top of
-the screen; the flame licks 600 pixels up and goes no further. That is the whole
-bargain of it, and it changes how you play:
+the screen; the flame licks **750 pixels** up and goes no further. That is the
+whole bargain of it, and it changes how you play:
 
-- **Let them come to you.** The top of the screen is still out of reach, and a
-  herd that has dropped down to your level goes up in seconds.
+- **The top row is safe — just.** A herd starts 80 pixels down the screen, which
+  is **800** above your ship's nose. The flame stops at 750, so the top row of a
+  fresh wave is out of it by 50 pixels. Two drops of the herd bring it in.
 - **It bites harder the closer they are.** An animal at the mouth of the flame
   takes heat twice as fast as one at the tip.
-- **The flame spreads.** It leaves the nose 26 pixels across and is 238 across by
-  the end of its reach — about five animals wide — so the further away a thing
-  is, the wider a sweep you have.
+- **The flame spreads.** It leaves the nose 26 pixels across and is 291 across by
+  the end of its reach — wide enough to hold **five columns** of the herd — so
+  the further away a thing is, the wider a sweep you have.
 - **Their falling shots burn up in it** — but only the ones that have come down
   far enough to be inside it. One still high up sails straight through.
 
@@ -477,9 +478,19 @@ The numbers are all together near the top of `index.html`: `FLAME_TANK`,
 One warning about two of them. `FLAME_REACH` is how **long** the flame is, and
 `FLAME_MOUTH` with `FLAME_SPREAD` is the **angle** it opens out at. So making the
 flame longer on its own makes it *thinner*, because it takes further to open out
-to the same width. To make it longer and keep its shape, double `FLAME_SPREAD`
-along with `FLAME_REACH` — `FLAME_MOUTH` stays put, because the width at the nose
-has nothing to do with the length.
+to the same width. To make it longer and keep its shape, raise `FLAME_SPREAD` by
+the same fraction as `FLAME_REACH`:
+
+```
+FLAME_SPREAD = FLAME_MOUTH + (FLAME_REACH x 0.353)
+```
+
+`FLAME_MOUTH` stays put through all of it, because the width at the nose has
+nothing to do with the length.
+
+And keep the flame **short of 800**. That is how far the top row of a fresh herd
+sits above your ship, and a flame that reaches it is a flame that clears a wave
+from where you are standing. A test holds that line.
 
 Neither beam is a delete key. Animals have to be **held in the beam** for a
 moment before they go — swing away too soon and they cool off — and a lit beam
