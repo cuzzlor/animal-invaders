@@ -544,10 +544,18 @@ const BOMB_RING   = 20;  // frames the shockwave ring takes to reach full size
 // soon as you swing away. `drag` is how slowly you steer while it's lit, and
 // `arc` is how far the current jumps sideways to animals beside the beam
 // (0 = it doesn't jump at all).
-const BEAM_TIME    = 180;  // steps the red beam burns for (180 = 3s at GAME_SPEED 1)
-const BEAM_RELOAD  = 60;   // frames it reloads for afterwards (60 = 1 second)
+// The RED LASER burns for two seconds and is back in under half of one, so
+// it is lit for five sixths of the time — and one burn now carries you nearly
+// nine columns, which is the whole width of a wave.
+//   BEAM_BURN is the one to be careful with. An animal swept past sits in the
+// beam for about 22 steps if you sweep the way the herd is drifting and only
+// 18 if you sweep against it. So 16 meant a TOUGH animal, which needs melting
+// twice, could not be killed by sweeping at all — one burn across a wave of
+// them took nothing. 14 puts the with-the-drift sweep inside reach.
+const BEAM_TIME    = 240;  // steps the red beam burns for
+const BEAM_RELOAD  = 48;   // steps it reloads for afterwards
 const BEAM_WIDTH   = 18;   // how wide the beam's bright core is, in pixels
-const BEAM_BURN    = 16;   // frames an animal must be held in the beam before it melts
+const BEAM_BURN    = 14;   // steps an animal must be held in the beam before it melts
 const BEAM_DRAG    = 0.65; // how much of your usual speed you steer at while firing
 const LASER_BEAM = {
   time: BEAM_TIME, reload: BEAM_RELOAD, width: BEAM_WIDTH,
@@ -833,7 +841,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-09-13 embers";
+const BUILD = "2026-09-13 redlaser";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player

@@ -351,12 +351,13 @@ takes to beat at the default `GAME_SPEED` of 2 — double these if you set it to
 
 | Ship | How long |
 |------|----------|
-| Red Laser | ~8 s — a beam can't miss something that big |
+| Red Laser | ~6 s — a beam can't miss something that big |
 | Twin Blaster | ~12 s |
 | Electric Arc | ~12 s |
 | Blast Cannon | ~13–21 s |
 | Scout | ~16–22 s |
 | Rapid Fire | ~35–40 s |
+| Flamethrower | ~25 s — it lights the chicken, but one chicken is not a herd |
 
 Rapid Fire is the slow way to do it, and that's its own trade-off: half-strength
 bullets are the worst possible thing to bring to something with real armour.
@@ -378,7 +379,7 @@ seconds to reach the bottom, and the slowest ship clears one in about half that.
 |------|--------------|
 | Scout, Twin Blaster | two bullets per animal instead of one |
 | Rapid Fire | four bullets instead of two |
-| Red Laser | you must hold the beam on each animal twice as long — about 5 of a wave per burn, down from 10 |
+| Red Laser | you must hold the beam on each animal twice as long. One burn swept across them clears about **16**, where a tough herd used to be the one thing a sweep could not touch at all |
 | Electric Arc | the same, but it copes better because it holds a crowd at once — about 17 per burn, down from 26 |
 | **Blast Cannon** | **nothing at all** |
 
@@ -410,7 +411,7 @@ back to exactly where you were — the new ship is in your hands immediately.
 | **Rapid Fire** | score 2,500 in one game | **Hold** the button and it pours out ten shots a second — but each one only hits half as hard, so most animals take two. |
 | **Twin Blaster** | score 5,000 in one game | Two cannons — two bullets every shot, so you clear the herd twice as fast. |
 | **Blast Cannon** | score 7,500 in one game | Lobs a shell that **blows up** where it lands, clearing whatever it hits and the whole ring of animals around it — about seven at a time in the thick of the herd. A quarter of a second to reload. |
-| **Red Laser** | score 10,000 in one game | A red beam that smashes clean through every animal it touches (and melts their shots). Burns for 1.5 seconds, then reloads for half a second. |
+| **Red Laser** | score 10,000 in one game | A red beam that smashes clean through every animal it touches (and melts their shots). Burns for **2 seconds**, then reloads in under half of one — so it is lit five sixths of the time, and one burn carries you nearly the whole width of a wave. |
 | **Electric Arc** | score 15,000 in one game | Lightning instead of a laser: the current **jumps sideways** from animal to animal, up to three deep either side of the beam. Burns for 2.5 seconds, then reloads for half a second. |
 | **Flamethrower** | fill the bank to 100,000 | **Hold** the button and it pours out fire. It burns what it touches **and sets it alight**, and the fire goes on eating long after you have swung away. Slow on any one animal, frightening on a herd. Three and a half seconds of fuel in a tank. |
 
@@ -536,9 +537,17 @@ Two numbers to keep an eye on:
 Neither beam is a delete key. Animals have to be **held in the beam** for a
 moment before they go — swing away too soon and they cool off — and a lit beam
 is heavy, so you steer slowly while it burns. Pick your column and hold your
-nerve. At best the Red Laser takes out about half a wave and the Electric Arc
-about three quarters, so you'll need more than one burn either way. Both pass
-straight over your own bases, so they can't wreck your cover.
+nerve. Swept out and back, one burn of the Red Laser takes about two thirds of
+an ordinary wave and one of the Electric Arc can take all of it, so you will
+still want more than one burn. Both pass straight over your own bases, so they
+can't wreck your cover.
+
+There is one thing worth knowing about **which way you sweep**. The herd is
+always drifting one way or the other, and an animal only melts if the beam stays
+on it long enough. Sweep the way the herd is going and each animal sits in your
+beam for about 22 steps; sweep against it and you get only 18. Against a **tough**
+herd, which has to be melted twice, that difference is the whole difference
+between clearing half of what you pass and clearing none of it.
 
 The two beams want opposite things from you. The Red Laser likes to be **swept**
 — parked on one spot it manages only a column. The Electric Arc is the other way
