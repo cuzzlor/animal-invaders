@@ -313,6 +313,13 @@ const VOLT_ROCKET_ART = spr([
   "eee.sssss.eee", "ee..sssss..ee", "e...WsssW...e", "...GGGGGGG...",
   "....CCCCC....", ".....CYC.....",
 ]);
+const FLAME_ROCKET_ART = spr([
+  "......Y......", ".....YOY.....", "....YOOOY....", "...ROOYOOR...",
+  "..RROOYOORR..", "..ROWWWWWOR..", "..ROWDDDWOR..", "..ROWDCDWOR..",
+  "..ROWDDDWOR..", "..ROWWWWWOR..", "..ROsssssOR..", ".ROOsssssOOR.",
+  "ROO.sssss.OOR", "RO..sssss..OR", "R...WsssW...R", "...GGGGGGG...",
+  "....OYYYO....", ".....YOY.....",
+]);
 const COW_ART = spr([
   ".HH.......HH.", "HHKH.....HKHH", ".KWWWWWWWWWK.", ".WWKKWWWKKWW.",
   "WWWKKWWWKKWWW", "WWWWWWWWWWWWW", "WWKWWWWWWWKWW", ".WWWWWWWWWWW.",
@@ -502,6 +509,13 @@ function secs(steps) {
 function aSecond(everySteps) {
   return Math.round(60 * GAME_SPEED / everySteps);
 }
+// stepsFor(): the other way round — how many steps of the game are in a
+// number of SECONDS. Use it wherever you want to say "three seconds" and
+// mean three seconds. Writing the number out by hand is the easy mistake
+// here, and a silent one: 180 looks like three seconds, because a screen
+// draws 60 times a second, but the game takes 60 x GAME_SPEED steps in a
+// second, so 180 is only half of what it looks like.
+function stepsFor(seconds) { return Math.round(seconds * 60 * GAME_SPEED); }
 const BULLET_COLOR  = "#7ef9ff"; // colour of YOUR laser streaks — try "#ff5", "#f6f"
 const BULLET_LENGTH = 22;  // how long your shots look (bigger = longer streaks)
 
@@ -560,6 +574,33 @@ const VOLT_BEAM = {
   color: "#7ef9ff", glow: "rgba(126,249,255,0.26)", jagged: true,
 };
 
+// ---------------------------------------------------------------------
+// THE FLAMETHROWER — the one gun you HOLD instead of pressing.
+//   A beam is one press and a fixed burn. The flame is different: it pours
+// out for as long as the button is down, and it drinks a TANK of fuel while
+// it does. Let go and the tank fills again. Run the tank dry and the gun
+// will not light until the tank is full once more — so there is no holding
+// the button down all game. You pick your moment, and you let go.
+//   What it pays for that is REACH. The flame licks `reach` pixels up the
+// screen and no further, and every other gun in the game reaches the top.
+// So it is terrible against a herd still up at the top and frightening
+// against one that has come down to meet you: the deeper they get, the
+// better it works. It also burns HOTTER the nearer a thing is to the nose,
+// which is the same bargain again.
+// ---------------------------------------------------------------------
+const FLAME_TANK   = stepsFor(3.5); // a full tank is 3.5 seconds of fire
+const FLAME_FILL   = 1;    // frames of fire the tank wins back each frame
+const FLAME_REACH  = 300;  // how far up the screen the flame licks, in pixels
+const FLAME_MOUTH  = 26;   // how wide the flame is where it leaves the nose
+const FLAME_SPREAD = 132;  // how wide it has grown by the end of its reach
+const FLAME_BURN   = 20;   // heat an animal must take before it goes
+const FLAME_DRAG   = 0.8;  // how much of your usual speed you keep while burning
+const FLAME_PRICE  = 100000; // what it costs — paid into the bank, not in one game
+const FLAME_GUN = {
+  tank: FLAME_TANK, fill: FLAME_FILL, reach: FLAME_REACH, mouth: FLAME_MOUTH,
+  spread: FLAME_SPREAD, burn: FLAME_BURN, drag: FLAME_DRAG,
+};
+
 // `damage` is how much of an animal one bullet takes off. Animals have 1
 // health to begin with, so damage 1 downs them in a single hit and 0.5 takes
 // two — and past stage TOUGH_AFTER they have 2, so it's two hits and four.
@@ -596,6 +637,17 @@ const SHIPS = [
     blurb: ["Lightning that WALKS through the herd,",
             "animal to animal. Burns " + secs(BOLT_TIME) + ", reloads " + secs(BOLT_RELOAD) + "."],
   },
+  // The last ship is not bought with ONE big game. It is bought out of the
+  // BANK: every point you have ever scored, in every game you have ever
+  // played, adding up over days until it reaches the price. See `bank`
+  // further down. `bank` here is the price; a ship with no `bank` is earned
+  // the old way, with `need`.
+  {
+    id: "flame", name: "FLAMETHROWER", art: FLAME_ROCKET_ART, bank: FLAME_PRICE,
+    fire: "flame", damage: 1, reload: 0, flame: FLAME_GUN,
+    blurb: ["HOLD to pour out fire. Deadly up close,",
+            "useless far off. " + secs(FLAME_TANK) + " of fuel a tank."],
+  },
 ];
 
 // --- The numbers you'll reach for first ---
@@ -612,7 +664,7 @@ const PLAYER_BULLET_SPEED = 5; // how fast your shots fly up
 const SHOT_SPEED    = 2; // how fast the animals' shots fall down
 const STARTING_LIVES = 3;  // how many tries you get
 const SAFE_TIME     = 90;  // frames you flash & can't be hit after losing a life
-const FREEZE_TIME   = 180; // frames the ICE holds you still — 180 is 3 seconds
+const FREEZE_TIME   = stepsFor(3); // the ICE holds you still for three seconds
 
 // --- Stages: clear the herd without dying and a new, faster wave begins ---
 const STAGE_SPEEDUP = 0.12; // each stage everything gets this much faster (0.12 = 12%)
@@ -747,7 +799,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-09-13 hearts";
+const BUILD = "2026-09-13 flame";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
@@ -866,6 +918,9 @@ let state;         // "start", "playing", "cleared", "lost", "won" or "shop"
 let paused;        // true while the game is frozen by the pause button (or P)
 let beamTimer;     // frames left of the RED LASER's beam (0 = not firing)
 let beamCooldown;  // frames left before the beam can be fired again
+let flameFuel;     // frames of fire left in the FLAMETHROWER's tank
+let flameLit;      // is the flame burning THIS frame?
+let flameDry;      // ran the tank out — no fire until it is full again
 let gunTimer;      // frames until this ship's gun has finished reloading
 let invuln;        // frames left of "just got hit, can't be hit again yet"
 let iced;          // frames left stuck in the ICE — can't move, can't shoot
@@ -1067,6 +1122,9 @@ function buildLevel() {
   iced = 0;           // a new wave starts you thawed out, whatever hit you last
   beamTimer = 0;      // a fresh wave means a cooled-off, fully loaded gun
   beamCooldown = 0;
+  flameFuel = FLAME_TANK;  // ...and a full tank of fuel
+  flameLit = false;
+  flameDry = false;
   gunTimer = 0;
   stageBanner = BANNER_TIME;
 }
@@ -1078,6 +1136,8 @@ function buildLevel() {
 function newGame(startState) {
   player = { x: W / 2, y: H - CELL - 20 };
   score = 0;
+  banked = 0;            // nothing of THIS run is in the bank yet...
+  bankAtRunStart = bank; // ...and this is what the bank held before it began
   lives = STARTING_LIVES;
   stage = 1;
   state = startState;
@@ -1196,10 +1256,9 @@ function closeShop() {
 // ---------------------------------------------------------------------
 function restartGame() {
   if (state !== "playing") return;
-  if (score > bestRun) {
-    bestRun = score;
-    saveShop();
-  }
+  bankPoints();
+  if (score > bestRun) bestRun = score;
+  saveShop(); // and the bank keeps the points this run made, however it ended
   newGame("playing"); // stage 1, score 0, full lives, fresh board, un-paused
 }
 
@@ -1303,8 +1362,10 @@ function levelCleared() {
   // A level is a go in its own right, so bank what it was worth. Without
   // this a level player could never earn a ship, since the score goes back
   // to nothing the moment you pick the next level.
-  justUnlocked = SHIPS.filter((s) => s.need > 0 && bestRun < s.need && score >= s.need);
-  if (score > bestRun) { bestRun = score; saveShop(); }
+  bankPoints();            // everything this level made is in the bank first...
+  justUnlocked = shipsWonThisRun(); // ...so the shout can see a bank it just filled
+  if (score > bestRun) { bestRun = score; }
+  saveShop(); // the bank moved too, so write it down whether the run was best or not
   state = "cleared";
   clearedAt = nowMs();
   updateSpace();
@@ -1550,6 +1611,38 @@ function playLaserSound(start, electric) {
   } catch (e) { /* if audio isn't available, just stay silent */ }
 }
 
+// The FLAMETHROWER's roar: a rush of low, filtered noise, like burning gas.
+// It is asked for over and over while the flame burns, and each burst lasts
+// longer than the gap between two of them, so the bursts run into one
+// another and you hear one steady roar instead of a row of puffs.
+function playFlameSound() {
+  if (!soundOn) return;
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const t = audioCtx.currentTime;
+    const dur = 0.24;
+    const buffer = audioCtx.createBuffer(1, Math.floor(audioCtx.sampleRate * dur), audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    const noise = audioCtx.createBufferSource();
+    noise.buffer = buffer;
+    // A band low down. Under it the roar turns to rumble, over it to hiss;
+    // this is the part of the noise that sounds like fire.
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = "bandpass";
+    filter.frequency.setValueAtTime(430, t);
+    filter.frequency.linearRampToValueAtTime(290, t + dur);
+    filter.Q.value = 0.7;
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.09, t + 0.06); // swells...
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + dur); // ...and falls away
+    noise.connect(filter).connect(gain).connect(audioCtx.destination);
+    noise.start(t);
+    noise.stop(t + dur);
+  } catch (e) { /* if audio isn't available, just stay silent */ }
+}
+
 // ---------------------------------------------------------------------
 // THE SOUND OF SPACE — a quiet drone that plays under everything else,
 // so the game doesn't sit in silence between the bangs.
@@ -1681,6 +1774,10 @@ function playerFire() {
   if (iced > 0) return;
   if (state !== "playing" || paused) return;
   const ship = currentShip();
+  // The FLAMETHROWER is held, not pressed: update() watches the button and
+  // pours the fire. A press has nothing of its own to do here — and must NOT
+  // fall through to shootBullets(), or a flame ship would fire bullets too.
+  if (ship.flame) return;
   if (ship.beam) {
     // One press burns the beam for its whole `time`; you can't fire again
     // until it's finished burning AND finished reloading.
@@ -1808,14 +1905,35 @@ function update() {
   const shotSpeed = SHOT_SPEED * speedScale;
   if (stageBanner > 0) stageBanner--; // count down the "STAGE N" banner
 
+  // --- The FLAMETHROWER's tank ---
+  // Worked out BEFORE you move, because a lit flame slows your steering and
+  // the game has to know whether it is lit before it moves you.
+  //   Hold the button and the flame burns and the tank drains. Let go and it
+  // fills again. Run it dry and the gun will not light until the tank is
+  // full once more — which is what stops the button simply being held down
+  // from the first frame of a wave to the last.
+  const flameGun = currentShip().flame;
+  flameLit = !!flameGun && !!keys[" "] && iced === 0 && !flameDry && flameFuel > 0;
+  if (flameLit) {
+    flameFuel--;
+    if (flameFuel <= 0) { flameFuel = 0; flameDry = true; }
+    // The roar. Each burst lasts longer than the gap between two of them, so
+    // they run together into one steady sound instead of a row of puffs.
+    if (flameFuel % 8 === 0) playFlameSound();
+  } else if (flameGun) {
+    flameFuel = Math.min(flameGun.tank, flameFuel + flameGun.fill);
+    if (flameFuel >= flameGun.tank) flameDry = false;
+  }
+
   // --- Move the player ---
   // Firing a beam is heavy work: while one is lit you steer slowly, so you
   // can't simply sweep it across the whole herd in one go. The ELECTRIC ARC
-  // is the heaviest of the lot.
+  // is the heaviest of the lot, and a lit flame is heavy too.
   // And ice stops you dead: while `iced` is counting down the keys and the
   // on-screen buttons do nothing at all.
   const lit = beamTimer > 0 && currentShip().beam;
-  const moveSpeed = iced > 0 ? 0 : PLAYER_SPEED * (lit ? currentShip().beam.drag : 1);
+  const drag = lit ? currentShip().beam.drag : flameLit ? flameGun.drag : 1;
+  const moveSpeed = iced > 0 ? 0 : PLAYER_SPEED * drag;
   if (keys["ArrowLeft"] || keys["a"] || keys["A"])  player.x -= moveSpeed;
   if (keys["ArrowRight"] || keys["d"] || keys["D"]) player.x += moveSpeed;
   // Keep the player inside the screen.
@@ -1988,7 +2106,15 @@ function update() {
     if (!inv.alive) continue;
     const onIt = beamOn && inBeam(inv.x, inv.y, sizeOf(inv));
     const hop = onIt ? 0 : hopOf(inv.x, inv.y);
-    if (onIt || hop > 0) {
+    // The FLAMETHROWER heats an animal exactly the way a beam does, so it
+    // comes in here rather than getting a loop of its own — otherwise the
+    // heat one added would be taken straight back off by the other. A ship
+    // carries ONE gun, so a beam and a flame are never both on: these three
+    // are a ladder, not a crowd.
+    const licked = (onIt || hop > 0) ? 0 : flameHeat(inv.x, inv.y, sizeOf(inv));
+    if (onIt || hop > 0 || licked > 0) {
+      // How much heat sees this animal off, for whichever gun has hold of it.
+      const limit = licked > 0 ? flameGun.burn : beamGun.burn;
       if (hop > 0) {
         // The current gutters, so `gutter` is how hard it bites THIS frame —
         // anywhere from nothing to twice its share. That's why no two animals
@@ -1998,6 +2124,8 @@ function update() {
         const gutter = Math.random();
         inv.heat += gutter * 2 * Math.pow(beamGun.jump, hop);
         if (gutter > 0.12) bolts.push(jumpBolt(inv, hop, gutter));
+      } else if (licked > 0) {
+        inv.heat += licked;
       } else {
         inv.heat++;
       }
@@ -2005,7 +2133,7 @@ function update() {
       // That's the whole of an ordinary animal, so they melt exactly as they
       // always did — but the BIG CHICK has sixty of them, so a beam has to be
       // held on it over and over to see it off.
-      if (inv.heat >= beamGun.burn) {
+      if (inv.heat >= limit) {
         inv.heat = 0;
         inv.hp -= 1;
         if (inv.hp <= 0) {
@@ -2037,6 +2165,10 @@ function update() {
     if (!beamGun) beamTimer = 0;
     if (beamCooldown > 0) beamCooldown--;
   }
+  // The flame burns their falling shots out of the air as well — but only
+  // the ones that have come down far enough to be IN it. A shot still up at
+  // the top sails through, which is the whole bargain of this gun.
+  if (flameLit) shots = shots.filter((m) => flameHeat(m.x, m.y, m.size || 28) === 0);
 
   // Your bullets hitting animals. A bullet takes its ship's `dmg` off the
   // animal's health — a full-strength one downs it outright, while the RAPID
@@ -2129,6 +2261,41 @@ function update() {
   // --- Cleared the herd? On to the next (faster) stage! ---
   // Only if you're still alive, of course.
   if (state === "playing" && invaders.every((inv) => !inv.alive)) nextStage();
+
+  // --- Everything you scored this frame goes into the bank as well ---
+  // Last of all, so the stage bonus nextStage() just handed you is in it
+  // too. This is the ONLY door: every place in the game that adds to the
+  // score comes past here before the frame ends.
+  bankPoints();
+}
+
+// ---------------------------------------------------------------------
+// flameHeat(): how much heat the FLAMETHROWER is putting into a thing at
+// (x, y) this frame, or 0 for anything the flame is not touching. It is
+// the ONE place that says what the flame can reach, so the animals it
+// burns, the falling shots it burns up and the fire drawn on the screen
+// can never disagree with each other.
+//   The flame is a CONE: `mouth` wide where it leaves the nose, growing to
+// `spread` by the end of its reach. And it bites harder the nearer a thing
+// is — twice as hard at the nose as at the very tip.
+//   It answers 0 for every other ship, so nothing but the FLAMETHROWER
+// behaves one jot differently for its being here.
+// ---------------------------------------------------------------------
+function flameHeat(x, y, size) {
+  if (!flameLit) return 0;
+  const gun = currentShip().flame;
+  if (!gun) return 0;
+  const up = player.y - CELL / 2 - y;      // how far ABOVE the nose the thing is
+  if (up < 0 || up > gun.reach) return 0;  // level with you, behind you, or too far
+  const half = flameHalf(gun, up / gun.reach);
+  if (Math.abs(x - player.x) > half + (size === undefined ? CELL : size) / 2) return 0;
+  return 2 - up / gun.reach;
+}
+
+// flameHalf(): how far the flame spreads either side of the ship, `t` of
+// the way along its reach (0 at the nose, 1 at the tip).
+function flameHalf(gun, t) {
+  return (gun.mouth + (gun.spread - gun.mouth) * t) / 2;
 }
 
 // ---------------------------------------------------------------------
@@ -2327,15 +2494,69 @@ function spawnExplosion(x, y, scale = 1) {
 // ---------------------------------------------------------------------
 const BEST_KEY = "ai-best"; // the highest score you've ever managed in one game
 const SHIP_KEY = "ai-ship"; // id of the ship you're flying
+const BANK_KEY = "ai-bank"; // every point you have EVER scored — see the bank below
 
 // Read them back, falling back to a sensible default if nothing is saved
 // yet (or if it's somehow broken) so a bad save can never wedge you.
 let bestRun = 0;
 try { bestRun = Math.max(0, Number(localStorage.getItem(BEST_KEY)) || 0); } catch (e) {}
 
-// Which ships that best run has earned you. Worked out from bestRun rather
-// than kept in its own list, so the two can never disagree.
-function unlocked(ship) { return bestRun >= ship.need; }
+// ---------------------------------------------------------------------
+// THE BANK — how the most expensive ship is paid for.
+//   The FLAMETHROWER costs 100,000, which is far more than one game can
+// make. So it is not bought with one game. Every point you score, in every
+// game you play, goes into the bank as well as onto the scoreboard, and the
+// bank keeps what it is given for ever. It fills a little each time you
+// play, over days, and when it reaches the price the ship is yours.
+//   The bank is never SPENT. It is a record of everything you have done,
+// not a purse, so flying the ship does not empty it and you can never lose
+// the ship again. Losing a run does not take anything out of it either: a
+// bad game simply adds less than a good one.
+// ---------------------------------------------------------------------
+let bank = 0;
+try { bank = Math.max(0, Number(localStorage.getItem(BANK_KEY)) || 0); } catch (e) {}
+let banked = 0;            // how much of THIS run has gone in already
+let bankAtRunStart = bank; // what the bank held when this run began
+let bankSaved = bank;      // what was last written down in the browser's store
+const BANK_STEP = 250;     // points the bank must grow by before it is written again
+
+// bankPoints(): put everything scored since the last frame into the bank
+// too. It is called at the end of every frame, and again at each of the
+// three doors a run can leave by — game over, a level cleared, and the
+// start-again button — so the bank is right however the run ended and not
+// only if a frame happened to run afterwards. Calling it twice costs
+// nothing: the second call finds nothing left to bank.
+// `banked` is what makes it safe to call every single frame: it holds
+// how much of this run is already in, so no point is ever counted twice,
+// and starting the run again cannot lose the points it had already made.
+//   It is only WRITTEN DOWN every BANK_STEP points. Writing to the
+// browser's store sixty times a second would be waste, and the most a shut
+// lid can cost you is 250 points out of a hundred thousand.
+function bankPoints() {
+  if (score <= banked) return;
+  bank += score - banked;
+  banked = score;
+  if (bank - bankSaved >= BANK_STEP) saveShop();
+}
+
+// Which ships you have earned. Most are worked out from bestRun, so the
+// two can never disagree; the FLAMETHROWER is worked out from the bank the
+// same way. Nothing keeps a list of "ships I own" — there is nothing to go
+// out of step with.
+function unlocked(ship) {
+  if (ship.bank) return bank >= ship.bank;
+  return bestRun >= ship.need;
+}
+
+// shipsWonThisRun(): the ships you could not fly when this run began and
+// can fly now. Every "NEW SHIP UNLOCKED" shout comes through here, so the
+// game-over screen, the WELL DONE screen and the YOU WIN screen can never
+// disagree about what you have just won.
+function shipsWonThisRun() {
+  return SHIPS.filter((s) => s.bank
+    ? (bankAtRunStart < s.bank && bank >= s.bank)
+    : (s.need > 0 && bestRun < s.need && score >= s.need));
+}
 
 let shipId = "scout";
 try {
@@ -2348,6 +2569,8 @@ function saveShop() {
   try {
     localStorage.setItem(BEST_KEY, String(bestRun));
     localStorage.setItem(SHIP_KEY, shipId);
+    localStorage.setItem(BANK_KEY, String(bank));
+    bankSaved = bank;
   } catch (e) { /* private browsing etc. — just don't remember it */ }
 }
 
@@ -2367,6 +2590,9 @@ function equipShip(ship) {
   beamTimer = 0;
   beamCooldown = 0;
   bolts = [];
+  flameFuel = FLAME_TANK;   // and the new ship arrives with a full tank
+  flameLit = false;
+  flameDry = false;
   saveShop();
   playShootSound(); // a little chirp to say "you're in this one now"
 }
@@ -2466,6 +2692,7 @@ function onGameOver() {
   beamTimer = 0;            // switch the gun off, so no beam is left hanging
   beamCooldown = 0;         // over the game-over screen
   bolts = [];               // and no lightning left forking over it either
+  flameLit = false;         // and no flame still pouring out of the nose
   // Ships this run just earned: ones the run reached but your old best hadn't.
   // Finishing the course counts as reaching the end of it — and is worth
   // remembering in its own right.
@@ -2473,11 +2700,10 @@ function onGameOver() {
     if (LEVELS.length > bestLevel) { bestLevel = LEVELS.length; saveRung(); }
     if (!finished) { finished = true; saveDone(); }
   }
-  justUnlocked = SHIPS.filter((s) => s.need > 0 && bestRun < s.need && score >= s.need);
-  if (score > bestRun) {
-    bestRun = score;
-    saveShop();
-  }
+  bankPoints();            // everything this run made is in the bank first...
+  justUnlocked = shipsWonThisRun(); // ...so the shout can see a bank it just filled
+  if (score > bestRun) bestRun = score;
+  saveShop(); // the bank moved too, so write it down whether the run was best or not
   if (scoreQualifies(score)) showNameEntry();
 }
 
@@ -2778,6 +3004,14 @@ function levelFace(i) {
 // Where you stand on a level, in two or three words.
 // What to shout when a run earns you a ship. Naming them all looks fine for
 // one and runs clean off the screen for five, so past one we say how many.
+// bankLine(): "   •   bank: 12340" to tack on the end of a line — or
+// nothing at all, once the ship the bank pays for is yours. A number with
+// nothing left to say is clutter, and both these screens are full.
+function bankLine() {
+  const ship = SHIPS.find((s) => s.bank);
+  return ship && !unlocked(ship) ? "   •   bank: " + bank : "";
+}
+
 function unlockedLine() {
   if (justUnlocked.length === 1) {
     return "★ NEW SHIP UNLOCKED: " + justUnlocked[0].name + " ★";
@@ -2844,11 +3078,23 @@ function drawStartLevels() {
 // drawShop(): the ship shop — a screen of its own, with one card per
 // ship showing what it looks like, what it does, and what it costs.
 // ---------------------------------------------------------------------
-// Six cards have to fit between the heading and the buttons at the bottom,
-// so they're shorter and closer together than they were with five.
-const SHOP_CARD_TOP = 142; // where the first ship card starts
-const SHOP_CARD_H   = 108; // how tall each card is
-const SHOP_CARD_GAP = 8;   // the space between two cards
+// Every ship gets a card, and they all have to fit between the heading and
+// the line at the foot of the screen. So the height is not fixed: it is
+// worked out from how many ships there are. Add a ship and they all get a
+// little shorter together, and none of them falls off the bottom.
+const SHOP_CARD_TOP = 128; // where the first ship card starts
+const SHOP_CARD_BOT = 838; // the last card must finish ABOVE the buttons at 848
+const SHOP_CARD_GAP = 6;   // the space between two cards
+const SHOP_CARD_H = Math.min(108, Math.floor(
+  (SHOP_CARD_BOT - SHOP_CARD_TOP - (SHIPS.length - 1) * SHOP_CARD_GAP) / SHIPS.length));
+// And the five lines of writing INSIDE a card move with the card's height,
+// so a shorter card squeezes them together instead of dropping one on top
+// of another. Add an eighth ship and this all still reads.
+const CARD_NAME_Y = Math.round(SHOP_CARD_H * 0.21); // the ship's name
+const CARD_TEXT_Y = Math.round(SHOP_CARD_H * 0.40); // the first line of the blurb
+const CARD_TEXT_GAP = 17;                           // and the second, under it
+const CARD_FOOT_Y = SHOP_CARD_H - 24;               // "EARNED", or what it costs
+const CARD_BAR_Y  = SHOP_CARD_H - 12;               // the bar creeping toward it
 function shopCardY(i) { return SHOP_CARD_TOP + i * (SHOP_CARD_H + SHOP_CARD_GAP); }
 
 function drawShop() {
@@ -2859,13 +3105,14 @@ function drawShop() {
   ctx.textBaseline = "middle";
   ctx.fillStyle = "#7ef9ff";
   ctx.font = "42px 'Courier New', monospace";
-  ctx.fillText("SHIP SHOP", W / 2, 70);
+  ctx.fillText("SHIP SHOP", W / 2, 62);
   ctx.fillStyle = "#ffd34d";
   ctx.font = "26px 'Courier New', monospace";
-  ctx.fillText("BEST RUN: " + bestRun, W / 2, 106);
+  ctx.fillText("BEST RUN: " + bestRun + "   •   BANK: " + bank, W / 2, 94);
   ctx.fillStyle = "#888";
   ctx.font = "17px 'Courier New', monospace";
-  ctx.fillText("Ships are earned by scoring big in ONE game", W / 2, 130);
+  ctx.fillText("Most ships are earned in ONE big game." +
+               "   •   The last one fills the bank up slowly", W / 2, 116);
 
   for (let i = 0; i < SHIPS.length; i++) {
     const ship = SHIPS[i];
@@ -2886,7 +3133,7 @@ function drawShop() {
     ctx.fillStyle = "#666";
     ctx.font = "19px 'Courier New', monospace";
     ctx.textAlign = "center";
-    ctx.fillText(String(i + 1), 76, y + SHOP_CARD_H / 2);
+    ctx.fillText(String(i + 1), 74, y + SHOP_CARD_H / 2);
     drawThing(ship.art, 140, y + SHOP_CARD_H / 2, 72,
               typeof ship.art === "string" ? -Math.PI / 4 : 0);
 
@@ -2894,32 +3141,37 @@ function drawShop() {
     ctx.textAlign = "left";
     ctx.fillStyle = mine ? "#fff" : "#bbb";
     ctx.font = "23px 'Courier New', monospace";
-    ctx.fillText(ship.name, 198, y + 22);
+    ctx.fillText(ship.name, 198, y + CARD_NAME_Y);
     ctx.fillStyle = "#9aa6b2";
     ctx.font = "16px 'Courier New', monospace";
     for (let l = 0; l < ship.blurb.length; l++) {
-      ctx.fillText(ship.blurb[l], 198, y + 44 + l * 18);
+      ctx.fillText(ship.blurb[l], 198, y + CARD_TEXT_Y + l * CARD_TEXT_GAP);
     }
     // How you get it — and, if you haven't yet, how close you've come.
     ctx.font = "14px 'Courier New', monospace";
     ctx.fillStyle = flying ? "#ffd34d" : mine ? "#5fd66f" : "#777";
     ctx.fillText(flying ? "★ FLYING THIS ONE"
                  : mine ? (ship.need === 0 ? "✓ ALWAYS YOURS" : "✓ EARNED")
+                 : ship.bank ? "LOCKED — the bank must reach " + ship.bank
                  : "LOCKED — score " + ship.need + " in one game",
-                 198, y + SHOP_CARD_H - 26);
+                 198, y + CARD_FOOT_Y);
     if (!mine) {
-      // A bar creeping toward the score you need, so you can see how far off
-      // your best run is rather than just being told "no". It gets the bottom
-      // line of the card to itself, clear of the writing above.
+      // A bar creeping toward what you need, so you can see how far off you
+      // are rather than just being told "no". For most ships that is your
+      // best single run against the price; for the one that fills up it is
+      // the bank against the price. It gets the bottom line of the card to
+      // itself, clear of the writing above.
       const barW = 250;
-      const gone = Math.min(1, bestRun / ship.need);
+      const got  = ship.bank ? bank : bestRun;
+      const want = ship.bank ? ship.bank : ship.need;
       ctx.fillStyle = "rgba(255,255,255,0.12)";
-      ctx.fillRect(198, y + SHOP_CARD_H - 13, barW, 4);
-      ctx.fillStyle = "#7ef9ff";
-      ctx.fillRect(198, y + SHOP_CARD_H - 13, barW * gone, 4);
+      ctx.fillRect(198, y + CARD_BAR_Y, barW, 4);
+      ctx.fillStyle = ship.bank ? "#ff8c1a" : "#7ef9ff";
+      ctx.fillRect(198, y + CARD_BAR_Y, barW * Math.min(1, got / want), 4);
       ctx.fillStyle = "#666";
       ctx.font = "13px 'Courier New', monospace";
-      ctx.fillText("best so far: " + bestRun, 198 + barW + 10, y + SHOP_CARD_H - 10);
+      ctx.fillText((ship.bank ? "in the bank: " : "best so far: ") + got,
+                   198 + barW + 10, y + CARD_BAR_Y + 3);
     }
   }
 
@@ -2929,6 +3181,74 @@ function drawShop() {
   ctx.fillText("Tap a ship you've earned to fly it (or press 1–" + SHIPS.length + ")" +
                "   •   Esc goes back", W / 2, 922);
 }
+
+// ---------------------------------------------------------------------
+// drawFlame(): the FLAMETHROWER's fire.
+//   Not a straight column like the beams — a CONE, narrow where it leaves
+// the nose and wider the further it climbs, stopping dead at the end of its
+// reach. What you see is exactly what flameHeat() can burn: both are drawn
+// from the same flameHalf(), so the fire on the screen cannot promise
+// anything the gun does not do.
+//   It is painted in four coats, widest and deepest first, so the middle of
+// it runs white-hot — a red envelope, orange inside that, yellow inside
+// that, and a short pale core at the mouth. Every coat has a torn edge,
+// thrown about fresh each frame, and loose puffs ride up inside it. That is
+// what makes it read as fire and not as a triangle. "lighter" makes the
+// coats ADD their light where they lie over one another, the same trick the
+// beams use.
+// ---------------------------------------------------------------------
+const FLAME_COATS = [
+  { wide: 1.00, far: 1.00, color: "#ff3a00", alpha: 0.40 },
+  { wide: 0.72, far: 0.88, color: "#ff8c1a", alpha: 0.46 },
+  { wide: 0.44, far: 0.70, color: "#ffd23d", alpha: 0.52 },
+  { wide: 0.22, far: 0.42, color: "#fff3c4", alpha: 0.62 },
+];
+const FUEL_BAR     = 90; // how wide the fuel gauge is, in pixels
+const FLAME_STEPS  = 7;  // how many steps each torn edge is drawn in
+const FLAME_PUFFS  = 9;  // loose lumps of fire riding up inside the cone
+
+function drawFlame(x, noseY, gun) {
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.shadowColor = "#ff6a00";
+  ctx.shadowBlur = 18;
+  for (const coat of FLAME_COATS) {
+    const far = gun.reach * coat.far;
+    ctx.globalAlpha = coat.alpha;
+    ctx.fillStyle = coat.color;
+    ctx.beginPath();
+    ctx.moveTo(x - gun.mouth * coat.wide / 2, noseY);
+    for (let i = 1; i <= FLAME_STEPS; i++) {            // up the left-hand edge
+      const t = i / FLAME_STEPS;
+      ctx.lineTo(x - flameHalf(gun, t) * coat.wide * torn(), noseY - far * t);
+    }
+    ctx.lineTo(x + (Math.random() - 0.5) * gun.mouth,   // a tongue off the tip
+               noseY - far * (1 + 0.08 * Math.random()));
+    for (let i = FLAME_STEPS; i >= 1; i--) {            // and back down the right
+      const t = i / FLAME_STEPS;
+      ctx.lineTo(x + flameHalf(gun, t) * coat.wide * torn(), noseY - far * t);
+    }
+    ctx.lineTo(x + gun.mouth * coat.wide / 2, noseY);
+    ctx.closePath();
+    ctx.fill();
+  }
+  // The loose puffs. Pale and small near the mouth where the fire is
+  // hottest, bigger and redder the further up they have drifted.
+  for (let i = 0; i < FLAME_PUFFS; i++) {
+    const t = Math.random();
+    const half = flameHalf(gun, t) * 0.8;
+    ctx.globalAlpha = 0.28 + Math.random() * 0.24;
+    ctx.fillStyle = t < 0.45 ? "#ffe680" : "#ff7a1a";
+    ctx.beginPath();
+    ctx.arc(x + (Math.random() * 2 - 1) * half, noseY - gun.reach * t,
+            4 + (1 - t) * 4 + Math.random() * 7, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+// torn(): a little more, or a little less, than the flame's true width —
+// the wobble that makes an edge look like fire.
+function torn() { return 0.78 + Math.random() * 0.44; }
 
 // ---------------------------------------------------------------------
 // LIGHTNING — the ELECTRIC ARC's beam and its jumps are drawn as torn,
@@ -3020,8 +3340,11 @@ function drawBoltLine(x1, y1, x2, y2, gun, flicker, bright, hop) {
 
 // drawReloadBar(): a little bar under the ship that fills back up as a
 // slow gun reloads, so you know exactly when you can fire again.
-function drawReloadBar(done, color) {
-  const full = CELL;
+// `wide` is for the FLAMETHROWER's fuel gauge, which is not a reload bar you
+// glance at once but a tank you watch all the way down. The rest of the guns
+// leave it out and get the ship's own width, as they always did.
+function drawReloadBar(done, color, wide) {
+  const full = wide || CELL;
   const y = player.y + CELL / 2 + 6;
   ctx.fillStyle = "rgba(255,255,255,0.18)";
   ctx.fillRect(player.x - full / 2, y, full, 4);
@@ -3233,6 +3556,19 @@ function draw() {
     drawReloadBar(1 - gunTimer / BOMB_RELOAD, "#ffd23d");
   }
 
+  // The FLAMETHROWER: the fire itself while it burns, and a FUEL GAUGE under
+  // the ship whenever the tank is not full — so you can see how much fire
+  // you have left before the moment you need it. The gauge turns red when
+  // you have run the tank dry, which is the game telling you WHY the button
+  // has stopped working: the tank has to fill right up again first.
+  const flameG = currentShip().flame;
+  if (flameG) {
+    if (flameLit) drawFlame(player.x, noseY, flameG);
+    if (flameFuel < flameG.tank) {
+      drawReloadBar(flameFuel / flameG.tank, flameDry ? "#ff3a00" : "#ffd23d", FUEL_BAR);
+    }
+  }
+
   // Draw the player — whichever ship you've bought and are flying. While
   // safe after a hit, blink it on and off so you can see you're protected.
   // Held in the ice, the ship does NOT blink: the block of ice around it
@@ -3364,7 +3700,8 @@ function draw() {
     ctx.fillStyle = "#888";
     ctx.font = "18px 'Courier New', monospace";
     ctx.fillText("Move with ← →   •   Shoot with Space", W / 2, 330);
-    ctx.fillText("Flying: " + currentShip().name + "   •   best run: " + bestRun, W / 2, 360);
+    ctx.fillText("Flying: " + currentShip().name + "   •   best run: " + bestRun +
+                 bankLine(), W / 2, 360);
     // Which copy of the game this is — see BUILD, up at the top. Small and
     // grey, because it is only there for the day a phone will not update.
     // The build, and the frames a second this device is really managing. Both
@@ -3403,7 +3740,7 @@ function draw() {
     } else {
       ctx.fillStyle = "#888";
       ctx.font = "20px 'Courier New', monospace";
-      ctx.fillText("Best run: " + bestRun, W / 2, 254);
+      ctx.fillText("Best run: " + bestRun + bankLine(), W / 2, 254);
     }
     // While the name box is up, that HTML pop-up covers the middle — don't
     // draw the board or the buttons behind it. Once you've saved (or if you

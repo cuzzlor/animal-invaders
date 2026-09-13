@@ -131,7 +131,7 @@ the buttons.
 | `hp` | hits one animal takes |
 | `boss` | `true` puts a Big Chick there instead of a herd, with `bossHp` hits |
 | `herd` | make every animal one kind, by name: `"penguin"`, `"cow"`, `"pig"`, `"chicken"` or `"monkey"`. Leave it out for the usual mix. |
-| `freeze` | frames the level's shots hold you still. `180` is three seconds. The shot still takes a life; the freeze is on top of it. |
+| `freeze` | steps the level's shots hold you still. Write it as `stepsFor(3)` for three seconds, **not** as `3 * 60` — see "Seconds, and steps" below. The shot still takes a life; the freeze is on top of it. |
 
 A boss level has no herd, so `rows`, `cols`, `reload`, `aim` and `hp` do nothing
 on that line. Only `speed` reaches the chicken, as how fast it sweeps.
@@ -260,6 +260,27 @@ frames of that iPad, four times the steps in each, still the same speed.
 steps one frame may make up; both are worked out from `GAME_SPEED`, so the
 12-frames-a-second floor stays put however fast you set it.
 
+### Seconds, and steps ⏳
+
+Everything in the game is timed in **steps**, and the game takes
+**60 × `GAME_SPEED`** of them in one second — **120 a second** as it is set now.
+
+That is an easy thing to get wrong, and a silent one, because a screen draws 60
+times a second and `60` looks like the number of a second. It caught this game
+once: the ice on the Ice Floe was written as `180`, which looks like three
+seconds and is one and a half.
+
+So never write the arithmetic out by hand. Two little helpers do it for you:
+
+| | |
+|---|---|
+| `stepsFor(3)` | how many steps are in three seconds — use it **wherever you set a time** |
+| `secs(360)` | what 360 steps is in seconds, written the way the shop writes it |
+
+They are inverses of one another, and they both know about `GAME_SPEED`. Set a
+time with `stepsFor`, and turning `GAME_SPEED` up or down can never leave the
+game holding you still for half as long as it says.
+
 ## Which copy am I playing? 🏷️
 
 The foot of the start screen shows a **build** in small grey text, like
@@ -371,9 +392,12 @@ before it kicks in, and `TOUGH_HP` is how much health those animals get.
 
 ## The ship shop 🚀
 
-Better ships are **earned by scoring big in a single game**. Not added up over
+Most ships are **earned by scoring big in a single game**. Not added up over
 lots of games — all in one run. Manage it once and the ship is yours forever,
 however badly the next game goes.
+
+The **Flamethrower** is the one that is not. It is bought out of **the bank**,
+which fills a little every time you play. See below.
 
 Visit the **SHOP** to fly what you've earned: from the start screen, from the
 game-over screen, or mid-game with the trolley button along the top-left. Going
@@ -388,13 +412,66 @@ back to exactly where you were — the new ship is in your hands immediately.
 | **Blast Cannon** | score 7,500 in one game | Lobs a shell that **blows up** where it lands, clearing whatever it hits and the whole ring of animals around it — about seven at a time in the thick of the herd. A quarter of a second to reload. |
 | **Red Laser** | score 10,000 in one game | A red beam that smashes clean through every animal it touches (and melts their shots). Burns for 1.5 seconds, then reloads for half a second. |
 | **Electric Arc** | score 15,000 in one game | Lightning instead of a laser: the current **jumps sideways** from animal to animal, up to three deep either side of the beam. Burns for 2.5 seconds, then reloads for half a second. |
+| **Flamethrower** | fill the bank to 100,000 | **Hold** the button and it pours out fire. It only reaches a third of the way up the screen, and it burns hotter the nearer a thing is — so it is useless against a herd at the top and frightening against one that has come down to meet you. Three and a half seconds of fuel in a tank. |
 
-Rapid Fire is the only ship you **hold** the button for; every other one fires
-once per press. An animal that's been hit but not finished off fades, so you can
+Rapid Fire and the Flamethrower are the two ships you **hold** the button for;
+every other one fires once per press. An animal that's been hit but not finished off fades, so you can
 see which ones need one more.
 
-The shop shows a bar creeping toward each ship, so you can see how close your
-best run has come.
+The shop shows a bar creeping toward each ship, so you can see how close you
+are. For most ships the bar measures your best single run. For the Flamethrower
+it measures the bank.
+
+### The bank 🏦
+
+The Flamethrower costs **100,000**, which is far more than one game can make. So
+it is not bought with one game.
+
+**Every point you score, in every game you play, goes into the bank as well as
+onto the scoreboard.** The bank keeps what it is given. It fills a little each
+time you play — over days — and when it reaches 100,000 the ship is yours.
+
+Three things are worth knowing about it:
+
+- **The bank is never spent.** It is a record of everything you have done, not a
+  purse. Flying the ship does not empty it, and you can never lose the ship again.
+- **Losing takes nothing out of it.** A bad game simply puts less in than a good
+  one. There is no way to go backwards.
+- **Every point counts, in both games.** Levels and Endless both pay into the
+  same bank, and a run you give up on halfway still banks what it made.
+
+You can watch it filling on the start screen, on the game-over screen, and at the
+top of the shop. Once the ship is yours the number stops being shown, because it
+has nothing left to say.
+
+The price is `FLAME_PRICE` in `index.html`. Make it smaller and the ship arrives
+sooner.
+
+### The Flamethrower 🔥
+
+It is the only gun in the game that is **short**. Every other one reaches the top
+of the screen; the flame licks 300 pixels up and stops. That is the whole bargain
+of it, and it changes how you play:
+
+- **Let them come to you.** A herd up at the top is out of reach entirely. A herd
+  that has dropped down to your level goes up in a few seconds.
+- **It bites harder the closer they are.** An animal at the mouth of the flame
+  takes heat twice as fast as one at the tip.
+- **The flame spreads.** It leaves the nose narrow and is five times wider by the
+  end of its reach, so the further away a thing is, the wider a sweep you have.
+- **Their falling shots burn up in it** — but only the ones that have come down
+  far enough to be inside it. One still high up sails straight through.
+
+And it is the only gun with a **tank**. Holding the button drains it, letting go
+fills it up again, and **running it dry means no fire at all until the tank is
+full once more**. So the button cannot simply be held down from the first frame
+of a wave to the last: you pick your moment and you let go. The gauge under your
+ship shows what is left, and turns **red** when you have run it dry — which is
+the game telling you why the button has stopped working.
+
+The numbers are all together near the top of `index.html`: `FLAME_TANK`,
+`FLAME_FILL`, `FLAME_REACH`, `FLAME_MOUTH`, `FLAME_SPREAD`, `FLAME_BURN` and
+`FLAME_DRAG`.
 
 Neither beam is a delete key. Animals have to be **held in the beam** for a
 moment before they go — swing away too soon and they cool off — and a lit beam
@@ -430,7 +507,9 @@ this computer — there's no internet server, so they don't follow you to anothe
 device.
 
 Ships out of reach? Each one's `need` lives in the `SHIPS` list near the top of
-`index.html` — make the numbers smaller and the good ships arrive sooner.
+`index.html` — make the numbers smaller and the good ships arrive sooner. The
+Flamethrower has `bank` instead of `need`, because it is paid for out of the
+bank rather than out of one run.
 
 Want to meet the Big Chick without playing fifteen stages? Change `BOSS_EVERY`
 to `1` and it turns up straight away. `BOSS_HP` makes it tougher or softer,
