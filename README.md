@@ -14,7 +14,7 @@ nothing to install, no internet needed.
 | Move left / right | ← →  (or `A` / `D`) |
 | Shoot | `Spacebar` |
 | Pause / un-pause | `P` (or tap the two bars, top-left) |
-| Choose a level (LEVELS) | tap its line on the start screen, or press `1`–`5` |
+| Choose a level (LEVELS) | tap its line on the start screen, or press `1`–`6` |
 | Play again after you win or lose | `Enter` |
 | Start the whole run again | `R` (or tap the arrows that point back, top-left) |
 | Open the ship shop | `S` (or tap the trolley, top-left, or the SHOP button) |
@@ -33,11 +33,11 @@ remembers your choice.
 12% faster than the one before. It never ends. You play it for a score, and the
 Big Chick turns up every 15 stages.
 
-**LEVELS** is a set course with a finish. There are **5 levels**. Level 1 is
+**LEVELS** is a set course with a finish. There are **6 levels**. Level 1 is
 gentle: ten animals, slow, and they hardly ever shoot back. Each level puts more
 animals on the screen, moves them faster, and lets them shoot more often. Level
 5 is the Big Chick — a kinder one than the endless game's, 30 hits instead of
-45. Beat it and you have **finished the game**.
+45. Then comes the Ice Floe. Beat that and you have **finished the game**.
 
 | Level | Name | What comes at you | How fast |
 |-------|------|-------------------|----------|
@@ -46,9 +46,33 @@ animals on the screen, moves them faster, and lets them shoot more often. Level
 | 3 | THE HILLTOP | 3 rows of 8 | 0.80 |
 | 4 | THE STORM | 4 rows of 8, and two hits each | 1.00 |
 | 5 | THE BIG CHICK | the boss, 30 hits | 1.00 |
+| 6 | THE ICE FLOE | 3 rows of 8 penguins, two hits each — **and their ice freezes you** | 1.10 |
 
 "How fast" is measured against the endless game's FIRST wave, which is 1. So the
 animals in level 1 move at a bit under half that speed.
+
+### The Ice Floe 🧊🐧
+
+The last level is penguins, and nothing but penguins. Every one of them throws
+ice.
+
+Ice hits you exactly as hard as milk, mud or an egg: it takes **one life**, the
+same as any other shot. What it does **on top of that** is hold you still for
+**three seconds**. You cannot move and you cannot shoot — your ship sits in a
+block of ice with the word FROZEN over it, and a bar underneath that counts the
+thaw down for you.
+
+You are **safe for the whole three seconds**. The flashing you get after any hit
+is stretched to cover the freeze, so nothing can touch you while you are stuck.
+Being frozen costs you the seconds, not the rest of your lives — and the herd
+uses those seconds to march closer.
+
+The instant the ice lets go you are out in the open again. So the level is a
+question of how much ground the penguins take while you can do nothing about it.
+
+The penguin has always been in the game, mixed in with the cows and the pigs.
+Its ice only freezes you **on this level** — see `freeze` in the level table
+below.
 
 ### Choosing a level 🗺️
 
@@ -85,7 +109,7 @@ only the start screen that gives its room to the levels, because choosing one
 is what you came to that screen to do. The level you have reached is remembered
 on this device.
 
-The two games keep **separate high-score boards**. A 5-level run is worth a few
+The two games keep **separate high-score boards**. A 6-level run is worth a few
 thousand points, and an endless run can climb for ever — one board would mean a
 level game never got onto it. Your **ships are shared**: a good level run earns
 them the same way an endless run does.
@@ -93,8 +117,10 @@ them the same way an endless run does.
 ### Add a level, or change one 🛠️
 
 Find `const LEVELS` in `index.html`. Each level is one line. Add a line and you
-have six levels. Nothing else needs changing, because the screens count the
-table themselves: `LEVEL 3/5` becomes `LEVEL 3/6` on its own.
+have seven levels. Nothing else needs changing, because the screens count the
+table themselves: `LEVEL 3/6` becomes `LEVEL 3/7` on its own, and the list on
+the start screen makes its lines a little shorter so they all still fit above
+the buttons.
 
 | In the line | What it does |
 |-------------|--------------|
@@ -104,9 +130,16 @@ table themselves: `LEVEL 3/5` becomes `LEVEL 3/6` on its own.
 | `aim` | the chance (0 to 1) that a shot is aimed AT you |
 | `hp` | hits one animal takes |
 | `boss` | `true` puts a Big Chick there instead of a herd, with `bossHp` hits |
+| `herd` | make every animal one kind, by name: `"penguin"`, `"cow"`, `"pig"`, `"chicken"` or `"monkey"`. Leave it out for the usual mix. |
+| `freeze` | frames the level's shots hold you still. `180` is three seconds. The shot still takes a life; the freeze is on top of it. |
 
 A boss level has no herd, so `rows`, `cols`, `reload`, `aim` and `hp` do nothing
 on that line. Only `speed` reaches the chicken, as how fast it sweeps.
+
+`herd` and `freeze` are independent of each other. A level of nothing but pigs
+that does not freeze you is one word; so is a mixed herd whose every shot
+freezes you. A name that is not in the animal list is ignored, and you get the
+usual mix — a typo cannot empty the screen.
 
 ### The four buttons in the corner 🕹️
 

@@ -456,12 +456,14 @@ const SHOP_ART = spr([
 // The animals that invade, and what each one shoots. The herd is built
 // from a RANDOM mix of these, so every game looks different! Each pair is
 // a pixel-art sprite from up above — swap in your own, or an emoji string.
+// Each one has a NAME as well, so a level can ask for a herd of nothing but
+// that animal — see `herd` in the level table below.
 const ANIMALS = [
-  { animal: COW_ART,     shot: MILK_ART   }, // cow shoots milk
-  { animal: CHICKEN_ART, shot: EGG_ART    }, // chicken shoots eggs
-  { animal: PIG_ART,     shot: MUD_ART    }, // pig shoots mud
-  { animal: MONKEY_ART,  shot: BANANA_ART }, // monkey shoots bananas
-  { animal: PENGUIN_ART, shot: ICE_ART    }, // penguin shoots ice
+  { name: "cow",     animal: COW_ART,     shot: MILK_ART   }, // cow shoots milk
+  { name: "chicken", animal: CHICKEN_ART, shot: EGG_ART    }, // chicken shoots eggs
+  { name: "pig",     animal: PIG_ART,     shot: MUD_ART    }, // pig shoots mud
+  { name: "monkey",  animal: MONKEY_ART,  shot: BANANA_ART }, // monkey shoots bananas
+  { name: "penguin", animal: PENGUIN_ART, shot: ICE_ART    }, // penguin shoots ice
 ];
 const PLAYER     = ROCKET_ART;   // your starting ship (or an emoji)
 
@@ -599,6 +601,7 @@ const PLAYER_BULLET_SPEED = 5; // how fast your shots fly up
 const SHOT_SPEED    = 2; // how fast the animals' shots fall down
 const STARTING_LIVES = 3;  // how many tries you get
 const SAFE_TIME     = 90;  // frames you flash & can't be hit after losing a life
+const FREEZE_TIME   = 180; // frames the ICE holds you still — 180 is 3 seconds
 
 // --- Stages: clear the herd without dying and a new, faster wave begins ---
 const STAGE_SPEEDUP = 0.12; // each stage everything gets this much faster (0.12 = 12%)
@@ -654,13 +657,29 @@ const EGG_BOOM     = 2.6; // how big the bang LOOKS
 //           — a boss level has no herd, so rows, cols, reload, aim and hp
 //           do nothing on it. The chicken lays eggs on its own BOSS_RELOAD
 //           and only `speed` reaches it, as how fast it sweeps.
+//   herd    make EVERY animal this one kind, by its name in ANIMALS above
+//           ("penguin", "cow", "pig"...). Leave it out for the usual mix.
+//   freeze  frames the level's shots hold you still where they hit you. The
+//           shot still takes a life, the same as any other; on top of that
+//           you cannot move or shoot until the ice lets go. You flash for
+//           the whole time, so nothing can hit you while you are stuck.
 const LEVELS = [
   { name: "THE FARMYARD",  rows: 2, cols: 5, speed: 0.45, reload: 115, aim: 0.10, hp: 1 },
   { name: "THE MEADOW",    rows: 3, cols: 6, speed: 0.62, reload:  90, aim: 0.25, hp: 1 },
   { name: "THE HILLTOP",   rows: 3, cols: 8, speed: 0.80, reload:  70, aim: 0.40, hp: 1 },
   { name: "THE STORM",     rows: 4, cols: 8, speed: 1.00, reload:  52, aim: 0.55, hp: 2 },
   { name: "THE BIG CHICK", boss: true,       speed: 1.00, bossHp: 30 },
+  { name: "THE ICE FLOE",  rows: 3, cols: 8, speed: 1.10, reload:  48, aim: 0.62, hp: 2,
+    herd: "penguin", freeze: FREEZE_TIME },
 ];
+
+// Find one kind of animal by its name, for a level that wants a herd of
+// nothing else. A name that is not in the list gives back nothing, and the
+// level falls back to the usual mix — so a typo cannot empty the screen.
+function herdKind(name) {
+  for (const a of ANIMALS) if (a.name === name) return a;
+  return null;
+}
 
 // --- The bases (shields) you can hide behind ---
 const BASE_COUNT   = 3;    // how many bases there are
@@ -717,7 +736,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-09-12 carryon";
+const BUILD = "2026-09-13 icefloe";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
@@ -838,6 +857,7 @@ let beamTimer;     // frames left of the RED LASER's beam (0 = not firing)
 let beamCooldown;  // frames left before the beam can be fired again
 let gunTimer;      // frames until this ship's gun has finished reloading
 let invuln;        // frames left of "just got hit, can't be hit again yet"
+let iced;          // frames left stuck in the ICE — can't move, can't shoot
 let stage;         // which wave or level you're on (1, 2, 3, ...)
 let plan;          // the numbers for the wave on the board — see levelPlan()
 
@@ -857,6 +877,14 @@ try { bestLevel = Math.max(1, Number(localStorage.getItem(RUNG_KEY)) || 1); } ca
 // number cannot say both — so finishing gets a flag of its own.
 let finished = false;
 try { finished = localStorage.getItem(DONE_KEY) === "1"; } catch (e) {}
+// A game that has GROWN a level since you last played it is not finished any
+// more, however finished it was when you put it down. You cannot have beaten
+// a level you have not even reached, so the flag is corrected as the game
+// starts rather than left to tell the level list something untrue.
+function unfinishByAddingALevel() {
+  if (finished && bestLevel < LEVELS.length) { finished = false; saveDone(); }
+}
+unfinishByAddingALevel();
 
 function inLevels() { return mode === "levels"; }
 function saveMode() { try { localStorage.setItem(MODE_KEY, mode); } catch (e) {} }
@@ -914,15 +942,21 @@ function levelPlan() {
       reload: L.reload || SHOT_RELOAD,
       aim: L.aim === undefined ? AIM_CHANCE : L.aim,
       hp: L.hp || 1, boss: !!L.boss, bossHp: L.bossHp || BOSS_HP,
+      // One kind of animal for the whole herd, and how long its shots hold
+      // you. Both are off unless the level asks for them.
+      herd: herdKind(L.herd), freeze: L.freeze || 0,
       title: L.name,
     };
   }
+  // ENDLESS: a mixed herd, and no ice — the waves are the same as they have
+  // always been.
   return {
     rows: ROWS, cols: COLS,
     speed: 1 + (stage - 1) * STAGE_SPEEDUP,
     reload: SHOT_RELOAD, aim: AIM_CHANCE,
     hp: stage > TOUGH_AFTER ? TOUGH_HP : 1,
     boss: stage % BOSS_EVERY === 0, bossHp: BOSS_HP,
+    herd: null, freeze: 0,
     title: null,
   };
 }
@@ -933,6 +967,9 @@ function isBossStage() { return !!(plan && plan.boss); }
 function theBoss() { return invaders.find((inv) => inv.alive && inv.boss); }
 // How much health an ordinary animal has this time.
 function herdHp() { return plan ? plan.hp : 1; }
+// How long this level's shots hold you still, in frames. 0 on every level
+// but the ice one, and on every wave of the endless game.
+function freezeTime() { return plan ? plan.freeze : 0; }
 // How wide across a thing is. Everything is one CELL except the boss.
 function sizeOf(inv) { return inv.size || CELL; }
 
@@ -963,8 +1000,9 @@ function buildLevel() {
     const startY = 80;   // top of the grid
     for (let row = 0; row < plan.rows; row++) {
       for (let col = 0; col < plan.cols; col++) {
-        // Pick a random animal for this spot, so the herd is a mixed bunch.
-        const kind = ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
+        // Pick a random animal for this spot, so the herd is a mixed bunch —
+        // unless the level asks for one kind only, and then they all match.
+        const kind = plan.herd || ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
         invaders.push({
           x: startX + col * gapX,
           y: startY + row * gapY,
@@ -1015,6 +1053,7 @@ function buildLevel() {
   invaderDir = 1;
   shotTimer = 0;
   invuln = 0;
+  iced = 0;           // a new wave starts you thawed out, whatever hit you last
   beamTimer = 0;      // a fresh wave means a cooled-off, fully loaded gun
   beamCooldown = 0;
   gunTimer = 0;
@@ -1382,6 +1421,31 @@ function playShootSound(light) {
   } catch (e) { /* if audio isn't available, just stay silent */ }
 }
 
+// The sound of the ice taking hold: a bright, glassy chime that slides down
+// and rings out, so you HEAR that you are stuck as well as see it.
+function playFreezeSound() {
+  if (!soundOn) return;
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const t = audioCtx.currentTime;
+    const dur = 0.9;
+    // Two tones a fifth apart, both sliding down. Two together ring like
+    // glass where one on its own only beeps.
+    for (const start of [1760, 1170]) {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(start, t);
+      osc.frequency.exponentialRampToValueAtTime(start / 3, t + dur);
+      gain.gain.setValueAtTime(0.12, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start(t);
+      osc.stop(t + dur);
+    }
+  } catch (e) { /* if audio isn't available, just stay silent */ }
+}
+
 // A short "boom" made with the Web Audio API — a burst of filtered white
 // noise that fades out, for when you blow up an animal. No sound files needed.
 function playExplosionSound(big = false) {
@@ -1600,6 +1664,10 @@ function shootBullets() {
 //   ELECTRIC ARC — the same, but a longer burn and the current jumps.
 // ---------------------------------------------------------------------
 function playerFire() {
+  // Stuck in the ice? Nothing fires until it lets go. This catches the key,
+  // the FIRE button and the beams in one place, because every one of them
+  // comes through here.
+  if (iced > 0) return;
   if (state !== "playing" || paused) return;
   const ship = currentShip();
   if (ship.beam) {
@@ -1733,8 +1801,10 @@ function update() {
   // Firing a beam is heavy work: while one is lit you steer slowly, so you
   // can't simply sweep it across the whole herd in one go. The ELECTRIC ARC
   // is the heaviest of the lot.
+  // And ice stops you dead: while `iced` is counting down the keys and the
+  // on-screen buttons do nothing at all.
   const lit = beamTimer > 0 && currentShip().beam;
-  const moveSpeed = PLAYER_SPEED * (lit ? currentShip().beam.drag : 1);
+  const moveSpeed = iced > 0 ? 0 : PLAYER_SPEED * (lit ? currentShip().beam.drag : 1);
   if (keys["ArrowLeft"] || keys["a"] || keys["A"])  player.x -= moveSpeed;
   if (keys["ArrowRight"] || keys["d"] || keys["D"]) player.x += moveSpeed;
   // Keep the player inside the screen.
@@ -1745,7 +1815,7 @@ function update() {
   // RAPID FIRE ship instead pours out a stream for as long as you hold the
   // button down, one bullet every RAPID_EVERY frames.
   if (gunTimer > 0) gunTimer--;
-  if (currentShip().auto && keys[" "] && gunTimer === 0) shootBullets();
+  if (currentShip().auto && keys[" "] && gunTimer === 0 && iced === 0) shootBullets();
 
   // --- Move YOUR bullets up; drop ones that fly off the top ---
   for (const b of bullets) b.y -= PLAYER_BULLET_SPEED;
@@ -1753,7 +1823,12 @@ function update() {
 
   // --- Move the herd (or the boss) ---
   const aliveCount = invaders.filter((inv) => inv.alive).length;
-  const totalCount = ROWS * COLS;
+  // How many animals this wave STARTED with. It has to be this wave's own
+  // grid: a level with a small herd would otherwise look nearly wiped out
+  // from the first frame, and charge about at four times its proper speed.
+  // In ENDLESS every wave is ROWS x COLS, so this is the same number it
+  // always was there.
+  const totalCount = Math.max(1, plan.rows * plan.cols);
   const boss = theBoss();
   let step;
   if (boss) {
@@ -2001,8 +2076,9 @@ function update() {
     }
   }
 
-  // Count down the "safe" flashing time after being hit.
+  // Count down the "safe" flashing time after being hit, and the ice.
   if (invuln > 0) invuln--;
+  if (iced > 0) iced--;
 
   // Shots hitting the player. While you're flashing (invuln) you're safe,
   // so one splash can't drain several lives at once. An egg that reaches you
@@ -2012,11 +2088,7 @@ function update() {
     if (invuln === 0 && hit(m.x, m.y, player.x, player.y, CELL)) {
       m.y = H + 999;       // remove this shot
       if (m.explodes) { eggBlast(m.x, m.y); continue; }
-      lives--;             // lose a life
-      invuln = SAFE_TIME;  // brief flashing safety so you can recover
-      spawnExplosion(player.x, player.y, 2.5); // a BIG blast where you got hit
-      playExplosionSound(true);                // ...and a big boom to match
-      if (lives <= 0) state = "lost";
+      hurtPlayer(true);    // a life, a bang, and the ice if this level has it
     }
   }
   shots = shots.filter((m) => m.y < H + 20);
@@ -2148,13 +2220,32 @@ function eggBlast(x, y) {
       if (blk.alive && Math.hypot(blk.x - x, blk.y - y) <= EGG_RADIUS) blk.alive = false;
     }
   }
-  // Caught in it? That's a life — the same as being hit head-on.
+  // Caught in it? That's a life — the same as being hit head-on. The blast
+  // has already made its own noise, so this one does not add another.
   if (invuln === 0 && Math.hypot(player.x - x, player.y - y) <= EGG_RADIUS) {
-    lives--;
-    invuln = SAFE_TIME;
-    spawnExplosion(player.x, player.y, 2.5);
-    if (lives <= 0) state = "lost";
+    hurtPlayer(false);
   }
+}
+
+// ---------------------------------------------------------------------
+// hurtPlayer(): something got through. This is the ONLY place a life is
+// taken, so a hit costs exactly the same whether a shot reached you or an
+// egg went off beside you.
+//   On a level with `freeze` in the table (the ICE FLOE), the same hit
+// also holds you still for freezeTime() frames: you cannot move and you
+// cannot shoot until the ice lets go. The flashing safe time is stretched
+// to cover ALL of it, so being frozen can never put you in front of a
+// second shot you had no way to dodge — the cost is the seconds, not the
+// rest of your lives.
+// ---------------------------------------------------------------------
+function hurtPlayer(boom) {
+  lives--;
+  iced = freezeTime();
+  invuln = Math.max(SAFE_TIME, iced);
+  spawnExplosion(player.x, player.y, 2.5);  // a BIG blast where you got hit
+  if (boom) playExplosionSound(true);       // ...and a big boom to match
+  if (iced > 0) playFreezeSound();
+  if (lives <= 0) state = "lost";
 }
 
 // ---------------------------------------------------------------------
@@ -2547,6 +2638,66 @@ function drawButtons() {
 }
 
 // ---------------------------------------------------------------------
+// drawIce(): the block of ice around your ship on the ICE FLOE, drawn on
+// top of it so you can still see which ship is in there. It is painted in
+// the same square pixels as everything else on the screen — no curves and
+// no soft edges — and it thins out as it thaws, so the picture itself
+// counts the seconds down for you.
+// ---------------------------------------------------------------------
+const ICE_BLOCK = CELL + 16;   // how far the ice stands out past the ship
+function drawIce() {
+  const full = Math.max(1, freezeTime());
+  const left = iced / full;              // 1 when it takes hold, 0 as it lets go
+  const half = ICE_BLOCK / 2;
+  const x = Math.round(player.x - half), y = Math.round(player.y - half);
+  ctx.save();
+  // The ice itself: pale blue, and clearer the nearer it is to letting go.
+  ctx.globalAlpha = 0.30 + 0.35 * left;
+  ctx.fillStyle = "#9fe8ff";
+  ctx.fillRect(x, y, ICE_BLOCK, ICE_BLOCK);
+  // A hard white rim, so it reads as a solid block and not a glow.
+  ctx.globalAlpha = 0.55 + 0.45 * left;
+  ctx.fillStyle = "#e8fbff";
+  ctx.fillRect(x, y, ICE_BLOCK, 4);
+  ctx.fillRect(x, y + ICE_BLOCK - 4, ICE_BLOCK, 4);
+  ctx.fillRect(x, y, 4, ICE_BLOCK);
+  ctx.fillRect(x + ICE_BLOCK - 4, y, 4, ICE_BLOCK);
+  // Four chips of frost inside. They sit at fixed spots rather than random
+  // ones, so the block looks like ice and not like static.
+  ctx.globalAlpha = 0.5 + 0.4 * left;
+  for (const [fx, fy, fs] of [[8, 10, 8], [34, 16, 6], [14, 36, 6], [38, 40, 8]]) {
+    ctx.fillRect(x + fx, y + fy, fs, fs);
+  }
+  ctx.restore();
+  // How much longer, on a bar UNDER the block — the reload bars' own slot is
+  // inside the ice from here, where nothing would be readable.
+  const barY = Math.round(player.y + half + 6);
+  ctx.fillStyle = "rgba(255,255,255,0.18)";
+  ctx.fillRect(Math.round(player.x - half), barY, ICE_BLOCK, 4);
+  ctx.fillStyle = "#bff3ff";
+  ctx.fillRect(Math.round(player.x - half), barY, ICE_BLOCK * (1 - left), 4);
+  ctx.save();
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "#bff3ff";
+  ctx.font = ICE_FONT;
+  ctx.fillText(ICE_WORD, iceLabelX(), player.y - half - 14);
+  ctx.restore();
+}
+
+// The word sits over the ship — but the ship can be hard against either
+// edge of the screen when the ice takes hold, and a word centred there
+// would hang off it. So it follows the ship until it reaches the edge, and
+// then stops. Written on its own so the tests can ask where it lands.
+const ICE_WORD = "FROZEN!";
+const ICE_FONT = "16px 'Courier New', monospace";
+function iceLabelX() {
+  ctx.font = ICE_FONT;
+  const half = ctx.measureText(ICE_WORD).width / 2 + 6;
+  return Math.max(half, Math.min(W - half, player.x));
+}
+
+// ---------------------------------------------------------------------
 // drawStartLevels(): the level list, on the start screen, in the room the
 // high scores take in the endless game. One line per level: its number, a
 // face from it, its name, and where you stand on it. Tap a line to play
@@ -2557,9 +2708,15 @@ function drawButtons() {
 // ---------------------------------------------------------------------
 const SLV_TOP = 410; // where the first line sits — level with the board
                      // the endless game draws in this same room
-const SLV_H   = 42;  // how tall one line is
+const SLV_BOT = 660; // and where the last line must END, clear of the row of
+                     // buttons at 678. Between them is all the room there is.
 const SLV_GAP = 7;   // the space between two lines
 const SLV_W   = 460; // how wide the lines are
+// How tall one line is: as tall as 42, or as tall as will FIT, whichever is
+// smaller. So adding a level makes every line a little shorter instead of
+// pushing the last one down underneath the buttons.
+const SLV_H = Math.min(42, Math.floor(
+  (SLV_BOT - SLV_TOP - (LEVELS.length - 1) * SLV_GAP) / LEVELS.length));
 function startLevelRow(i) {
   return { x: (W - SLV_W) / 2, y: SLV_TOP + i * (SLV_H + SLV_GAP),
            w: SLV_W, h: SLV_H };
@@ -2568,7 +2725,11 @@ function startLevelRow(i) {
 // A face for each line, so the levels do not all look the same. The boss
 // level shows the chicken itself, which is fair warning.
 function levelFace(i) {
-  return LEVELS[i].boss ? BIG_CHICK_ART : ANIMALS[i % ANIMALS.length].animal;
+  if (LEVELS[i].boss) return BIG_CHICK_ART;
+  // A level made of one animal shows THAT animal — the list should not
+  // promise you cows and then give you a wall of penguins.
+  const only = herdKind(LEVELS[i].herd);
+  return only ? only.animal : ANIMALS[i % ANIMALS.length].animal;
 }
 
 // Where you stand on a level, in two or three words.
@@ -2615,7 +2776,7 @@ function drawStartLevels() {
     // A face from the level. A level you have not reached is a dark shape,
     // not a picture: what is on it is part of what you are playing for.
     ctx.globalAlpha = open ? 1 : 0.22;
-    drawThing(levelFace(i), r.x + 54, mid, 30);
+    drawThing(levelFace(i), r.x + 54, mid, Math.min(30, r.h - 6));
     ctx.globalAlpha = 1;
 
     // Its name...
@@ -3032,12 +3193,16 @@ function draw() {
 
   // Draw the player — whichever ship you've bought and are flying. While
   // safe after a hit, blink it on and off so you can see you're protected.
-  const blinking = invuln > 0 && Math.floor(invuln / 6) % 2 === 0;
+  // Held in the ice, the ship does NOT blink: the block of ice around it
+  // already says "safe, and stuck", and a ship flashing in and out of a
+  // frozen block only makes it harder to see what is going on.
+  const blinking = invuln > 0 && iced === 0 && Math.floor(invuln / 6) % 2 === 0;
   // The pixel rockets already point straight up. Only an EMOJI ship needs a
   // -45° spin (🚀 leans up-right), so we rotate just when it's a string.
   const shipArt = currentShip().art;
   const playerRot = (typeof shipArt === "string") ? -Math.PI / 4 : 0;
   if (!blinking) drawThing(shipArt, player.x, player.y, CELL, playerRot);
+  if (iced > 0) drawIce();
 
   // Draw the ELECTRIC ARC's jumps ON TOP of the animals, so you can see
   // which ones the current has hold of. (The beam column itself is drawn
