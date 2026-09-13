@@ -364,6 +364,39 @@ bullets are the worst possible thing to bring to something with real armour.
 The beams do best, because you never have to lead a target that's sweeping
 across the screen.
 
+## The green bases 🛡️
+
+The three green blobs are **cover**. Each one is a little grid of blocks, and
+they wear away a block at a time. Four things eat into them:
+
+| | |
+|---|---|
+| **Their shots** | one block per shot, which is what cover is for |
+| **Your own bullets** | you shoot your own cover away too — mind where you aim |
+| **The Big Chick's eggs** | a whole hole at once, wherever one lands |
+| **The herd walking into them** | see below |
+
+**Lose a whole base and the run is over.** Protect all three.
+
+### When the herd reaches them 🐄
+
+If the animals get low enough to touch the cover, they **eat it**. Any block an
+animal is standing on crumbles away, and the herd chews a hole clean through
+your shields as it slides across — the same as the arcade game has always done
+it. They take only what they walk over, so a base off to the side of the herd is
+left standing while the ones under it are gone.
+
+**A base the herd walks through does NOT end the run.** That is the one
+exception to the rule above, and it matters: the herd arrives at all three bases
+at once and has them down within a few steps, so counting it would turn "they
+are breaking through!" into an instant loss with nothing you could have done.
+You still lose when they reach **you**, a few rows further down. The rule stands
+for what it was written for — their *shots* wearing a base away while the herd
+is still up above, which is cover you failed to hold rather than cover they took.
+
+So the last part of a wave now looks the way it should: the herd comes down onto
+your shields, eats them, and then comes for you.
+
 ## A hardier herd 🐄🐄
 
 Beat the Big Chick and the animals come back **twice as tough.** From stage 16
