@@ -457,4 +457,24 @@ to this file (a `sprites/` folder works too), then follow the commented example
 inside the config block. It's a **one-line** change — the game already knows how
 to draw both emoji and pictures.
 
+### One place emoji do not belong 📵
+
+An **animal, a shot or a ship** can be an emoji — those are drawn in the middle
+of their own square and nothing else depends on how wide they turn out.
+
+**Writing along the top of the screen is different.** The lives are laid out
+from the **right-hand edge inwards**, so where the row starts depends on how
+wide it is. An iPad does not measure an emoji the way a computer does, and the
+lives used to be `"❤️".repeat(lives)`: on an iPad the row was measured far too
+narrow, started too far right, and everything after the "L" of LIVES was off the
+side of the screen.
+
+The heart is now a pixel drawing like every other picture in the game
+(`HEART_ART`), and `drawLives()` works out where each one goes from `HEART` and
+`HEART_GAP` — numbers we know. Nothing is measured, so nothing can be measured
+wrongly.
+
+The tests now sweep **every screen in the game** and fail if any text drawn on
+any of them carries an emoji. Putting the old line back is caught by 17 of them.
+
 Have fun! 🚀

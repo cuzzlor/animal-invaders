@@ -395,6 +395,17 @@ const ICE_ART = spr([
   ".CCCCCCC.", "CCCCCCCCC", "CCWWCCCCC", "CCWCCCCCC", "CCCCCCCCC",
   "CCCCCCCCC", "CCCCCCCCC", ".CCCCCCC.", ".........",
 ]);
+// The heart that counts your lives, up in the corner. This used to be the
+// ❤️ EMOJI, and on an iPad it was cut off after the "L" of LIVES: iOS does
+// not measure an emoji the way a computer does, and the row is laid out from
+// the right-hand edge, so a bad measurement pushed the whole thing off the
+// side of the screen. Drawn instead, it is a picture like every other picture
+// in the game, laid down at a place we work out ourselves. Nothing has to be
+// measured, so nothing can be measured wrongly.
+const HEART_ART = spr([
+  ".RR...RR.", "RRRRRRRRR", "RLRRRRRRR", "RLRRRRRRR", "RRRRRRRRR",
+  ".RRRRRRR.", "..RRRRR..", "...RRR...", "....R....",
+]);
 // The four little buttons at the top-left corner: sound, pause, start-again
 // and shop. They are pixel art too, drawn from the same letter grids as the
 // animals and the ships, so the whole screen is made of the same fat pixels.
@@ -736,7 +747,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-09-13 icefloe";
+const BUILD = "2026-09-13 hearts";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
@@ -2638,6 +2649,38 @@ function drawButtons() {
 }
 
 // ---------------------------------------------------------------------
+// drawLives(): the word LIVES and one heart for each one you have left, in
+// the top right-hand corner.
+//   The hearts are laid out from the RIGHT-HAND EDGE inwards, so the row
+// ends in the same place however many lives you have, and the word is butted
+// up against the left-most heart. Every position is worked out from HEART
+// and HEART_GAP, which we know, rather than from measuring a string of
+// emoji, which an iPad gets wrong.
+// ---------------------------------------------------------------------
+const HEART      = 20; // how big one heart is drawn
+const HEART_GAP  = 3;  // the space between two of them
+const HUD_RIGHT  = 12; // how far the row stops short of the right-hand edge
+const HUD_MID_Y  = 21; // level with the middle of the 20px HUD text
+// Where the left-hand edge of the hearts falls, for a given number of lives.
+// The word ends just short of this, so the two can never sit on each other.
+function heartsLeft(count) {
+  if (count <= 0) return W - HUD_RIGHT;
+  return W - HUD_RIGHT - count * HEART - (count - 1) * HEART_GAP;
+}
+function drawLives() {
+  const count = Math.max(0, lives);
+  for (let i = 0; i < count; i++) {
+    const mid = W - HUD_RIGHT - HEART / 2 - i * (HEART + HEART_GAP);
+    drawThing(HEART_ART, mid, HUD_MID_Y, HEART);
+  }
+  ctx.fillStyle = "#fff";
+  ctx.font = "20px 'Courier New', monospace";
+  ctx.textAlign = "right";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText("LIVES:", heartsLeft(count) - 8, 28);
+}
+
+// ---------------------------------------------------------------------
 // drawIce(): the block of ice around your ship on the ICE FLOE, drawn on
 // top of it so you can still see which ship is in there. It is painted in
 // the same square pixels as everything else on the screen — no curves and
@@ -3051,8 +3094,7 @@ function draw() {
   // finish, so it says how far along the course you are.
   ctx.fillText(inLevels() ? "LEVEL " + stage + "/" + LEVELS.length
                           : "STAGE " + stage, W / 2, 28);
-  ctx.textAlign = "right";
-  ctx.fillText("LIVES: " + "❤️".repeat(lives), W - 12, 28);
+  drawLives();
 
   // The BIG CHICK's health, so you can see you're getting somewhere. It's a
   // long fight, and without this it would feel like nothing was happening.
