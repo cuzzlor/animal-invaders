@@ -608,22 +608,23 @@ const FLAME_SPREAD = FLAME_MOUTH + FLAME_TAPER * FLAME_REACH; // width at the ti
 //   Hold the flame on an animal and it takes heat, the same as it does in
 // a beam. When the heat is full, two things happen at once: the flame
 // takes a BITE out of it, and it CATCHES FIRE.
-//   The bite is small. A beam takes a whole animal every time its heat
-// fills; the flame takes a QUARTER of one. On its own that makes this much
-// the weakest gun in the game.
+//   The bite is tiny. A beam takes a whole animal every time its heat
+// fills; the flame takes an EIGHTH of one. On its own that makes this much
+// the weakest gun in the game — eight fills of the heat to see off a single
+// animal, where a beam needs one.
 //   The fire is what gives it back. Once something is alight it goes on
 // burning on its own, a quarter of an animal at a time, wherever it goes
 // and long after you have swung the flame somewhere else. Nothing puts it
 // out. One lighting is three animals' worth of fire — more than enough to
 // finish anything in the herd, if it is left alone to burn.
-//   Held on one animal at the nose it takes about 60 steps to finish it,
-// where the old flame took 15 and a RED LASER takes 16. So this gun is slow
+//   Held on one animal at the nose it takes about 80 steps to finish it,
+// where the flame once took 15 and a RED LASER takes 16. So this gun is slow
 // on any ONE animal and frightening on a HERD: you sweep across twenty of
 // them, and all twenty burn down at once behind you while you go and light
 // the next lot.
 // ---------------------------------------------------------------------
 const FLAME_CATCH  = 40;   // heat before the flame bites and lights (20 steps at the nose)
-const FLAME_BITE   = 0.25; // health the flame itself takes at each bite
+const FLAME_BITE   = 0.125; // health the flame itself takes at each bite
 const FIRE_TIME    = stepsFor(2); // how long a thing stays alight once lit
 const FIRE_TICK    = 20;   // steps between one bite of the fire and the next
 const FIRE_BITE    = 0.25; // health the fire takes at each bite
@@ -832,7 +833,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-09-13 onfire";
+const BUILD = "2026-09-13 embers";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
@@ -2180,7 +2181,7 @@ function update() {
           inv.fire = FIRE_TIME;
           inv.hp -= FLAME_BITE;
         } else {
-          inv.hp -= 1;   // a beam takes a whole animal where the flame takes a quarter
+          inv.hp -= 1;   // a beam takes a whole animal where the flame takes an eighth
         }
         if (inv.hp <= 0) {
           inv.alive = false;

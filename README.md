@@ -461,7 +461,7 @@ slow it is, are the bargain of it, and they change how you play:
   fills, two things happen at once: the flame takes a **bite** out of the animal,
   and the animal **catches fire**. See below.
 - **It is far slower than either beam.** Held on one animal at the mouth of the
-  flame it takes about **60 steps** to finish it. The Red Laser sees one off in
+  flame it takes about **80 steps** to finish it. The Red Laser sees one off in
   16 and the Electric Arc in 26. It works by holding a lot of the herd at once,
   not by being quick with any one animal.
 - **It bites harder the closer they are.** An animal at the mouth of the flame
@@ -475,14 +475,16 @@ slow it is, are the bargain of it, and they change how you play:
 
 #### The fire it leaves behind
 
-The flame's own bite is small: a **quarter** of an animal, where a beam takes a
-whole one. That on its own would make it the feeblest gun in the game.
+The flame's own bite is tiny: an **eighth** of an animal, where a beam takes a
+whole one. Eight fills of its heat to see off a single animal, against a beam's
+one. On its own it is far and away the feeblest gun in the game.
 
 The fire is what gives it back. Once something is alight:
 
 - It burns for **two seconds**, and takes a **quarter** of an animal every sixth
-  of a second — **three animals' worth** of damage in all, which is more than
-  enough to finish anything in the herd.
+  of a second — twice what the flame itself takes, and **three animals' worth**
+  of damage in all, which is more than enough to finish anything in the herd. The
+  fire, not the flame, is where almost all of this gun's damage comes from.
 - It burns **on its own**. You can swing the flame away, reload, or run for your
   life, and it goes on eating.
 - **Nothing puts it out.** It burns for its two seconds and then dies down by
@@ -528,8 +530,8 @@ Two numbers to keep an eye on:
   that many steps close up and **all** of them at the far end.
 - `FLAME_BITE` is what the flame itself takes each time; `FIRE_BITE`, `FIRE_TICK`
   and `FIRE_TIME` are what the fire takes, how often, and for how long. Keep them
-  to **quarters and halves**: a computer holds those exactly, and a size like 0.2
-  can leave an animal standing on a sliver of health it should not have.
+  to **halves, quarters and eighths**: a computer holds those exactly, and a size
+  like 0.2 can leave an animal standing on a sliver of health it should not have.
 
 Neither beam is a delete key. Animals have to be **held in the beam** for a
 moment before they go — swing away too soon and they cool off — and a lit beam
