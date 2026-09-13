@@ -590,14 +590,26 @@ const VOLT_BEAM = {
 // ---------------------------------------------------------------------
 const FLAME_TANK   = stepsFor(3.5); // a full tank is 3.5 seconds of fire
 const FLAME_FILL   = 1;    // frames of fire the tank wins back each frame
-// REACH is the length of the flame, and MOUTH and SPREAD together are the
-// ANGLE it opens out at. So these two go up and down TOGETHER: to make the
-// flame longer without making it thinner, both have to double. (26 stays
-// put: that is the width at the nose, which the length has no say over.)
-const FLAME_REACH  = 750;  // how far up the screen the flame licks, in pixels
-const FLAME_MOUTH  = 26;   // how wide the flame is where it leaves the nose
-const FLAME_SPREAD = 291;  // how wide it has grown by the end of its reach
-const FLAME_BURN   = 20;   // heat an animal must take before it goes
+// The flame's SHAPE and its LENGTH are two separate things, and they are
+// written here as two separate numbers so that changing one cannot quietly
+// change the other. MOUTH and TAPER are the shape: how wide it starts and
+// how much wider it gets for each pixel it climbs. REACH is only how far up
+// it goes. Lengthen it and the flame is the same width as before at every
+// height it already covered — it simply carries on.
+//   (SPREAD, the width at the very tip, falls out of the other three. It
+// used to be typed in by hand, which made it easy to lengthen the flame and
+// leave a thinner one behind.)
+const FLAME_MOUTH  = 26;       // how wide the flame is where it leaves the nose
+const FLAME_TAPER  = 106 / 300; // width it gains for each pixel it climbs
+const FLAME_REACH  = 780;      // how far up the screen the flame licks, in pixels
+const FLAME_SPREAD = FLAME_MOUTH + FLAME_TAPER * FLAME_REACH; // width at the tip
+// How much heat sees an animal off. The flame puts in 2 a step right at the
+// nose and 1 a step at the very tip, so this is 15 steps of holding it on
+// something close and 30 steps out at the end of its reach. Both beams are
+// quicker than that over most of the flame's length: the RED LASER takes 16
+// and the ELECTRIC ARC 26. The flame's answer is that it covers five columns
+// at once, and theirs is that they reach the top of the screen.
+const FLAME_BURN   = 30;   // heat an animal must take before it goes
 const FLAME_DRAG   = 0.8;  // how much of your usual speed you keep while burning
 const FLAME_PRICE  = 100000; // what it costs — paid into the bank, not in one game
 const FLAME_GUN = {
@@ -803,7 +815,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-09-13 longflame2";
+const BUILD = "2026-09-13 slowflame";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player

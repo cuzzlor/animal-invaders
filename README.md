@@ -412,7 +412,7 @@ back to exactly where you were — the new ship is in your hands immediately.
 | **Blast Cannon** | score 7,500 in one game | Lobs a shell that **blows up** where it lands, clearing whatever it hits and the whole ring of animals around it — about seven at a time in the thick of the herd. A quarter of a second to reload. |
 | **Red Laser** | score 10,000 in one game | A red beam that smashes clean through every animal it touches (and melts their shots). Burns for 1.5 seconds, then reloads for half a second. |
 | **Electric Arc** | score 15,000 in one game | Lightning instead of a laser: the current **jumps sideways** from animal to animal, up to three deep either side of the beam. Burns for 2.5 seconds, then reloads for half a second. |
-| **Flamethrower** | fill the bank to 100,000 | **Hold** the button and it pours out fire. It reaches almost to the top of the screen and stops 50 pixels short of a fresh herd's top row, and it burns hotter the nearer a thing is. Three and a half seconds of fuel in a tank. |
+| **Flamethrower** | fill the bank to 100,000 | **Hold** the button and it pours out fire. It reaches almost to the top of the screen, and it burns hotter the nearer a thing is. It is **slow**, though: both beams see an animal off quicker over most of the flame's length. What it has instead is width — it holds five columns of the herd at once. Three and a half seconds of fuel in a tank. |
 
 Rapid Fire and the Flamethrower are the two ships you **hold** the button for;
 every other one fires once per press. An animal that's been hit but not finished off fades, so you can
@@ -450,17 +450,24 @@ sooner.
 ### The Flamethrower 🔥
 
 It is the only gun in the game that **stops**. Every other one reaches the top of
-the screen; the flame licks **750 pixels** up and goes no further. That is the
-whole bargain of it, and it changes how you play:
+the screen; the flame licks **780 pixels** up and goes no further. That, and how
+slow it is, are the bargain of it, and they change how you play:
 
-- **The top row is safe — just.** A herd starts 80 pixels down the screen, which
-  is **800** above your ship's nose. The flame stops at 750, so the top row of a
-  fresh wave is out of it by 50 pixels. Two drops of the herd bring it in.
+- **The top row is safe — only just.** A herd starts 80 pixels down the screen,
+  which is **800** above your ship's nose. The flame stops at 780, so the top row
+  of a fresh wave is out of it by 20 pixels. **One drop** of the herd brings it
+  in.
+- **It is slower than either beam.** An animal takes **15 steps** to burn right
+  at the mouth of the flame and **30** out at the tip. The Red Laser sees one off
+  in 16 and the Electric Arc in 26, so only at point-blank range does the flame
+  beat a beam. It works by holding a lot of the herd at once, not by being quick
+  with any one animal.
 - **It bites harder the closer they are.** An animal at the mouth of the flame
-  takes heat twice as fast as one at the tip.
-- **The flame spreads.** It leaves the nose 26 pixels across and is 291 across by
-  the end of its reach — wide enough to hold **five columns** of the herd — so
-  the further away a thing is, the wider a sweep you have.
+  takes heat twice as fast as one at the tip — that is where the 15 and the 30
+  come from.
+- **The flame spreads.** It leaves the nose 26 pixels across and is about 302
+  across by the end of its reach — wide enough to hold **five columns** of the
+  herd — so the further away a thing is, the wider a sweep you have.
 - **Their falling shots burn up in it** — but only the ones that have come down
   far enough to be inside it. One still high up sails straight through.
 
@@ -475,22 +482,27 @@ The numbers are all together near the top of `index.html`: `FLAME_TANK`,
 `FLAME_FILL`, `FLAME_REACH`, `FLAME_MOUTH`, `FLAME_SPREAD`, `FLAME_BURN` and
 `FLAME_DRAG`.
 
-One warning about two of them. `FLAME_REACH` is how **long** the flame is, and
-`FLAME_MOUTH` with `FLAME_SPREAD` is the **angle** it opens out at. So making the
-flame longer on its own makes it *thinner*, because it takes further to open out
-to the same width. To make it longer and keep its shape, raise `FLAME_SPREAD` by
-the same fraction as `FLAME_REACH`:
+The flame's **shape** and its **length** are separate on purpose:
 
-```
-FLAME_SPREAD = FLAME_MOUTH + (FLAME_REACH x 0.353)
-```
+| | |
+|---|---|
+| `FLAME_MOUTH` | how wide it is where it leaves the nose |
+| `FLAME_TAPER` | how much wider it gets for each pixel it climbs |
+| `FLAME_REACH` | how far up it goes — and **only** that |
+| `FLAME_SPREAD` | the width at the tip, **worked out** from the three above |
 
-`FLAME_MOUTH` stays put through all of it, because the width at the nose has
-nothing to do with the length.
+So you can lengthen or shorten the flame with one number, and it stays the same
+width at every height it already covered. `FLAME_SPREAD` used to be typed in by
+hand, which made it easy to lengthen the flame and leave a thinner one behind.
 
-And keep the flame **short of 800**. That is how far the top row of a fresh herd
-sits above your ship, and a flame that reaches it is a flame that clears a wave
-from where you are standing. A test holds that line.
+Two numbers to keep an eye on:
+
+- Keep `FLAME_REACH` **short of 800**. That is how far the top row of a fresh
+  herd sits above your ship, and a flame that reaches it is a flame that clears a
+  wave from where you are standing. A test holds that line.
+- `FLAME_BURN` is how much heat sees an animal off. The flame puts in 2 a step at
+  the nose and 1 at the tip, so the number is **half** that many steps close up
+  and **all** of them at the far end. Make it smaller and the gun gets fiercer.
 
 Neither beam is a delete key. Animals have to be **held in the beam** for a
 moment before they go — swing away too soon and they cool off — and a lit beam
