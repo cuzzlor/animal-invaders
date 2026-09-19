@@ -33,23 +33,46 @@ remembers your choice.
 12% faster than the one before. It never ends. You play it for a score, and the
 Big Chick turns up every 15 stages.
 
-**LEVELS** is a set course with a finish. There are **6 levels**. Level 1 is
+**LEVELS** is a set course with a finish. There are **10 levels**. Level 1 is
 gentle: ten animals, slow, and they hardly ever shoot back. Each level puts more
 animals on the screen, moves them faster, and lets them shoot more often. Level
 5 is the Big Chick — a kinder one than the endless game's, 30 hits instead of
-45. Then comes the Ice Floe. Beat that and you have **finished the game**.
+45. From level 7 on, a level can be **more than one wave** (see below). Level 10
+is two Big Chicks, one after the other. Beat that and you have **finished the
+game**.
 
-| Level | Name | What comes at you | How fast |
-|-------|------|-------------------|----------|
-| 1 | THE FARMYARD | 2 rows of 5 | 0.45 |
-| 2 | THE MEADOW | 3 rows of 6 | 0.62 |
-| 3 | THE HILLTOP | 3 rows of 8 | 0.80 |
-| 4 | THE STORM | 4 rows of 8, and two hits each | 1.00 |
-| 5 | THE BIG CHICK | the boss, 30 hits | 1.00 |
-| 6 | THE ICE FLOE | 3 rows of 8 penguins, two hits each — **and their ice freezes you** | 1.10 |
+| Level | Name | What comes at you | Waves | How fast |
+|-------|------|-------------------|-------|----------|
+| 1 | THE FARMYARD | 2 rows of 5 | 1 | 0.45 |
+| 2 | THE MEADOW | 3 rows of 6 | 1 | 0.62 |
+| 3 | THE HILLTOP | 3 rows of 8 | 1 | 0.80 |
+| 4 | THE STORM | 4 rows of 8, and two hits each | 1 | 1.00 |
+| 5 | THE BIG CHICK | the boss, 30 hits | 1 | 1.00 |
+| 6 | THE ICE FLOE | 3 rows of 8 penguins, two hits each — **and their ice freezes you** | 1 | 1.10 |
+| 7 | THE STAMPEDE | 4 rows of 8 cows, two hits each | **2** | 1.25 |
+| 8 | THE TREETOPS | 3 rows of 8 monkeys — they aim at you 4 shots in 5 | **2** | 1.35 |
+| 9 | THE DEEP FREEZE | 4 rows of 8 penguins, and the ice again | **3** | 1.40 |
+| 10 | THE LAST CHICK | two Big Chicks, 45 hits each | **2** | 1.30 |
 
 "How fast" is measured against the endless game's FIRST wave, which is 1. So the
-animals in level 1 move at a bit under half that speed.
+animals in level 1 move at a bit under half that speed. A boss's number means
+how fast the chicken sweeps, which is not the same thing as a herd's, so the two
+kinds of level are only worth comparing to their own kind.
+
+### Waves 🌊
+
+A level can throw more than one herd at you. Clear the first and the next comes
+straight down — **you keep your score and your lives**, so a wave is the next
+round of the same fight, not a fresh start. Only the last wave of a level
+finishes it.
+
+Each wave is **10% faster** than the one before, so a three-wave level works up
+rather than asking the same thing three times. The HUD says which wave you are
+on (`LEVEL 9/10  W2/3`), and the list on the start screen marks the levels that
+have more than one (`x2`, `x3`) so you know before you pick.
+
+On a boss level it means that many Big Chicks, one after another. That is what
+level 10 is.
 
 ### The Ice Floe 🧊🐧
 
@@ -117,10 +140,10 @@ them the same way an endless run does.
 ### Add a level, or change one 🛠️
 
 Find `const LEVELS` in `index.html`. Each level is one line. Add a line and you
-have seven levels. Nothing else needs changing, because the screens count the
-table themselves: `LEVEL 3/6` becomes `LEVEL 3/7` on its own, and the list on
-the start screen makes its lines a little shorter so they all still fit above
-the buttons.
+have eleven levels. Nothing else needs changing, because the screens count the
+table themselves: `LEVEL 3/10` becomes `LEVEL 3/11` on its own, and the list on
+the start screen lays itself out to fit — one wide column up to six levels, then
+two narrower ones, and shorter lines again if it has to.
 
 | In the line | What it does |
 |-------------|--------------|
@@ -132,6 +155,7 @@ the buttons.
 | `boss` | `true` puts a Big Chick there instead of a herd, with `bossHp` hits |
 | `herd` | make every animal one kind, by name: `"penguin"`, `"cow"`, `"pig"`, `"chicken"` or `"monkey"`. Leave it out for the usual mix. |
 | `freeze` | steps the level's shots hold you still. Write it as `stepsFor(3)` for three seconds, **not** as `3 * 60` — see "Seconds, and steps" below. The shot still takes a life; the freeze is on top of it. |
+| `waves` | how many herds the level throws at you. Leave it out for one. Each wave after the first is `WAVE_SPEEDUP` faster, and you keep your score and lives all the way through. On a boss level it is that many Big Chicks. |
 
 A boss level has no herd, so `rows`, `cols`, `reload`, `aim` and `hp` do nothing
 on that line. Only `speed` reaches the chicken, as how fast it sweeps.

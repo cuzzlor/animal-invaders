@@ -768,6 +768,14 @@ const EGG_BOOM     = 2.6; // how big the bang LOOKS
 //           shot still takes a life, the same as any other; on top of that
 //           you cannot move or shoot until the ice lets go. You flash for
 //           the whole time, so nothing can hit you while you are stuck.
+//   waves   how many herds the level throws at you before it is beaten.
+//           Leave it out for one, which is what every level used to be.
+//           Each wave after the first is WAVE_SPEEDUP faster than the one
+//           before it, and you keep your score and your lives all the way
+//           through — a wave is not a fresh start, it is the next round of
+//           the same fight. On a boss level it means that many BIG CHICKS,
+//           one after another.
+const WAVE_SPEEDUP = 0.10; // each wave of a level is this much faster
 const LEVELS = [
   { name: "THE FARMYARD",  rows: 2, cols: 5, speed: 0.45, reload: 115, aim: 0.10, hp: 1 },
   { name: "THE MEADOW",    rows: 3, cols: 6, speed: 0.62, reload:  90, aim: 0.25, hp: 1 },
@@ -776,6 +784,13 @@ const LEVELS = [
   { name: "THE BIG CHICK", boss: true,       speed: 1.00, bossHp: 30 },
   { name: "THE ICE FLOE",  rows: 3, cols: 8, speed: 1.10, reload:  48, aim: 0.62, hp: 2,
     herd: "penguin", freeze: FREEZE_TIME },
+  { name: "THE STAMPEDE",  rows: 4, cols: 8, speed: 1.25, reload:  44, aim: 0.65, hp: 2,
+    herd: "cow", waves: 2 },
+  { name: "THE TREETOPS",  rows: 3, cols: 8, speed: 1.35, reload:  38, aim: 0.80, hp: 2,
+    herd: "monkey", waves: 2 },
+  { name: "THE DEEP FREEZE", rows: 4, cols: 8, speed: 1.40, reload: 40, aim: 0.70, hp: 2,
+    herd: "penguin", freeze: FREEZE_TIME, waves: 3 },
+  { name: "THE LAST CHICK", boss: true,      speed: 1.30, bossHp: 45, waves: 2 },
 ];
 
 // Find one kind of animal by its name, for a level that wants a herd of
@@ -842,7 +857,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-09-19 sharpsky";
+const BUILD = "2026-09-19 tenlevels";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
@@ -970,6 +985,7 @@ let gunTimer;      // frames until this ship's gun has finished reloading
 let invuln;        // frames left of "just got hit, can't be hit again yet"
 let iced;          // frames left stuck in the ICE — can't move, can't shoot
 let stage;         // which wave or level you're on (1, 2, 3, ...)
+let wave;          // which wave OF THAT LEVEL you're on (1, 2, 3, ...)
 let plan;          // the numbers for the wave on the board — see levelPlan()
 
 // --- Which of the two games you are playing, and how far you have got ---
@@ -1045,9 +1061,14 @@ function levelPlan() {
     // Past the end of the table (which cannot happen in play — the last
     // level wins the game) hold on the last level rather than break.
     const L = LEVELS[Math.min(stage, LEVELS.length) - 1];
+    const waves = L.waves || 1;
     return {
       rows: L.rows || 0, cols: L.cols || 0,
-      speed: L.speed,
+      // Each wave of a level is a little faster than the one before it, so
+      // a three-wave level gets harder as you work through it instead of
+      // asking for the same thing three times.
+      speed: L.speed * (1 + (Math.max(1, wave || 1) - 1) * WAVE_SPEEDUP),
+      waves: waves,
       // A boss level leaves these out, so fall back to the ordinary numbers
       // rather than letting an `undefined` loose in the shooting maths.
       reload: L.reload || SHOT_RELOAD,
@@ -1068,6 +1089,7 @@ function levelPlan() {
     hp: stage > TOUGH_AFTER ? TOUGH_HP : 1,
     boss: stage % BOSS_EVERY === 0, bossHp: BOSS_HP,
     herd: null, freeze: 0,
+    waves: 1,      // in ENDLESS every wave IS a stage, so a stage is one wave
     title: null,
   };
 }
@@ -1187,6 +1209,7 @@ function buildLevel() {
 function newGame(startState) {
   player = { x: W / 2, y: H - CELL - 20 };
   score = 0;
+  wave = 1;              // the first wave of whatever level you are on
   banked = 0;            // nothing of THIS run is in the bank yet...
   bankAtRunStart = bank; // ...and this is what the bank held before it began
   lives = STARTING_LIVES;
@@ -1258,7 +1281,7 @@ function goToLevels() {
 function startLevel(n) {
   if (!levelOpen(n)) return;      // not reached yet — nothing happens
   if (!inLevels()) { mode = "levels"; saveMode(); }
-  newGame("playing");             // fresh score, full lives, un-paused
+  newGame("playing");             // fresh score, full lives, wave one, un-paused
   stage = Math.max(1, Math.min(LEVELS.length, n));
   buildLevel();                   // lay THAT level out, and flash its banner
   updateSpace();
@@ -1375,6 +1398,15 @@ function nextStage() {
     buildLevel();
     return;
   }
+  // A level can be more than one wave. Clearing one of those is not
+  // clearing the level: the next herd comes straight down, a little faster,
+  // and you keep your score and your lives. Only the LAST wave of a level
+  // finishes it.
+  if (wave < plan.waves) {
+    wave++;
+    buildLevel();
+    return;
+  }
   // LEVELS stops at the end of every level. Clearing the LAST one finishes
   // the whole game; clearing any other says WELL DONE, opens the one after
   // it, and puts you back on the list to choose what to play next.
@@ -1472,14 +1504,19 @@ document.addEventListener("keydown", (e) => {
   }
   // In the shop, 1 / 2 / 3 fly the ship on that row, if you've earned it.
   // (The same thing the row's button does when tapped.)
-  if (state === "shop" && e.key >= "1" && e.key <= String(SHIPS.length)) {
-    equipShip(SHIPS[Number(e.key) - 1]);
+  //   numberKey() turns the key into the number it means. It compares the
+  // NUMBERS, not the letters: "2" <= "10" is false, because letter by letter
+  // "2" comes after "1". That is fine while there are fewer than ten of a
+  // thing and silently breaks every key but 1 the moment there are ten. And
+  // 0 means ten, because there is no key for it.
+  const picked = numberKey(e.key);
+  if (state === "shop" && picked >= 1 && picked <= SHIPS.length) {
+    equipShip(SHIPS[picked - 1]);
     return;
   }
   // ...and on the level game's start screen they pick a level.
-  if (state === "start" && inLevels() &&
-      e.key >= "1" && e.key <= String(LEVELS.length)) {
-    startLevel(Number(e.key));
+  if (state === "start" && inLevels() && picked >= 1 && picked <= LEVELS.length) {
+    startLevel(picked);
     return;
   }
   // On the start / game-over / shop screens, Enter/Space begins (or restarts).
@@ -1848,6 +1885,14 @@ function fireShot() {
   // The on-screen FIRE button. Starting the game and restarting are handled
   // by the "tap anywhere" listener below.
   playerFire();
+}
+
+// numberKey(): which number a key press means, or 0 for a key that is not a
+// number at all. "0" means TEN, so a tenth level or a tenth ship still has a
+// key. Anything else answers 0, which is never a level or a ship.
+function numberKey(key) {
+  if (key === "0") return 10;
+  return /^[1-9]$/.test(key) ? Number(key) : 0;
 }
 
 // A move button holds a direction down while you're pressing it.
@@ -3105,14 +3150,24 @@ const SLV_TOP = 410; // where the first line sits — level with the board
 const SLV_BOT = 660; // and where the last line must END, clear of the row of
                      // buttons at 678. Between them is all the room there is.
 const SLV_GAP = 7;   // the space between two lines
-const SLV_W   = 460; // how wide the lines are
+// Past six levels one column of lines would be too squashed to read, so the
+// list goes into TWO columns and fills the left one first. Six or fewer and
+// it is the single wide column it has always been.
+const SLV_COLS = LEVELS.length > 6 ? 2 : 1;
+const SLV_ROWS = Math.ceil(LEVELS.length / SLV_COLS);
+const SLV_W = SLV_COLS === 1 ? 460 : 330; // how wide one line is
+const SLV_COLGAP = 18;                    // the space between the two columns
 // How tall one line is: as tall as 42, or as tall as will FIT, whichever is
 // smaller. So adding a level makes every line a little shorter instead of
 // pushing the last one down underneath the buttons.
 const SLV_H = Math.min(42, Math.floor(
-  (SLV_BOT - SLV_TOP - (LEVELS.length - 1) * SLV_GAP) / LEVELS.length));
+  (SLV_BOT - SLV_TOP - (SLV_ROWS - 1) * SLV_GAP) / SLV_ROWS));
 function startLevelRow(i) {
-  return { x: (W - SLV_W) / 2, y: SLV_TOP + i * (SLV_H + SLV_GAP),
+  const col = Math.floor(i / SLV_ROWS);   // down the left column, then the right
+  const row = i % SLV_ROWS;
+  const wide = SLV_COLS * SLV_W + (SLV_COLS - 1) * SLV_COLGAP;
+  return { x: (W - wide) / 2 + col * (SLV_W + SLV_COLGAP),
+           y: SLV_TOP + row * (SLV_H + SLV_GAP),
            w: SLV_W, h: SLV_H };
 }
 
@@ -3124,6 +3179,14 @@ function levelFace(i) {
   // promise you cows and then give you a wall of penguins.
   const only = herdKind(LEVELS[i].herd);
   return only ? only.animal : ANIMALS[i % ANIMALS.length].animal;
+}
+
+// waveTag(): "  W2/3" while you are partway through a level of more than
+// one wave, and nothing at all otherwise. A level with a single wave has
+// nothing to say here, and the HUD line is short of room.
+function waveTag() {
+  const many = plan && plan.waves > 1;
+  return many ? "  W" + wave + "/" + plan.waves : "";
 }
 
 // Where you stand on a level, in two or three words.
@@ -3144,10 +3207,20 @@ function unlockedLine() {
   return "★ " + justUnlocked.length + " NEW SHIPS UNLOCKED! ★";
 }
 
+// A two-column line is narrower, so the longest of these has to be shorter
+// or it runs into the level's name.
 function levelStanding(i) {
-  if (finished && i === LEVELS.length - 1) return "✓ FINISHED";
-  if (i + 1 === bestLevel) return "★ YOU ARE HERE";
+  const tight = SLV_COLS > 1;
+  if (finished && i === LEVELS.length - 1) return tight ? "✓ DONE" : "✓ FINISHED";
+  if (i + 1 === bestLevel) return tight ? "★ HERE" : "★ YOU ARE HERE";
   return levelOpen(i + 1) ? "✓ BEATEN" : "LOCKED";
+}
+
+// "x3" for a level that throws three herds at you, and nothing for the
+// ordinary one-wave levels. It is worth knowing before you pick one.
+function levelWaves(i) {
+  const many = LEVELS[i].waves || 1;
+  return many > 1 ? "x" + many : "";
 }
 
 function drawStartLevels() {
@@ -3181,16 +3254,28 @@ function drawStartLevels() {
     drawThing(levelFace(i), r.x + 54, mid, Math.min(30, r.h - 6));
     ctx.globalAlpha = 1;
 
-    // Its name...
+    // Its name, in a smaller hand when the lines are the narrow two-column
+    // sort, so a long one still clears the standing on the right.
+    const tight = SLV_COLS > 1;
     ctx.textAlign = "left";
     ctx.fillStyle = open ? "#fff" : "#888";
-    ctx.font = "18px 'Courier New', monospace";
+    ctx.font = (tight ? 16 : 18) + "px 'Courier New', monospace";
     ctx.fillText(LEVELS[i].name, r.x + 78, mid);
+    // How many herds it throws at you, if it is more than one. Small and
+    // grey, tucked in after the name — a warning, not a heading. The name is
+    // measured rather than guessed at, so it cannot be landed on.
+    const many = levelWaves(i);
+    if (many) {
+      const nameEnd = r.x + 78 + ctx.measureText(LEVELS[i].name).width;
+      ctx.fillStyle = open ? "#888" : "#555";
+      ctx.font = "12px 'Courier New', monospace";
+      ctx.fillText(many, nameEnd + 6, mid);
+    }
 
     // ...and where you stand on it, backed up against the right-hand end so
     // it cannot run into the name however long either of them gets.
     ctx.textAlign = "right";
-    ctx.font = "13px 'Courier New', monospace";
+    ctx.font = (tight ? 12 : 13) + "px 'Courier New', monospace";
     ctx.fillStyle = here ? "#ffd34d" : open ? "#5fd66f" : "#666";
     ctx.fillText(levelStanding(i), r.x + r.w - 14, mid);
   }
@@ -3587,7 +3672,7 @@ function draw() {
   ctx.textAlign = "center";
   // ENDLESS counts up for ever, so it just says which wave. LEVELS has a
   // finish, so it says how far along the course you are.
-  ctx.fillText(inLevels() ? "LEVEL " + stage + "/" + LEVELS.length
+  ctx.fillText(inLevels() ? "LEVEL " + stage + "/" + LEVELS.length + waveTag()
                           : "STAGE " + stage, W / 2, 28);
   drawLives();
 
@@ -3824,7 +3909,8 @@ function draw() {
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.font = "44px 'Courier New', monospace";
-    ctx.fillText(inLevels() ? "LEVEL " + stage : "STAGE " + stage, W / 2, H / 2);
+    ctx.fillText(inLevels() ? "LEVEL " + stage + waveTag() : "STAGE " + stage,
+                 W / 2, H / 2);
     // A level has a name, so say it. An endless wave has not, so the only
     // thing worth shouting about there is the BIG CHICK — which you deserve
     // the warning about either way.
