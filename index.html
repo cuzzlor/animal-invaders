@@ -292,6 +292,16 @@ const RAPID_ROCKET_ART = spr([
   "ggg.sssss.ggg", "gg..sssss..gg", "g...WsssW...g", "...GGGGGGG...",
   "....OOOOO....", ".....OYO.....",
 ]);
+// Three barrels, and the middle one stands two rows FORWARD of the other
+// two — which is where its bullet leaves from, so the ship looks like what
+// it shoots.
+const TRIPLE_ROCKET_ART = spr([
+  "......C......", "..C...C...C..", "..C...C...C..", "..C.CCCCC.C..",
+  "..CCCCCCCCC..", "..CDWWWWWDC..", "..CDWDDDWDC..", "..CDWDCDWDC..",
+  "..CDWDDDWDC..", "..CDWWWWWDC..", "..CDsssssDC..", ".CCDsssssDCC.",
+  "CCC.sssss.CCC", "CC..sssss..CC", "C...WsssW...C", "...GGGGGGG...",
+  "....CCCCC....", ".....COC.....",
+]);
 const BOMB_ROCKET_ART = spr([
   "....vvvvv....", "...vvvvvvv...", "..vvvvvvvvv..", "..vvOOOOOvv..",
   "..vvOYYYOvv..", "..vvOOOOOvv..", ".vvvWWWWWvvv.", ".vvvWDDDWvvv.",
@@ -526,6 +536,12 @@ const BULLET_LENGTH = 22;  // how long your shots look (bigger = longer streaks)
 // reach the good ships sooner!
 // How often each gun can shoot, in frames (60 frames = one second), and
 // how far the BLAST CANNON's explosion reaches.
+// The TRIPLE BLASTER's three bullets: how far out the side ones sit, and how
+// far UP the screen the middle one starts. The middle barrel stands forward
+// on the ship, so its bullet does too — the three fly as an arrowhead and
+// the middle one lands first.
+const TRIPLE_SPREAD = 15; // how far out the two side bullets start, in pixels
+const TRIPLE_LEAD   = 16; // how far ahead of them the middle one starts
 const RAPID_EVERY = 12;  // between RAPID FIRE shots (12 = five a second at GAME_SPEED 1)
 const BOMB_RELOAD = 30;  // between BLAST CANNON shells (30 = half a second at GAME_SPEED 1)
 const BOMB_RADIUS = 95;  // how far the blast reaches, in pixels
@@ -660,6 +676,12 @@ const SHIPS = [
   {
     id: "twin", name: "TWIN BLASTER", art: TWIN_ROCKET_ART, need: 5000, fire: "twin", damage: 1, reload: 0,
     blurb: ["Two cannons, two bullets a shot —", "clear the herd twice as fast."],
+  },
+  {
+    id: "triple", name: "TRIPLE BLASTER", art: TRIPLE_ROCKET_ART, need: 6250,
+    fire: "triple", damage: 1, reload: 0,
+    blurb: ["Three cannons. The middle one stands",
+            "forward, so its shot flies out in front."],
   },
   {
     id: "bomb", name: "BLAST CANNON", art: BOMB_ROCKET_ART, need: 7500, fire: "bomb",
@@ -857,7 +879,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-09-19 tenlevels";
+const BUILD = "2026-09-19 triple";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
@@ -1835,6 +1857,14 @@ function shootBullets() {
   if (ship.fire === "twin") {
     bullets.push({ x: player.x - 11, y: nose, dmg: ship.damage });
     bullets.push({ x: player.x + 11, y: nose, dmg: ship.damage });
+  } else if (ship.fire === "triple") {
+    // The middle barrel stands forward on the ship, so its bullet starts
+    // TRIPLE_LEAD further up the screen than the other two. The three keep
+    // that shape the whole way, because every bullet flies at the same
+    // speed — an arrowhead going up, with the point in front.
+    bullets.push({ x: player.x - TRIPLE_SPREAD, y: nose, dmg: ship.damage });
+    bullets.push({ x: player.x, y: nose - TRIPLE_LEAD, dmg: ship.damage });
+    bullets.push({ x: player.x + TRIPLE_SPREAD, y: nose, dmg: ship.damage });
   } else {
     // `bomb` marks a BLAST CANNON shell — it blows up where it lands
     // instead of just poking the one animal it touched.
@@ -3300,11 +3330,19 @@ const SHOP_CARD_H = Math.min(108, Math.floor(
 // And the five lines of writing INSIDE a card move with the card's height,
 // so a shorter card squeezes them together instead of dropping one on top
 // of another. Add an eighth ship and this all still reads.
+// Under this height the full-size hand will not fit five lines of writing
+// in a card, so the whole card is set a size smaller rather than having a
+// line land on the one below it.
+const CARD_TIGHT   = SHOP_CARD_H < 96;
+const CARD_NAME_PT = CARD_TIGHT ? 20 : 23;          // the ship's name
+const CARD_TEXT_PT = CARD_TIGHT ? 14 : 16;          // what it does
+const CARD_FOOT_PT = CARD_TIGHT ? 12 : 14;          // "EARNED", or what it costs
 const CARD_NAME_Y = Math.round(SHOP_CARD_H * 0.21); // the ship's name
-const CARD_TEXT_Y = Math.round(SHOP_CARD_H * 0.40); // the first line of the blurb
-const CARD_TEXT_GAP = 17;                           // and the second, under it
-const CARD_FOOT_Y = SHOP_CARD_H - 24;               // "EARNED", or what it costs
-const CARD_BAR_Y  = SHOP_CARD_H - 12;               // the bar creeping toward it
+const CARD_TEXT_Y = CARD_NAME_Y + (CARD_TIGHT ? 17 : 22); // the first blurb line
+const CARD_TEXT_GAP = CARD_TIGHT ? 13 : 17;         // and the second, under it
+const CARD_FOOT_Y = SHOP_CARD_H - (CARD_TIGHT ? 21 : 24);
+const CARD_BAR_Y  = SHOP_CARD_H - (CARD_TIGHT ? 10 : 12); // the bar creeping to it
+const CARD_ART    = Math.min(72, SHOP_CARD_H - 12); // how big the ship is drawn
 function shopCardY(i) { return SHOP_CARD_TOP + i * (SHOP_CARD_H + SHOP_CARD_GAP); }
 
 function drawShop() {
@@ -3344,21 +3382,21 @@ function drawShop() {
     ctx.font = "19px 'Courier New', monospace";
     ctx.textAlign = "center";
     ctx.fillText(String(i + 1), 74, y + SHOP_CARD_H / 2);
-    drawThing(ship.art, 140, y + SHOP_CARD_H / 2, 72,
+    drawThing(ship.art, 140, y + SHOP_CARD_H / 2, CARD_ART,
               typeof ship.art === "string" ? -Math.PI / 4 : 0);
 
     // Its name, and what it does.
     ctx.textAlign = "left";
     ctx.fillStyle = mine ? "#fff" : "#bbb";
-    ctx.font = "23px 'Courier New', monospace";
+    ctx.font = CARD_NAME_PT + "px 'Courier New', monospace";
     ctx.fillText(ship.name, 198, y + CARD_NAME_Y);
     ctx.fillStyle = "#9aa6b2";
-    ctx.font = "16px 'Courier New', monospace";
+    ctx.font = CARD_TEXT_PT + "px 'Courier New', monospace";
     for (let l = 0; l < ship.blurb.length; l++) {
       ctx.fillText(ship.blurb[l], 198, y + CARD_TEXT_Y + l * CARD_TEXT_GAP);
     }
     // How you get it — and, if you haven't yet, how close you've come.
-    ctx.font = "14px 'Courier New', monospace";
+    ctx.font = CARD_FOOT_PT + "px 'Courier New', monospace";
     ctx.fillStyle = flying ? "#ffd34d" : mine ? "#5fd66f" : "#777";
     ctx.fillText(flying ? "★ FLYING THIS ONE"
                  : mine ? (ship.need === 0 ? "✓ ALWAYS YOURS" : "✓ EARNED")

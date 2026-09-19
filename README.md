@@ -468,13 +468,19 @@ back to exactly where you were — the new ship is in your hands immediately.
 | **Scout** | yours already | The rocket you start with. One shot at a time. |
 | **Rapid Fire** | score 2,500 in one game | **Hold** the button and it pours out ten shots a second — but each one only hits half as hard, so most animals take two. |
 | **Twin Blaster** | score 5,000 in one game | Two cannons — two bullets every shot, so you clear the herd twice as fast. |
+| **Triple Blaster** | score 6,250 in one game | Three cannons instead of two. The middle barrel stands **forward** on the ship, so its bullet leaves from further up the screen — the three fly as an arrowhead with the point in front, and the middle one lands first. |
 | **Blast Cannon** | score 7,500 in one game | Lobs a shell that **blows up** where it lands, clearing whatever it hits and the whole ring of animals around it — about seven at a time in the thick of the herd. A quarter of a second to reload. |
 | **Red Laser** | score 10,000 in one game | A red beam that smashes clean through every animal it touches (and melts their shots). Burns for **2 seconds**, then reloads in under half of one — so it is lit five sixths of the time, and one burn carries you nearly the whole width of a wave. |
 | **Electric Arc** | score 15,000 in one game | Lightning instead of a laser: the current **jumps sideways** from animal to animal, up to three deep either side of the beam. Burns for 2.5 seconds, then reloads for half a second. |
 | **Flamethrower** | fill the bank to 100,000 | **Hold** the button and it pours out fire. It burns what it touches **and sets it alight**, and the fire goes on eating long after you have swung away. Slow on any one animal, frightening on a herd. Three and a half seconds of fuel in a tank. |
 
 Rapid Fire and the Flamethrower are the two ships you **hold** the button for;
-every other one fires once per press. An animal that's been hit but not finished off fades, so you can
+every other one fires once per press.
+
+The Triple Blaster's arrowhead keeps its shape the whole way up, because every
+bullet in the game flies at the same speed. `TRIPLE_SPREAD` is how far out the
+two side bullets sit and `TRIPLE_LEAD` is how far ahead the middle one starts —
+both near the top of `index.html`. An animal that's been hit but not finished off fades, so you can
 see which ones need one more.
 
 The shop shows a bar creeping toward each ship, so you can see how close you
