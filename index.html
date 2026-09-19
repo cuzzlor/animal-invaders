@@ -842,7 +842,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-09-19 breakthrough";
+const BUILD = "2026-09-19 sharpsky";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
@@ -4171,14 +4171,29 @@ const starCanvas = document.getElementById("stars");
 const starCtx = starCanvas.getContext("2d");
 let stars = [];
 
-// Match the star canvas to the window size (and redo it if the window
-// is resized, so the stars always fill the whole screen).
+// Match the star canvas to the window (and redo it if the window is
+// resized, so the stars always fill the whole screen).
+//
+// A screen can pack more than one REAL pixel into each pixel the page
+// measures in. An iPad packs four — two across and two down. If the canvas
+// is built at the page size, the screen has to stretch it to fit, and that
+// makes every star twice as wide and soft at the edges. That is why the
+// stars looked like blobs on an iPad and like points on a computer.
+//   So the canvas is built at the real size instead, and the drawing is
+// scaled to match. Everything below still works in PAGE pixels, in skyW and
+// skyH, and nothing else has to know.
+let skyW = 0, skyH = 0, skyPix = 1;
 function resizeStars() {
-  starCanvas.width = window.innerWidth;
-  starCanvas.height = window.innerHeight;
+  // Two is as far as it is worth going. Past that the picture is no better
+  // and the phone is painting four times the pixels for nothing.
+  skyPix = Math.min(2, window.devicePixelRatio || 1);
+  skyW = window.innerWidth;
+  skyH = window.innerHeight;
+  starCanvas.width = Math.round(skyW * skyPix);
+  starCanvas.height = Math.round(skyH * skyPix);
+  starCtx.setTransform(skyPix, 0, 0, skyPix, 0, 0);
+  bakeGlows();  // a sharper screen wants sharper glow pictures
 }
-window.addEventListener("resize", resizeStars);
-resizeStars();
 
 // One soft glow per colour, painted once when the page opens.
 //
@@ -4188,35 +4203,47 @@ resizeStars();
 // them blurring the very same little dot over and over. Instead we blur each
 // colour ONE time into a small picture, and then stamp those pictures. It looks
 // the same and costs a fraction as much, which is what a phone needs.
-const GLOW_ART   = 32;  // how big each pre-painted glow picture is, in pixels
+// The pictures are baked at the SCREEN's sharpness, not the page's, so that
+// a stamp of one lands on real pixels instead of being stretched over them.
+const GLOW_ART   = 32;  // how big each pre-painted glow picture is, in page pixels
 const GLOW_DOT   = 3;   // the star inside it
 const GLOW_SPREAD = 9;  // how far its halo reaches
-const starGlows = {};
-for (const colour of STAR_COLORS) {
-  if (starGlows[colour]) continue;   // the list repeats white; bake it once
-  const cv = document.createElement("canvas");
-  cv.width = GLOW_ART;
-  cv.height = GLOW_ART;
-  const c = cv.getContext("2d");
-  c.fillStyle = colour;
-  c.shadowColor = colour;
-  c.shadowBlur = GLOW_SPREAD;
-  // One fill paints the star AND its halo, which is exactly what the game used
-  // to ask for every frame — the same picture, made once instead of 13,200
-  // times a second. Filling twice would double the halo and wash the sky out.
-  c.beginPath();
-  c.arc(GLOW_ART / 2, GLOW_ART / 2, GLOW_DOT, 0, Math.PI * 2);
-  c.fill();
-  starGlows[colour] = cv;
+let starGlows = {};
+let glowPix = 0;        // the sharpness the pictures we have were baked at
+function bakeGlows() {
+  if (glowPix === skyPix) return;   // already baked for this screen
+  glowPix = skyPix;
+  starGlows = {};
+  for (const colour of STAR_COLORS) {
+    if (starGlows[colour]) continue;   // the list repeats white; bake it once
+    const wide = Math.round(GLOW_ART * skyPix);
+    const cv = document.createElement("canvas");
+    cv.width = wide;
+    cv.height = wide;
+    const c = cv.getContext("2d");
+    c.fillStyle = colour;
+    c.shadowColor = colour;
+    c.shadowBlur = GLOW_SPREAD * skyPix;
+    // One fill paints the star AND its halo, which is exactly what the game
+    // used to ask for every frame — the same picture, made once instead of
+    // 13,200 times a second. Filling twice would double the halo and wash
+    // the sky out.
+    c.beginPath();
+    c.arc(wide / 2, wide / 2, GLOW_DOT * skyPix, 0, Math.PI * 2);
+    c.fill();
+    starGlows[colour] = cv;
+  }
 }
+window.addEventListener("resize", resizeStars);
+resizeStars();
 
 // Make one star. Bigger stars drift a little faster, which makes the
 // field feel deep — like nearer stars zipping past farther ones.
 function makeStar(anywhere) {
   const size = 0.7 + Math.random() * 2.3; // 0.7 — 3.0 pixels across
   return {
-    x: Math.random() * starCanvas.width,
-    y: anywhere ? Math.random() * starCanvas.height : -2,
+    x: Math.random() * skyW,
+    y: anywhere ? Math.random() * skyH : -2,
     size: size,
     color: STAR_COLORS[Math.floor(Math.random() * STAR_COLORS.length)],
     speed: 0.12 + size * 0.18,            // slow drift, faster when bigger
@@ -4235,9 +4262,9 @@ function moveStars() {
     // Drift downward; when a star falls off the bottom, send it back to
     // the top at a new spot so the field never runs out.
     s.y += s.speed;
-    if (s.y > starCanvas.height + 2) {
+    if (s.y > skyH + 2) {
       s.y = -2;
-      s.x = Math.random() * starCanvas.width;
+      s.x = Math.random() * skyW;
     }
     // Twinkling stars fade in and out; the rest stay steady.
     if (s.twinkle) s.phase += s.twinkleSpeed;
@@ -4246,7 +4273,8 @@ function moveStars() {
 
 // drawStars(): paint them. One stamp of a pre-blurred glow per star.
 function drawStars() {
-  starCtx.clearRect(0, 0, starCanvas.width, starCanvas.height);
+  // In page pixels, because the context is scaled to the screen's sharpness.
+  starCtx.clearRect(0, 0, skyW, skyH);
   for (const s of stars) {
     starCtx.globalAlpha = s.twinkle
       ? 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(s.phase))

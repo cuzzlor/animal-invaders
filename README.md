@@ -639,6 +639,30 @@ to this file (a `sprites/` folder works too), then follow the commented example
 inside the config block. It's a **one-line** change — the game already knows how
 to draw both emoji and pictures.
 
+### The stars, and how sharp your screen is 🌟
+
+The stars are drawn on their own canvas behind the game. A canvas has two
+sizes: how big the page says it is, and how many real pixels it is built from.
+An iPad packs **four real pixels into each pixel the page measures in** — two
+across and two down.
+
+The star canvas used to be built at the page size. The iPad then had to stretch
+it to fit its screen, and stretching doubled every star and softened its edges.
+That is why the stars looked like fat blobs on an iPad and like sharp points on
+a computer.
+
+Now the canvas is built at the real size, the drawing is scaled to match, and
+the glow pictures are baked at the same sharpness so a stamp of one is never
+stretched. Everything else still works in page pixels, in `skyW` and `skyH`, so
+nothing had to change but the three lines that set the canvas up.
+
+Measured, a star is now the same width in page pixels on both, and the sky costs
+**0.13 ms a frame** either way — 1.6% of a frame — because the extra pixels are
+the screen's work, not the game's.
+
+Two is as sharp as it goes. Past that the picture is no better and a phone is
+painting nine times the pixels for nothing.
+
 ### One place emoji do not belong 📵
 
 An **animal, a shot or a ship** can be an emoji — those are drawn in the middle
