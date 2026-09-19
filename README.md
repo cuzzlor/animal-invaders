@@ -470,12 +470,13 @@ back to exactly where you were — the new ship is in your hands immediately.
 | **Twin Blaster** | score 5,000 in one game | Two cannons — two bullets every shot, so you clear the herd twice as fast. |
 | **Blast Cannon** | score 7,500 in one game | Lobs a shell that **blows up** where it lands, clearing whatever it hits and the whole ring of animals around it — about seven at a time in the thick of the herd. A quarter of a second to reload. |
 | **Triple Blaster** | score 8,500 in one game | Three cannons instead of two. The middle barrel stands **forward** on the ship, so its bullet leaves from further up the screen — the three fly as an arrowhead with the point in front, and the middle one lands first. |
+| **Double Rapid** | score 9,000 in one game | Rapid Fire with two barrels. **Hold** the button and it pours out ten **pairs** a second. Each bullet is half strength, like Rapid Fire's, so a pair downs an ordinary animal where a single bullet leaves it standing. |
 | **Red Laser** | score 10,000 in one game | A red beam that smashes clean through every animal it touches (and melts their shots). Burns for **2 seconds**, then reloads in under half of one — so it is lit five sixths of the time, and one burn carries you nearly the whole width of a wave. |
 | **Electric Arc** | score 15,000 in one game | Lightning instead of a laser: the current **jumps sideways** from animal to animal, up to three deep either side of the beam. Burns for 2.5 seconds, then reloads for half a second. |
 | **Flamethrower** | fill the bank to 100,000 | **Hold** the button and it pours out fire. It burns what it touches **and sets it alight**, and the fire goes on eating long after you have swung away. Slow on any one animal, frightening on a herd. Three and a half seconds of fuel in a tank. |
 
-Rapid Fire and the Flamethrower are the two ships you **hold** the button for;
-every other one fires once per press.
+Rapid Fire, the Double Rapid and the Flamethrower are the three ships you
+**hold** the button for; every other one fires once per press.
 
 The Triple Blaster's arrowhead keeps its shape the whole way up, because every
 bullet in the game flies at the same speed. `TRIPLE_SPREAD` is how far out the
@@ -634,6 +635,23 @@ No two moments of it look the same. The bolt is torn into a fresh shape every
 frame, with branches forking off it and dying away, and every jump crackles at
 its own brightness — so it gutters and flickers like a live wire instead of
 sitting there like a painted line.
+
+### A shop of nine 🏪
+
+Past eight ships one column of cards is too short to hold a ship's name, what it
+does and what it costs without one line landing on another. So the shop goes
+into **two columns**, the same as the level list does — and two columns make the
+cards **taller**, not shorter.
+
+A narrow card has no room for a FLY THIS button beside it, so **the whole card
+is the button**. Again the same as the level list, where you tap a line rather
+than a box next to it.
+
+The blurb's size is not picked by hand. It is worked out from the **longest line
+any ship has** and the room a card leaves for it, so a wordy new ship shrinks the
+writing instead of running it off the side. Courier is a typewriter face — every
+letter is exactly 0.6 of the size across — which is what makes that a sum rather
+than a guess.
 
 Your best run, your ship, and the high scores are all kept in this browser on
 this computer — there's no internet server, so they don't follow you to another

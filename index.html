@@ -302,6 +302,15 @@ const TRIPLE_ROCKET_ART = spr([
   "CCC.sssss.CCC", "CC..sssss..CC", "C...WsssW...C", "...GGGGGGG...",
   "....CCCCC....", ".....COC.....",
 ]);
+// Two pairs of barrels, in the RAPID FIRE's green: it is that gun twice
+// over. Every other ship wears its gun on its nose, and so does this one.
+const DOUBLE_RAPID_ART = spr([
+  ".g.g.....g.g.", ".g.g.....g.g.", ".ggg.....ggg.", "..gg.ggg.gg..",
+  "..ggggggggg..", "..ggWWWWWgg..", "..ggWDDDWgg..", "..ggWDCDWgg..",
+  "..ggWDDDWgg..", "..ggWWWWWgg..", "..ggsssssgg..", ".gggsssssggg.",
+  "ggg.sssss.ggg", "gg..sssss..gg", "g...WsssW...g", "...GGGGGGG...",
+  "....OOOOO....", ".....OYO.....",
+]);
 const BOMB_ROCKET_ART = spr([
   "....vvvvv....", "...vvvvvvv...", "..vvvvvvvvv..", "..vvOOOOOvv..",
   "..vvOYYYOvv..", "..vvOOOOOvv..", ".vvvWWWWWvvv.", ".vvvWDDDWvvv.",
@@ -689,6 +698,15 @@ const SHIPS = [
     blurb: ["Three cannons. The middle one stands",
             "forward, so its shot flies out in front."],
   },
+  // No new firing code: `twin` already puts two bullets in the air with
+  // this ship's own damage, and `auto` already streams while the button is
+  // held. Putting the two together IS the gun.
+  {
+    id: "drapid", name: "DOUBLE RAPID", art: DOUBLE_RAPID_ART, need: 9000,
+    fire: "twin", damage: 0.5, reload: RAPID_EVERY, auto: true,
+    blurb: ["HOLD to pour " + aSecond(RAPID_EVERY) + " PAIRS a second —",
+            "half-strength each, so a pair downs one."],
+  },
   {
     id: "laser", name: "RED LASER", art: LASER_ROCKET_ART, need: 10000, fire: "laser", damage: 1, reload: 0,
     beam: LASER_BEAM,
@@ -879,7 +897,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-09-19 triple85";
+const BUILD = "2026-09-19 drapid";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
@@ -3020,13 +3038,22 @@ function screenButtons() {
     // One button per ship: fly the ones you've earned, and a dead LOCKED
     // box on the ones you haven't.
     const rows = SHIPS.map((ship, i) => {
+      const card = shopCard(i);
       const mine = unlocked(ship);
       const flying = ship.id === shipId;
-      const label = flying ? "FLYING THIS" : mine ? "FLY THIS" : "LOCKED";
-      const style = flying ? "gold" : mine ? "normal" : "locked";
       // Nothing to do if you're already flying it, or haven't earned it.
       const action = (flying || !mine) ? null : () => equipShip(ship);
-      return button(616, shopCardY(i) + (SHOP_CARD_H - BTN_H) / 2, 198, label, action, style);
+      // In two columns there is no room for a button beside the card, so
+      // the card itself is tapped — "bare" means drawShop() has already
+      // painted it and drawButtons() must not paint a box on top.
+      if (SHOP_COLS > 1) {
+        return { x: card.x, y: card.y, w: card.w, h: card.h,
+                 label: ship.name, style: "bare", action: action };
+      }
+      const label = flying ? "FLYING THIS" : mine ? "FLY THIS" : "LOCKED";
+      const style = flying ? "gold" : mine ? "normal" : "locked";
+      return button(card.x + card.w - 212, card.y + (SHOP_CARD_H - BTN_H) / 2,
+                    198, label, action, style);
     });
     // If you stepped in from a game in progress, the only way out is back
     // into it — a "PLAY" that quietly threw your run away would be cruel.
@@ -3324,26 +3351,61 @@ function drawStartLevels() {
 // little shorter together, and none of them falls off the bottom.
 const SHOP_CARD_TOP = 128; // where the first ship card starts
 const SHOP_CARD_BOT = 838; // the last card must finish ABOVE the buttons at 848
-const SHOP_CARD_GAP = 6;   // the space between two cards
+let SHOP_CARD_GAP = 6;     // the space between two cards — see just below
+// Past eight ships one column of cards is too short to hold a ship's name,
+// what it does and what it costs without one line landing on another. So
+// the shop goes into TWO columns, the same as the level list does, and
+// fills the left one first. Two columns make the cards TALLER, not shorter.
+//   A card in two columns has no room for a FLY THIS button beside it, so
+// the whole card IS the button — again the same as the level list, where a
+// line is tapped rather than a box beside it.
+const SHOP_COLS = SHIPS.length > 8 ? 2 : 1;
+SHOP_CARD_GAP = SHOP_COLS === 1 ? 6 : 18; // two columns have room to breathe
+const SHOP_ROWS = Math.ceil(SHIPS.length / SHOP_COLS);
+const SHOP_SIDE = SHOP_COLS === 1 ? 50 : 22;   // the margin at each edge
+const SHOP_COLGAP = 16;                        // the space between the columns
+const SHOP_CARD_W = Math.floor(
+  (W - 2 * SHOP_SIDE - (SHOP_COLS - 1) * SHOP_COLGAP) / SHOP_COLS);
 const SHOP_CARD_H = Math.min(108, Math.floor(
-  (SHOP_CARD_BOT - SHOP_CARD_TOP - (SHIPS.length - 1) * SHOP_CARD_GAP) / SHIPS.length));
-// And the five lines of writing INSIDE a card move with the card's height,
-// so a shorter card squeezes them together instead of dropping one on top
-// of another. Add an eighth ship and this all still reads.
-// Under this height the full-size hand will not fit five lines of writing
-// in a card, so the whole card is set a size smaller rather than having a
-// line land on the one below it.
+  (SHOP_CARD_BOT - SHOP_CARD_TOP - (SHOP_ROWS - 1) * SHOP_CARD_GAP) / SHOP_ROWS));
+// And the lines of writing INSIDE a card move with the card's height, so a
+// shorter card squeezes them together instead of dropping one on top of
+// another. Under 96 the full-size hand will not fit at all, so the whole
+// card is set a size smaller.
 const CARD_TIGHT   = SHOP_CARD_H < 96;
-const CARD_NAME_PT = CARD_TIGHT ? 20 : 23;          // the ship's name
-const CARD_TEXT_PT = CARD_TIGHT ? 14 : 16;          // what it does
-const CARD_FOOT_PT = CARD_TIGHT ? 12 : 14;          // "EARNED", or what it costs
+const CARD_NAME_PT = CARD_TIGHT ? 20 : 22;          // the ship's name
+const CARD_FOOT_PT = CARD_TIGHT ? 12 : 13;          // "EARNED", or what it costs
 const CARD_NAME_Y = Math.round(SHOP_CARD_H * 0.21); // the ship's name
 const CARD_TEXT_Y = CARD_NAME_Y + (CARD_TIGHT ? 17 : 22); // the first blurb line
 const CARD_TEXT_GAP = CARD_TIGHT ? 13 : 17;         // and the second, under it
 const CARD_FOOT_Y = SHOP_CARD_H - (CARD_TIGHT ? 21 : 24);
 const CARD_BAR_Y  = SHOP_CARD_H - (CARD_TIGHT ? 10 : 12); // the bar creeping to it
-const CARD_ART    = Math.min(72, SHOP_CARD_H - 12); // how big the ship is drawn
-function shopCardY(i) { return SHOP_CARD_TOP + i * (SHOP_CARD_H + SHOP_CARD_GAP); }
+const CARD_ART    = Math.min(SHOP_COLS === 1 ? 72 : 44, SHOP_CARD_H - 12);
+const CARD_NUM_X  = SHOP_COLS === 1 ? 24 : 14;  // the key you can press
+const CARD_SHIP_X = SHOP_COLS === 1 ? 90 : 54;  // the middle of the ship
+// Where the writing starts, measured in from the card's OWN left edge, and
+// how wide the bar under it may be. Both are narrower in two columns.
+const CARD_TEXT_X = SHOP_COLS === 1 ? 148 : 84;
+const CARD_BAR_W  = SHOP_COLS === 1 ? 250 : 176;
+// How big a ship's blurb is set. Not picked by hand: it is worked out from
+// the LONGEST line any ship has and the room a card leaves for it, so a
+// wordy new ship — or a narrower card — shrinks the writing instead of
+// running it off the side. Courier is a typewriter face: every letter is
+// exactly 0.6 of the size across, which is what makes this a sum and not a
+// guess.
+const CARD_TEXT_ROOM = SHOP_CARD_W - CARD_TEXT_X - 12;
+const CARD_LONGEST = SHIPS.reduce((most, sh) =>
+  sh.blurb.reduce((m, line) => Math.max(m, line.length), most), 1);
+const CARD_TEXT_PT = Math.max(9, Math.min(CARD_TIGHT ? 14 : 15,
+  Math.floor(CARD_TEXT_ROOM / (CARD_LONGEST * 0.6))));
+// One card's box. Down the left column first, then the right.
+function shopCard(i) {
+  const col = Math.floor(i / SHOP_ROWS), row = i % SHOP_ROWS;
+  return { x: SHOP_SIDE + col * (SHOP_CARD_W + SHOP_COLGAP),
+           y: SHOP_CARD_TOP + row * (SHOP_CARD_H + SHOP_CARD_GAP),
+           w: SHOP_CARD_W, h: SHOP_CARD_H };
+}
+function shopCardY(i) { return shopCard(i).y; }
 
 function drawShop() {
   ctx.fillStyle = "rgba(0,0,0,0.82)";
@@ -3364,13 +3426,15 @@ function drawShop() {
 
   for (let i = 0; i < SHIPS.length; i++) {
     const ship = SHIPS[i];
-    const y = shopCardY(i);
+    const card = shopCard(i);
+    const y = card.y;
+    const tx = card.x + CARD_TEXT_X;   // where the writing starts on THIS card
     const mine = unlocked(ship);
     const flying = ship.id === shipId;
 
     // The card itself — gold edge for the ship you're flying, a plain edge
     // for the ones you own, and a dim one for what you can't afford yet.
-    roundRectPath(50, y, 780, SHOP_CARD_H, 12);
+    roundRectPath(card.x, y, card.w, SHOP_CARD_H, 12);
     ctx.fillStyle = flying ? "rgba(255,211,77,0.08)" : "rgba(255,255,255,0.05)";
     ctx.fill();
     ctx.lineWidth = 2;
@@ -3381,19 +3445,21 @@ function drawShop() {
     ctx.fillStyle = "#666";
     ctx.font = "19px 'Courier New', monospace";
     ctx.textAlign = "center";
-    ctx.fillText(String(i + 1), 74, y + SHOP_CARD_H / 2);
-    drawThing(ship.art, 140, y + SHOP_CARD_H / 2, CARD_ART,
+    // The number sits clear of the ship, not under it — in the narrow
+    // two-column card there is only just room for both.
+    ctx.fillText(String(i + 1), card.x + CARD_NUM_X, y + SHOP_CARD_H / 2);
+    drawThing(ship.art, card.x + CARD_SHIP_X, y + SHOP_CARD_H / 2, CARD_ART,
               typeof ship.art === "string" ? -Math.PI / 4 : 0);
 
     // Its name, and what it does.
     ctx.textAlign = "left";
     ctx.fillStyle = mine ? "#fff" : "#bbb";
     ctx.font = CARD_NAME_PT + "px 'Courier New', monospace";
-    ctx.fillText(ship.name, 198, y + CARD_NAME_Y);
+    ctx.fillText(ship.name, tx, y + CARD_NAME_Y);
     ctx.fillStyle = "#9aa6b2";
     ctx.font = CARD_TEXT_PT + "px 'Courier New', monospace";
     for (let l = 0; l < ship.blurb.length; l++) {
-      ctx.fillText(ship.blurb[l], 198, y + CARD_TEXT_Y + l * CARD_TEXT_GAP);
+      ctx.fillText(ship.blurb[l], tx, y + CARD_TEXT_Y + l * CARD_TEXT_GAP);
     }
     // How you get it — and, if you haven't yet, how close you've come.
     ctx.font = CARD_FOOT_PT + "px 'Courier New', monospace";
@@ -3402,24 +3468,24 @@ function drawShop() {
                  : mine ? (ship.need === 0 ? "✓ ALWAYS YOURS" : "✓ EARNED")
                  : ship.bank ? "LOCKED — the bank must reach " + ship.bank
                  : "LOCKED — score " + ship.need + " in one game",
-                 198, y + CARD_FOOT_Y);
+                 tx, y + CARD_FOOT_Y);
     if (!mine) {
       // A bar creeping toward what you need, so you can see how far off you
       // are rather than just being told "no". For most ships that is your
       // best single run against the price; for the one that fills up it is
       // the bank against the price. It gets the bottom line of the card to
       // itself, clear of the writing above.
-      const barW = 250;
+      const barW = CARD_BAR_W;
       const got  = ship.bank ? bank : bestRun;
       const want = ship.bank ? ship.bank : ship.need;
       ctx.fillStyle = "rgba(255,255,255,0.12)";
-      ctx.fillRect(198, y + CARD_BAR_Y, barW, 4);
+      ctx.fillRect(tx, y + CARD_BAR_Y, barW, 4);
       ctx.fillStyle = ship.bank ? "#ff8c1a" : "#7ef9ff";
-      ctx.fillRect(198, y + CARD_BAR_Y, barW * Math.min(1, got / want), 4);
+      ctx.fillRect(tx, y + CARD_BAR_Y, barW * Math.min(1, got / want), 4);
       ctx.fillStyle = "#666";
-      ctx.font = "13px 'Courier New', monospace";
+      ctx.font = (CARD_TIGHT ? 11 : 13) + "px 'Courier New', monospace";
       ctx.fillText((ship.bank ? "in the bank: " : "best so far: ") + got,
-                   198 + barW + 10, y + CARD_BAR_Y + 3);
+                   tx + barW + 8, y + CARD_BAR_Y + 3);
     }
   }
 
