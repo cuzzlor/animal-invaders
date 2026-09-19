@@ -842,7 +842,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-09-13 trample";
+const BUILD = "2026-09-19 breakthrough";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
@@ -950,7 +950,7 @@ let player;        // {x, y}
 let invaders;      // array of {x, y, alive, animal, shot}
 let bullets;       // YOUR shots going up:   array of {x, y, dmg}
 let shots;         // animal shots coming down: array of {x, y, emoji}
-let bases;         // the shields: array of { blocks: [{x, y, alive}], trampled }
+let bases;         // the shields: array of { blocks: [{x, y, alive}] }
 let baseTop;       // top edge of the cover — the herd eats it from here down
 let crunch;        // steps until the next crunch of cover being eaten
 let particles;     // explosion bits: array of {x, y, vx, vy, life, maxLife, color}
@@ -1155,10 +1155,7 @@ function buildLevel() {
         });
       }
     }
-    // `trampled` is set the moment the HERD walks into this base. It is the
-    // difference between cover you failed to hold and cover they took — see
-    // the "Lose a base" rule in update().
-    bases.push({ blocks: blocks, trampled: false });
+    bases.push({ blocks: blocks });
   }
   baseTop = baseY;  // nothing above this line can be touching the cover
   crunch = 0;
@@ -2054,6 +2051,9 @@ function update() {
   // through your cover as it slides across. It is how the arcade game has
   // always done it, and it is what makes the herd getting low FEEL like
   // losing ground instead of a number going up.
+  //   Eating a base right down to nothing ENDS THE RUN, the same as letting
+  // their shots wear one away. See the "Lose a base" rule further down. So
+  // the herd getting into your cover is the last warning you get.
   //   Almost every frame nothing here happens at all: the first line throws
   // out every animal still above the cover, which is all of them for most of
   // a wave, so the inner loops are never reached.
@@ -2070,7 +2070,6 @@ function update() {
         const reach = half + BASE_BLOCK / 2;
         if (Math.abs(inv.x - blk.x) >= reach || Math.abs(inv.y - blk.y) >= reach) continue;
         blk.alive = false;
-        base.trampled = true;
         spawnExplosion(blk.x, blk.y, 0.25); // a puff of dust where it went
         eaten++;
       }
@@ -2348,19 +2347,13 @@ function update() {
 
   // --- Lose a base, lose the game ---
   // If ANY base is completely wiped out, it's game over — protect them all!
-  //   EXCEPT in two cases. Against the boss: blowing your cover apart is the
-  // whole point of its exploding eggs, and ending the run the moment it
-  // manages it would be no fun at all. On a boss stage you simply lose the
-  // cover, and have to get through the rest of the fight out in the open.
-  //   And except a base the HERD has walked through. That is not cover you
-  // failed to hold, it is cover they have taken — and they take all three of
-  // them within a few steps of arriving, so counting it would turn "they are
-  // breaking through!" into an instant loss with nothing you could have done.
-  // You still lose when they reach YOU, a few rows further down. So the rule
-  // stands for what it was written for: their SHOTS wearing a base away while
-  // the herd is still up above.
-  if (!isBossStage() &&
-      bases.some((base) => !base.trampled && base.blocks.every((blk) => !blk.alive))) {
+  // It does not matter what wiped it out: their shots wearing it away, your
+  // own bullets, or the herd walking through it and eating it.
+  //   EXCEPT against the boss. Blowing your cover apart is the whole point of
+  // its exploding eggs, and ending the run the moment it manages it would be
+  // no fun at all. On a boss stage you simply lose the cover, and have to get
+  // through the rest of the fight out in the open.
+  if (!isBossStage() && bases.some((base) => base.blocks.every((blk) => !blk.alive))) {
     state = "lost";
   }
 

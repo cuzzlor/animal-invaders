@@ -376,26 +376,27 @@ they wear away a block at a time. Four things eat into them:
 | **The Big Chick's eggs** | a whole hole at once, wherever one lands |
 | **The herd walking into them** | see below |
 
-**Lose a whole base and the run is over.** Protect all three.
+**Lose a whole base and the run is over.** Protect all three. It does not
+matter what took it: their shots, your own bullets, or the herd eating it.
+
+The one exception is a **boss stage**. Blowing your cover apart is the point of
+the Big Chick's eggs, so there you lose the cover and fight on without it.
 
 ### When the herd reaches them 🐄
 
 If the animals get low enough to touch the cover, they **eat it**. Any block an
-animal is standing on crumbles away, and the herd chews a hole clean through
-your shields as it slides across — the same as the arcade game has always done
-it. They take only what they walk over, so a base off to the side of the herd is
-left standing while the ones under it are gone.
+animal is standing on crumbles away, and the herd chews a hole through your
+shields as it slides across. They take only what they walk over, so a base off
+to the side of the herd is left standing while the ones under it go.
 
-**A base the herd walks through does NOT end the run.** That is the one
-exception to the rule above, and it matters: the herd arrives at all three bases
-at once and has them down within a few steps, so counting it would turn "they
-are breaking through!" into an instant loss with nothing you could have done.
-You still lose when they reach **you**, a few rows further down. The rule stands
-for what it was written for — their *shots* wearing a base away while the herd
-is still up above, which is cover you failed to hold rather than cover they took.
+Eating a base right down to nothing **ends the run**. Measured on THE STORM,
+that happens while the herd is still inside the cover — about **4.5 rows before**
+they would have reached your ship. So the herd getting into your shields is the
+last warning you get, and the end of a wave is now a race: clear them, or they
+clear your cover and the run is over.
 
-So the last part of a wave now looks the way it should: the herd comes down onto
-your shields, eats them, and then comes for you.
+Touching the cover is not enough on its own. They have to finish a whole base
+off, and they only eat the blocks they stand on, so you have time to work.
 
 ## A hardier herd 🐄🐄
 
