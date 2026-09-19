@@ -678,16 +678,16 @@ const SHIPS = [
     blurb: ["Two cannons, two bullets a shot —", "clear the herd twice as fast."],
   },
   {
-    id: "triple", name: "TRIPLE BLASTER", art: TRIPLE_ROCKET_ART, need: 6250,
-    fire: "triple", damage: 1, reload: 0,
-    blurb: ["Three cannons. The middle one stands",
-            "forward, so its shot flies out in front."],
-  },
-  {
     id: "bomb", name: "BLAST CANNON", art: BOMB_ROCKET_ART, need: 7500, fire: "bomb",
     damage: 1, reload: BOMB_RELOAD,
     blurb: ["A shell that BLOWS UP where it lands,",
             "wiping out all nearby. Reloads " + secs(BOMB_RELOAD) + "."],
+  },
+  {
+    id: "triple", name: "TRIPLE BLASTER", art: TRIPLE_ROCKET_ART, need: 8000,
+    fire: "triple", damage: 1, reload: 0,
+    blurb: ["Three cannons. The middle one stands",
+            "forward, so its shot flies out in front."],
   },
   {
     id: "laser", name: "RED LASER", art: LASER_ROCKET_ART, need: 10000, fire: "laser", damage: 1, reload: 0,
@@ -879,7 +879,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-09-19 triple";
+const BUILD = "2026-09-19 triple8k";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
