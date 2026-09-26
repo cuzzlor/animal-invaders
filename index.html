@@ -765,7 +765,9 @@ const ICE_SLOW      = 0.4;            // how much of its speed a chilled animal 
 const ICE_SLOW_TIME = stepsFor(0.5);  // how long the chill lasts once you swing away
 const ICE_FREEZE_AT = stepsFor(2);    // steps in the spray before it freezes solid
 const ICE_HOLD      = stepsFor(1);    // how long it stays frozen after you stop
-const ICE_BITE      = FLAME_BITE;     // the same small bite the flame itself takes
+// Three times the flame's own bite. Three eighths is still an exact binary
+// fraction, so nothing is ever left standing on a sliver of health.
+const ICE_BITE      = FLAME_BITE * 3;
 const ICE_PRICE     = 500000;         // paid into the bank, not in one game
 // What each spray is painted in. The two guns are the same shape, so the
 // colours are all that tell them apart — they hang off the gun rather than
@@ -1044,7 +1046,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-09-26 frost";
+const BUILD = "2026-09-26 frost3";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
