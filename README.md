@@ -250,6 +250,30 @@ text field and to press its buttons, and there is nothing to zoom in there.
 `DOUBLE_TAP_MS` is **400**. Make it bigger to refuse taps that are further
 apart, or smaller to let more of them through.
 
+### No selecting 🚫✍️
+
+Hold a finger down on an iPad and the browser decides you want to read. It puts
+a magnifying glass over the spot, paints the words blue, and offers you Copy and
+Look Up. On a page you read that is helpful. On a game board it is in the way:
+it covers the fight, and your finger was on FIRE, not on a word.
+
+So nothing on the page can be selected.
+
+| The rule | What it stops |
+|----------|---------------|
+| `user-select: none` | the blue words, the magnifying glass, and a drag that selects |
+| `-webkit-touch-callout: none` | the Copy / Look Up menu Safari offers with them |
+| `-webkit-tap-highlight-color: transparent` | the grey flash over a button when a finger lands on it |
+
+Both spellings of the first rule are written: Safari reads `-webkit-user-select`,
+and every other browser reads the plain `user-select`. One without the other
+leaves half the devices selecting.
+
+The **name box** is the one place in the game where you type, so it asks for its
+words back by name. That is not tidiness — Safari will not put a cursor in a
+field it believes cannot be selected, so without those three lines on
+`#nameentry input` you could not enter your name at all.
+
 ## The same speed on every device ⏱️
 
 The game keeps its own clock, so it plays at the same speed on a phone, a

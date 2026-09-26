@@ -56,6 +56,20 @@
        turned on its side. */
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
+    /* NO SELECTING. Hold a finger down on a phone or a tablet and the browser
+       thinks you want to read: it puts a magnifying glass over the spot, paints
+       the words blue, and offers you Copy and Look Up. On a page you read that
+       is helpful. On a game board it is in the way — it covers the fight, and
+       your finger was on FIRE, not on a word.
+         "user-select: none" takes the words out of reach, and
+       "-webkit-touch-callout: none" stops the menu Safari offers with them.
+       The name box is given its words back further down; it is the one place
+       in the game where you type. */
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    /* And no grey flash over a button when a finger lands on it. */
+    -webkit-tap-highlight-color: transparent;
   }
   /* Black goes on <html> ONLY. If we put it on <body> too, the body's
      background would paint OVER the star canvas (which sits at z-index -1)
@@ -196,6 +210,13 @@
   }
   #nameentry .title { color: #ffd34d; font-size: 22px; margin-bottom: 14px; }
   #nameentry input {
+    /* The ONE place in the game where selecting is wanted. Everything else is
+       locked by the "NO SELECTING" rule at the top, and Safari will not put a
+       cursor in a field it thinks cannot be selected, so the field has to ask
+       for its words back by name. */
+    -webkit-user-select: text;
+    user-select: text;
+    -webkit-touch-callout: default;
     font-family: inherit;
     font-size: 22px;
     text-align: center;
@@ -909,7 +930,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-09-26 nozoom";
+const BUILD = "2026-09-26 nosel";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
