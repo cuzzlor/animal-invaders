@@ -754,14 +754,18 @@ const FLAME_PRICE  = 250000; // what it costs — paid into the bank, not in one
 //   A frozen animal not dropping is the whole point of the gun: it is the one
 // gun in the game that stops a wave reaching your line at all.
 // ---------------------------------------------------------------------
-//   The TANK is short, and it FILLS twice as fast (see ICE_FILL below), so
-// the whole gun runs on seconds: one to freeze something, one more to hold
-// it there, one to fill the tank again, and one of freezing left over after
-// you let go. You cannot lean on the button; you pick your moment.
-const ICE_TANK      = stepsFor(2);    // well under the flame's 3.5
+//   A tank is three seconds: half a second of spray to freeze something and
+// two and a half seconds of holding it there, then two seconds of waiting
+// while the tank fills. You cannot lean on the button; you pick your moment.
+const ICE_TANK      = stepsFor(3);    // under the flame's 3.5
 const ICE_SLOW      = 0.4;            // how much of its speed a chilled animal keeps
 const ICE_SLOW_TIME = stepsFor(0.5);  // how long the chill lasts once you swing away
-const ICE_FREEZE_AT = stepsFor(1);    // steps in the spray before it freezes solid
+// Steps in the spray before it freezes solid. Half a second, and that is
+// under the 80 steps an ordinary animal takes to die at the mouth of the
+// spray — so EVERYTHING in the herd now lives long enough to freeze, not
+// just the tough ones. Put it back over 80 and only tough animals freeze;
+// over 160 and only the BIG CHICK does.
+const ICE_FREEZE_AT = stepsFor(0.5);
 const ICE_HOLD      = stepsFor(1);    // how long it stays frozen after you stop
 // Twice the flame's own bite — a QUARTER of an animal, where the flame takes
 // an eighth. A quarter is an exact binary fraction, so nothing is ever left
@@ -778,8 +782,12 @@ const ICE_BITE      = FLAME_BITE * 2;
 // counted in steps spent in the spray, so a faster bite does not freeze
 // anything sooner.
 const ICE_CATCH     = FLAME_CATCH / 2;
-// And the tank fills twice as fast, so the wait between tanks is halved.
-const ICE_FILL      = FLAME_FILL * 2;
+// How fast the tank fills, per step. Half again as fast as the flame's 1,
+// which over a three-second tank is a two-second wait.
+//   It does not have to be a whole number. Fuel can sit on a half while a
+// tank is filling, which is why the flame's roar is timed off a ROUNDED
+// fuel figure further down rather than off the fuel itself.
+const ICE_FILL      = FLAME_FILL * 1.5;
 const ICE_PRICE     = 500000;         // paid into the bank, not in one game
 // What each spray is painted in. The two guns are the same shape, so the
 // colours are all that tell them apart — they hang off the gun rather than
@@ -1058,7 +1066,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-09-26 frostmag2";
+const BUILD = "2026-09-26 frosttune";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
@@ -2279,7 +2287,10 @@ function update() {
     if (flameFuel <= 0) { flameFuel = 0; flameDry = true; }
     // The roar. Each burst lasts longer than the gap between two of them, so
     // they run together into one steady sound instead of a row of puffs.
-    if (flameFuel % 8 === 0) playFlameSound();
+    // Rounded, because a tank that fills by halves leaves the fuel on a
+    // half, and a bare "% 8" would then never come round and the roar would
+    // never play.
+    if (Math.round(flameFuel) % 8 === 0) playFlameSound();
   } else if (flameGun) {
     flameFuel = Math.min(flameGun.tank, flameFuel + flameGun.fill);
     if (flameFuel >= flameGun.tank) flameDry = false;
