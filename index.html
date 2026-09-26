@@ -695,7 +695,7 @@ const FIRE_TIME    = stepsFor(2); // how long a thing stays alight once lit
 const FIRE_TICK    = 20;   // steps between one bite of the fire and the next
 const FIRE_BITE    = 0.25; // health the fire takes at each bite
 const FLAME_DRAG   = 0.8;  // how much of your usual speed you keep while burning
-const FLAME_PRICE  = 100000; // what it costs — paid into the bank, not in one game
+const FLAME_PRICE  = 250000; // what it costs — paid into the bank, not in one game
 const FLAME_GUN = {
   tank: FLAME_TANK, fill: FLAME_FILL, reach: FLAME_REACH, mouth: FLAME_MOUTH,
   spread: FLAME_SPREAD, catchAt: FLAME_CATCH, drag: FLAME_DRAG,
@@ -930,7 +930,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-09-26 nosel";
+const BUILD = "2026-09-26 flame250";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
@@ -2792,7 +2792,7 @@ try { bestRun = Math.max(0, Number(localStorage.getItem(BEST_KEY)) || 0); } catc
 
 // ---------------------------------------------------------------------
 // THE BANK — how the most expensive ship is paid for.
-//   The FLAMETHROWER costs 100,000, which is far more than one game can
+//   The FLAMETHROWER costs 250,000, which is far more than one game can
 // make. So it is not bought with one game. Every point you score, in every
 // game you play, goes into the bank as well as onto the scoreboard, and the
 // bank keeps what it is given for ever. It fills a little each time you
@@ -3555,7 +3555,10 @@ function drawShop() {
       ctx.fillRect(tx, y + CARD_BAR_Y, barW * Math.min(1, got / want), 4);
       ctx.fillStyle = "#666";
       ctx.font = (CARD_TIGHT ? 11 : 13) + "px 'Courier New', monospace";
-      ctx.fillText((ship.bank ? "in the bank: " : "best so far: ") + got,
+      // Short labels. This line sits to the RIGHT of the bar, so what room
+      // is left is small, and the number is the part that has to be read.
+      // "in the bank: 249999" ran off the edge of the card; "bank:" does not.
+      ctx.fillText((ship.bank ? "bank: " : "best: ") + got,
                    tx + barW + 8, y + CARD_BAR_Y + 3);
     }
   }

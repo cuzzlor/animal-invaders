@@ -529,7 +529,7 @@ back to exactly where you were — the new ship is in your hands immediately.
 | **Double Rapid** | score 9,000 in one game | Rapid Fire with two barrels. **Hold** the button and it pours out ten **pairs** a second. Each bullet is half strength, like Rapid Fire's, so a pair downs an ordinary animal where a single bullet leaves it standing. |
 | **Red Laser** | score 10,000 in one game | A red beam that smashes clean through every animal it touches (and melts their shots). Burns for **2 seconds**, then reloads in under half of one — so it is lit five sixths of the time, and one burn carries you nearly the whole width of a wave. |
 | **Electric Arc** | score 15,000 in one game | Lightning instead of a laser: the current **jumps sideways** from animal to animal, up to three deep either side of the beam. Burns for 2.5 seconds, then reloads for half a second. |
-| **Flamethrower** | fill the bank to 100,000 | **Hold** the button and it pours out fire. It burns what it touches **and sets it alight**, and the fire goes on eating long after you have swung away. Slow on any one animal, frightening on a herd. Three and a half seconds of fuel in a tank. |
+| **Flamethrower** | fill the bank to 250,000 | **Hold** the button and it pours out fire. It burns what it touches **and sets it alight**, and the fire goes on eating long after you have swung away. Slow on any one animal, frightening on a herd. Three and a half seconds of fuel in a tank. |
 
 Rapid Fire, the Double Rapid and the Flamethrower are the three ships you
 **hold** the button for; every other one fires once per press.
@@ -546,12 +546,12 @@ it measures the bank.
 
 ### The bank 🏦
 
-The Flamethrower costs **100,000**, which is far more than one game can make. So
+The Flamethrower costs **250,000**, which is far more than one game can make. So
 it is not bought with one game.
 
 **Every point you score, in every game you play, goes into the bank as well as
 onto the scoreboard.** The bank keeps what it is given. It fills a little each
-time you play — over days — and when it reaches 100,000 the ship is yours.
+time you play — over days — and when it reaches 250,000 the ship is yours.
 
 Three things are worth knowing about it:
 
@@ -567,7 +567,10 @@ top of the shop. Once the ship is yours the number stops being shown, because it
 has nothing left to say.
 
 The price is `FLAME_PRICE` in `index.html`. Make it smaller and the ship arrives
-sooner.
+sooner. Be careful raising it on a machine that has already earned the ship: the
+lock asks whether the bank has reached the price, and nothing records that the
+ship was once yours. A bank of 150,000 owned the ship at 100,000 and does not
+own it at 250,000. Keep playing and it comes back.
 
 ### The Flamethrower 🔥
 
