@@ -381,13 +381,13 @@ go while it fills.
 figure for that reason — off the raw number it would never come round on a
 half, and the gun would fire in silence. A test holds that.)
 
-It bites **three times** as hard as the flame itself does — **three eighths** of
-an animal each time its heat fills, where the flame takes one eighth — and it
-bites **twice as often**, every 20 steps at the mouth of the spray where the
-flame needs 40. Six times the eating, all told. **Three** fills see off an
-ordinary animal and **six** see off a tough one, so one animal held at the mouth
-goes in **63 steps** against the Flamethrower's 161. The Big Chick takes about
-**55 seconds**.
+It bites **three and a half times** as hard as the flame itself does — **seven
+sixteenths** of an animal each time its heat fills, where the flame takes one
+eighth — and it bites **twice as often**, every 20 steps at the mouth of the
+spray where the flame needs 40. **Three** fills see off an ordinary animal and
+**five** see off a tough one, so one animal held at the mouth goes in **63
+steps** against the Flamethrower's 161. The Big Chick takes about **48
+seconds**.
 
 #### What lives long enough to freeze
 
@@ -398,13 +398,17 @@ the spray. Held at the mouth, the numbers are:
 | | Steps to kill it | Does it freeze? |
 |---|---|---|
 | An ordinary animal | 60 | **yes** — with 12 steps to spare |
-| A **tough** animal (stage 17 on, and the Ice Floe) | 120 | **yes** |
-| The Big Chick | 2,400 | **yes** |
+| A **tough** animal (stage 17 on, and the Ice Floe) | 100 | **yes** |
+| The Big Chick | 2,060 | **yes** |
 
 Twelve steps is the whole margin, which is why the freeze came down from half a
-second to four tenths when the bite went up. Bite **half** an animal instead and
-the kill drops to 40 steps, under the freeze, and nothing in the herd ever goes
-solid again.
+second to four tenths when the bite went up. **Seven sixteenths is as hard as
+this gun can bite and still be a freezing gun**: the next fraction up, a half,
+needs only two fills — 40 steps — which is under the freeze, and nothing in the
+herd would ever go solid again. Going from three eighths to seven sixteenths
+changed nothing for an ordinary animal, which still takes three fills; what it
+bought was the things that need more, a tough animal going from six fills to
+five and the chicken from 120 to 103.
 
 Two tests hold this: one that every size of animal outlives the freeze by at
 least ten steps, and one that no kill lands **exactly** on the freezing step —
@@ -539,7 +543,7 @@ takes to beat at the default `GAME_SPEED` of 2 — double these if you set it to
 | Scout | ~16–22 s |
 | Rapid Fire | ~35–40 s |
 | Flamethrower | ~40 s — it lights the chicken, but one chicken is not a herd |
-| Frost Thrower | ~55 s — and it can **freeze** the chicken while it works |
+| Frost Thrower | ~48 s — and it can **freeze** the chicken while it works |
 
 Rapid Fire is the slow way to do it, and that's its own trade-off: half-strength
 bullets are the worst possible thing to bring to something with real armour.
@@ -631,7 +635,7 @@ back to exactly where you were — the new ship is in your hands immediately.
 | **Double Rapid** | score 9,000 in one game | Rapid Fire with two barrels. **Hold** the button and it pours out ten **pairs** a second. Each bullet is half strength, like Rapid Fire's, so a pair downs an ordinary animal where a single bullet leaves it standing. |
 | **Red Laser** | score 10,000 in one game | A red beam that smashes clean through every animal it touches (and melts their shots). Burns for **2 seconds**, then reloads in under half of one — so it is lit five sixths of the time, and one burn carries you nearly the whole width of a wave. |
 | **Electric Arc** | score 15,000 in one game | Lightning instead of a laser: the current **jumps sideways** from animal to animal, up to three deep either side of the beam. Burns for 2.5 seconds, then reloads for half a second. |
-| **Frost Thrower** | fill the bank to 500,000 | **Hold** and it sprays cold instead of fire. Everything it touches walks at **two fifths** of its speed; hold it on one animal for **four tenths of a second** and that animal **freezes solid** — it stops walking, stops coming down with the herd, and stops shooting. Keep holding and it stays frozen; let go and it has one second left. Bites three eighths of an animal at a time, three times a second at the mouth, so three fills see one off. Three seconds of fuel a tank, and it refills in under two. |
+| **Frost Thrower** | fill the bank to 500,000 | **Hold** and it sprays cold instead of fire. Everything it touches walks at **two fifths** of its speed; hold it on one animal for **four tenths of a second** and that animal **freezes solid** — it stops walking, stops coming down with the herd, and stops shooting. Keep holding and it stays frozen; let go and it has one second left. Bites seven sixteenths of an animal at a time, three times a second at the mouth, so three fills see one off. Three seconds of fuel a tank, and it refills in under two. |
 | **Flamethrower** | fill the bank to 250,000 | **Hold** the button and it pours out fire. It burns what it touches **and sets it alight**, and the fire goes on eating long after you have swung away. Slow on any one animal, frightening on a herd. Three and a half seconds of fuel in a tank. |
 
 Rapid Fire, the Double Rapid and the Flamethrower are the three ships you
@@ -772,8 +776,9 @@ Two numbers to keep an eye on:
   that many steps close up and **all** of them at the far end.
 - `FLAME_BITE` is what the flame itself takes each time; `FIRE_BITE`, `FIRE_TICK`
   and `FIRE_TIME` are what the fire takes, how often, and for how long. Keep them
-  to **halves, quarters and eighths**: a computer holds those exactly, and a size
-  like 0.2 can leave an animal standing on a sliver of health it should not have.
+  to **halves, quarters, eighths and sixteenths**: a computer holds those
+  exactly, and a size like 0.2 can leave an animal standing on a sliver of
+  health it should not have. A test checks every damage size in the game.
 
 Neither beam is a delete key. Animals have to be **held in the beam** for a
 moment before they go — swing away too soon and they cool off — and a lit beam

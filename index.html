@@ -768,14 +768,20 @@ const ICE_SLOW_TIME = stepsFor(0.5);  // how long the chill lasts once you swing
 // holds both of those.
 const ICE_FREEZE_AT = stepsFor(0.4);
 const ICE_HOLD      = stepsFor(1);    // how long it stays frozen after you stop
-// Three times the flame's own bite — THREE EIGHTHS of an animal, where the
-// flame takes one. Three eighths is an exact binary fraction, so nothing is
-// ever left standing on a sliver of health.
-//   How big this gets is limited by the freeze. Three fills see off an
-// ordinary animal, which at the gun's fire rate is 60 steps; the freeze has
-// to fit inside that, and at ICE_FREEZE_AT's 48 it does. Half an animal a
-// bite would kill in 40 and nothing would ever freeze.
-const ICE_BITE      = FLAME_BITE * 3;
+// SEVEN SIXTEENTHS of an animal, where the flame takes one eighth. A
+// sixteenth is still an exact binary fraction, so nothing is ever left
+// standing on a sliver of health — the rule is "a fraction the computer
+// holds exactly", not literally "an eighth", and a size like 0.2 still is
+// not one.
+//   How big this gets is limited by the freeze. It still takes three fills
+// to see off an ordinary animal, which at the gun's fire rate is 60 steps,
+// and the freeze has to fit inside that: at ICE_FREEZE_AT's 48 it does, with
+// twelve steps to spare. The next step up, a HALF, would need only two fills
+// — 40 steps — and nothing in the herd would ever freeze again. So seven
+// sixteenths is as hard as this gun can bite and stay a freezing gun.
+//   What it buys is the things that take more than one fill: a tough animal
+// goes from six fills to five, and the BIG CHICK from 120 to 103.
+const ICE_BITE      = FLAME_BITE * 3.5;
 // How much heat it takes before each bite. Half the flame's, so the frost
 // bites TWICE AS OFTEN: 20 steps at the mouth of the spray where the flame
 // needs 40, and 40 at the tip where the flame needs 80. This is the gun's
@@ -1067,7 +1073,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-09-26 frosttune2";
+const BUILD = "2026-09-26 frostbite";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
