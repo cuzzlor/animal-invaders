@@ -434,10 +434,10 @@ takes to beat at the default `GAME_SPEED` of 2 — double these if you set it to
 | Red Laser | ~6 s — a beam can't miss something that big |
 | Twin Blaster | ~12 s |
 | Electric Arc | ~12 s |
-| Blast Cannon | ~13–21 s |
+| Blast Cannon | ~9–14 s |
 | Scout | ~16–22 s |
 | Rapid Fire | ~35–40 s |
-| Flamethrower | ~25 s — it lights the chicken, but one chicken is not a herd |
+| Flamethrower | ~33 s — it lights the chicken, but one chicken is not a herd |
 
 Rapid Fire is the slow way to do it, and that's its own trade-off: half-strength
 bullets are the worst possible thing to bring to something with real armour.
@@ -497,9 +497,9 @@ seconds to reach the bottom, and the slowest ship clears one in about half that.
 | Electric Arc | the same, but it copes better because it holds a crowd at once — about 17 per burn, down from 26 |
 | **Blast Cannon** | **nothing at all** |
 
-The Blast Cannon is the exception. A shell already does 3 damage, and 2 health
-doesn't save you from 3 — so it clears exactly the same ring of animals it
-always did. That makes it far and away the best wave-clearer once the herd
+The Blast Cannon is the exception. A shell does 5 damage, and 2 health doesn't
+save you from 5 — so it clears exactly the same ring of animals it always did.
+Even out at the edge of the blast, where a shell does only half, that is 2.5. That makes it far and away the best wave-clearer once the herd
 toughens up.
 
 Want the change somewhere else, or bigger? `TOUGH_AFTER` is the last stage
@@ -524,7 +524,7 @@ back to exactly where you were — the new ship is in your hands immediately.
 | **Scout** | yours already | The rocket you start with. One shot at a time. |
 | **Rapid Fire** | score 2,500 in one game | **Hold** the button and it pours out ten shots a second — but each one only hits half as hard, so most animals take two. |
 | **Twin Blaster** | score 5,000 in one game | Two cannons — two bullets every shot, so you clear the herd twice as fast. |
-| **Blast Cannon** | score 6,000 in one game | Lobs a shell that **blows up** where it lands, clearing whatever it hits and the whole ring of animals around it — about seven at a time in the thick of the herd. A quarter of a second to reload. |
+| **Blast Cannon** | score 6,000 in one game | Lobs a shell that **blows up** where it lands, clearing whatever it hits and the whole ring of animals around it — **six** at a time in the thick of the herd, four along its bottom edge. A shell does **5** damage, so a tough herd costs it nothing. A quarter of a second to reload. |
 | **Triple Blaster** | score 8,500 in one game | Three cannons instead of two. The middle barrel stands **forward** on the ship, so its bullet leaves from further up the screen — the three fly as an arrowhead with the point in front, and the middle one lands first. |
 | **Double Rapid** | score 9,000 in one game | Rapid Fire with two barrels. **Hold** the button and it pours out ten **pairs** a second. Each bullet is half strength, like Rapid Fire's, so a pair downs an ordinary animal where a single bullet leaves it standing. |
 | **Red Laser** | score 10,000 in one game | A red beam that smashes clean through every animal it touches (and melts their shots). Burns for **2 seconds**, then reloads in under half of one — so it is lit five sixths of the time, and one burn carries you nearly the whole width of a wave. |
@@ -586,7 +586,7 @@ slow it is, are the bargain of it, and they change how you play:
   fills, two things happen at once: the flame takes a **bite** out of the animal,
   and the animal **catches fire**. See below.
 - **It is far slower than either beam.** Held on one animal at the mouth of the
-  flame it takes about **80 steps** to finish it. The Red Laser sees one off in
+  flame it takes about **100 steps** to finish it. The Red Laser sees one off in
   16 and the Electric Arc in 26. It works by holding a lot of the herd at once,
   not by being quick with any one animal.
 - **It bites harder the closer they are.** An animal at the mouth of the flame
@@ -606,14 +606,20 @@ one. On its own it is far and away the feeblest gun in the game.
 
 The fire is what gives it back. Once something is alight:
 
-- It burns for **two seconds**, and takes a **quarter** of an animal every sixth
+- It burns for **four seconds**, and takes a **quarter** of an animal every third
   of a second — twice what the flame itself takes, and **three animals' worth**
   of damage in all, which is more than enough to finish anything in the herd. The
   fire, not the flame, is where almost all of this gun's damage comes from.
+- **It eats slowly.** A fire does the same three animals' worth of damage it
+  always did, but it takes twice as long to do it: twelve bites a third of a
+  second apart, not a sixth. One animal held at the mouth of the flame used to
+  take 80 steps and now takes 100; a 2-health one takes 180 where it took 126.
+  Slow is the point of this gun. You light a row and go and light the next while
+  the first burns down behind you.
 - It burns **on its own**. You can swing the flame away, reload, or run for your
   life, and it goes on eating.
-- **Nothing puts it out.** It burns for its two seconds and then dies down by
-  itself. Point the flame at it again and the two seconds start over.
+- **Nothing puts it out.** It burns for its four seconds and then dies down by
+  itself. Point the flame at it again and the four seconds start over.
 - You can see it: an animal that is alight carries little tongues of fire, and
   fades as the fire eats into it.
 

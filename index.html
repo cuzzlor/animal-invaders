@@ -591,8 +591,9 @@ const BOMB_CORE   = 44;  // inside this it's full strength; past it, half
 const BOMB_BOOM   = 3.4; // how big the bang LOOKS (bigger = more flying bits)
 // What one shell takes off. An ordinary animal has 1 health, so anything from
 // 1 up downs it outright and this number never showed — it only starts to
-// matter against something with real health, like the BIG CHICK boss.
-const BOMB_DAMAGE = 3;
+// matter against something with real health, like the BIG CHICK boss, and out
+// at the edge of the blast, where a shell does only half of it.
+const BOMB_DAMAGE = 5;
 const BOMB_RING   = 20;  // frames the shockwave ring takes to reach full size
 
 // --- The two beam guns ---
@@ -691,8 +692,13 @@ const FLAME_SPREAD = FLAME_MOUTH + FLAME_TAPER * FLAME_REACH; // width at the ti
 // ---------------------------------------------------------------------
 const FLAME_CATCH  = 40;   // heat before the flame bites and lights (20 steps at the nose)
 const FLAME_BITE   = 0.125; // health the flame itself takes at each bite
-const FIRE_TIME    = stepsFor(2); // how long a thing stays alight once lit
-const FIRE_TICK    = 20;   // steps between one bite of the fire and the next
+const FIRE_TIME    = stepsFor(4); // how long a thing stays alight once lit
+// Steps between one bite of the fire and the next. The fire eats at HALF the
+// speed it used to (40 steps instead of 20), and stays alight twice as long
+// to make up for it — so it still does its three animals' worth of damage in
+// the end, it just takes twice as long to get there. Slow is the point of
+// this gun: you light a row and go and light the next while they burn down.
+const FIRE_TICK    = 40;
 const FIRE_BITE    = 0.25; // health the fire takes at each bite
 const FLAME_DRAG   = 0.8;  // how much of your usual speed you keep while burning
 const FLAME_PRICE  = 250000; // what it costs — paid into the bank, not in one game
@@ -930,7 +936,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-09-26 bomb6000";
+const BUILD = "2026-09-26 slowfire";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
