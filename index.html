@@ -754,10 +754,11 @@ const FLAME_PRICE  = 250000; // what it costs — paid into the bank, not in one
 //   A frozen animal not dropping is the whole point of the gun: it is the one
 // gun in the game that stops a wave reaching your line at all.
 // ---------------------------------------------------------------------
-//   The TANK is the same size as the flame's, but it FILLS twice as fast
-// (see ICE_FILL below), so the wait between tanks is half. One tank buys a
-// second to freeze, two and a half to hold, and one more after you let go.
-const ICE_TANK      = stepsFor(3.5);  // the same as the flame's
+//   The TANK is short, and it FILLS twice as fast (see ICE_FILL below), so
+// the whole gun runs on seconds: one to freeze something, one more to hold
+// it there, one to fill the tank again, and one of freezing left over after
+// you let go. You cannot lean on the button; you pick your moment.
+const ICE_TANK      = stepsFor(2);    // well under the flame's 3.5
 const ICE_SLOW      = 0.4;            // how much of its speed a chilled animal keeps
 const ICE_SLOW_TIME = stepsFor(0.5);  // how long the chill lasts once you swing away
 const ICE_FREEZE_AT = stepsFor(1);    // steps in the spray before it freezes solid
@@ -1057,7 +1058,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-09-26 frostmag";
+const BUILD = "2026-09-26 frostmag2";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player

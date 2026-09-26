@@ -363,17 +363,26 @@ Because the herd is slowed animal by animal, a sweep **pulls it out of shape**.
 The columns you are pointing at fall behind the ones you are not, and the neat
 grid smears. That is the gun working.
 
-The **tank** is the same 3.5 seconds as the Flamethrower's, but it fills
-**twice as fast**, at 2 a step, so the wait for a full one is under two seconds
-instead of three and a half. One tank buys a second to freeze, **two and a half
-to hold**, and one more after you let go.
+The **tank** is short — **two seconds**, against the Flamethrower's three and a
+half — and it fills twice as fast, at 2 a step. So the whole gun runs on
+seconds, which is the easy way to remember it:
+
+| | |
+|---|---|
+| A second of spray | freezes something |
+| A second more | is all the holding one tank buys |
+| A second to fill the tank | before you can go again |
+| And a second of freezing | left over after you let go |
+
+You cannot lean on the button. You pick your moment, hold something still for a
+second or two, and let go while it fills.
 
 It bites **twice** as hard as the flame itself does — a **quarter** of an animal
 each time its heat fills, where the flame takes an eighth — and it bites **twice
 as often**, every 20 steps at the mouth of the spray where the flame needs 40.
 Four times the eating, all told. **Four** fills see off an ordinary animal and
 **eight** see off a tough one, so one animal held at the mouth goes in **84
-steps** against the Flamethrower's 161. The Big Chick takes about **85 seconds**.
+steps** against the Flamethrower's 161. The Big Chick takes about **89 seconds**, most of it waiting for the tank.
 
 #### What lives long enough to freeze
 
@@ -517,7 +526,7 @@ takes to beat at the default `GAME_SPEED` of 2 — double these if you set it to
 | Scout | ~16–22 s |
 | Rapid Fire | ~35–40 s |
 | Flamethrower | ~40 s — it lights the chicken, but one chicken is not a herd |
-| Frost Thrower | ~85 s — and it can **freeze** the chicken while it works |
+| Frost Thrower | ~89 s — and it can **freeze** the chicken while it works |
 
 Rapid Fire is the slow way to do it, and that's its own trade-off: half-strength
 bullets are the worst possible thing to bring to something with real armour.
@@ -609,7 +618,7 @@ back to exactly where you were — the new ship is in your hands immediately.
 | **Double Rapid** | score 9,000 in one game | Rapid Fire with two barrels. **Hold** the button and it pours out ten **pairs** a second. Each bullet is half strength, like Rapid Fire's, so a pair downs an ordinary animal where a single bullet leaves it standing. |
 | **Red Laser** | score 10,000 in one game | A red beam that smashes clean through every animal it touches (and melts their shots). Burns for **2 seconds**, then reloads in under half of one — so it is lit five sixths of the time, and one burn carries you nearly the whole width of a wave. |
 | **Electric Arc** | score 15,000 in one game | Lightning instead of a laser: the current **jumps sideways** from animal to animal, up to three deep either side of the beam. Burns for 2.5 seconds, then reloads for half a second. |
-| **Frost Thrower** | fill the bank to 500,000 | **Hold** and it sprays cold instead of fire. Everything it touches walks at **two fifths** of its speed; hold it on one animal for **one second** and that animal **freezes solid** — it stops walking, stops coming down with the herd, and stops shooting. Keep holding and it stays frozen; let go and it has one second left. Bites a quarter of an animal at a time, three times a second at the mouth, so four fills see one off. Three and a half seconds of fuel a tank, and it refills in under two. |
+| **Frost Thrower** | fill the bank to 500,000 | **Hold** and it sprays cold instead of fire. Everything it touches walks at **two fifths** of its speed; hold it on one animal for **one second** and that animal **freezes solid** — it stops walking, stops coming down with the herd, and stops shooting. Keep holding and it stays frozen; let go and it has one second left. Bites a quarter of an animal at a time, three times a second at the mouth, so four fills see one off. Two seconds of fuel a tank, and it refills in one. |
 | **Flamethrower** | fill the bank to 250,000 | **Hold** the button and it pours out fire. It burns what it touches **and sets it alight**, and the fire goes on eating long after you have swung away. Slow on any one animal, frightening on a herd. Three and a half seconds of fuel in a tank. |
 
 Rapid Fire, the Double Rapid and the Flamethrower are the three ships you
