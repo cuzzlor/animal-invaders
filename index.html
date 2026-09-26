@@ -760,21 +760,22 @@ const FLAME_PRICE  = 250000; // what it costs — paid into the bank, not in one
 const ICE_TANK      = stepsFor(3);    // under the flame's 3.5
 const ICE_SLOW      = 0.4;            // how much of its speed a chilled animal keeps
 const ICE_SLOW_TIME = stepsFor(0.5);  // how long the chill lasts once you swing away
-// Steps in the spray before it freezes solid. Half a second, and that is
-// under the 80 steps an ordinary animal takes to die at the mouth of the
-// spray — so EVERYTHING in the herd now lives long enough to freeze, not
-// just the tough ones. Put it back over 80 and only tough animals freeze;
-// over 160 and only the BIG CHICK does.
-const ICE_FREEZE_AT = stepsFor(0.5);
+// Steps in the spray before it freezes solid. It has to stay UNDER the time
+// an animal takes to die, or the animal is gone before the cold reaches it —
+// and it must not land exactly ON it, or which happens first depends on the
+// order of two lines in update(). At the bite below, an ordinary animal dies
+// in 60 steps at the mouth of the spray; 48 leaves a margin of 12. A test
+// holds both of those.
+const ICE_FREEZE_AT = stepsFor(0.4);
 const ICE_HOLD      = stepsFor(1);    // how long it stays frozen after you stop
-// Twice the flame's own bite — a QUARTER of an animal, where the flame takes
-// an eighth. A quarter is an exact binary fraction, so nothing is ever left
-// standing on a sliver of health.
-//   It matters that this is not bigger. At the gun's fire rate a quarter
-// takes 80 steps to see off a tough animal, against ICE_FREEZE_AT's 120 — so
-// a tough animal outlives the wait and DOES freeze. Half an animal a bite
-// killed everything before the cold could reach it.
-const ICE_BITE      = FLAME_BITE * 2;
+// Three times the flame's own bite — THREE EIGHTHS of an animal, where the
+// flame takes one. Three eighths is an exact binary fraction, so nothing is
+// ever left standing on a sliver of health.
+//   How big this gets is limited by the freeze. Three fills see off an
+// ordinary animal, which at the gun's fire rate is 60 steps; the freeze has
+// to fit inside that, and at ICE_FREEZE_AT's 48 it does. Half an animal a
+// bite would kill in 40 and nothing would ever freeze.
+const ICE_BITE      = FLAME_BITE * 3;
 // How much heat it takes before each bite. Half the flame's, so the frost
 // bites TWICE AS OFTEN: 20 steps at the mouth of the spray where the flame
 // needs 40, and 40 at the tip where the flame needs 80. This is the gun's
@@ -782,12 +783,12 @@ const ICE_BITE      = FLAME_BITE * 2;
 // counted in steps spent in the spray, so a faster bite does not freeze
 // anything sooner.
 const ICE_CATCH     = FLAME_CATCH / 2;
-// How fast the tank fills, per step. Half again as fast as the flame's 1,
-// which over a three-second tank is a two-second wait.
+// How fast the tank fills, per step. Three quarters again as fast as the
+// flame's 1, which over a three-second tank is a wait of about 1.7 seconds.
 //   It does not have to be a whole number. Fuel can sit on a half while a
 // tank is filling, which is why the flame's roar is timed off a ROUNDED
 // fuel figure further down rather than off the fuel itself.
-const ICE_FILL      = FLAME_FILL * 1.5;
+const ICE_FILL      = FLAME_FILL * 1.75;
 const ICE_PRICE     = 500000;         // paid into the bank, not in one game
 // What each spray is painted in. The two guns are the same shape, so the
 // colours are all that tell them apart — they hang off the gun rather than
@@ -1066,7 +1067,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-09-26 frosttune";
+const BUILD = "2026-09-26 frosttune2";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
