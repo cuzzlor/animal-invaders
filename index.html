@@ -44,6 +44,18 @@
     font-family: "Courier New", monospace;
     /* Stops the arrow keys from scrolling the page while you play. */
     overflow: hidden;
+    /* NO ZOOMING. The board is one fixed size that already fits the screen,
+       so a pinch or a double tap can only push part of it out of sight —
+       usually the score, or your own ship, in the middle of a fight.
+       "none" turns off every touch gesture the browser owns: panning,
+       double-tap zoom and pinch. Taps still work, so all the buttons and the
+       canvas are untouched. Safari needs more than this; see "NO ZOOMING ON
+       A PHONE OR TABLET" down in the script. */
+    touch-action: none;
+    /* And Safari must not make the text bigger by itself when the iPad is
+       turned on its side. */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
   /* Black goes on <html> ONLY. If we put it on <body> too, the body's
      background would paint OVER the star canvas (which sits at z-index -1)
@@ -897,7 +909,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-09-19 drapid";
+const BUILD = "2026-09-26 nozoom";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
@@ -1577,6 +1589,44 @@ document.addEventListener("keydown", (e) => {
 document.addEventListener("keyup", (e) => {
   keys[e.key] = false;
 });
+
+// ---------------------------------------------------------------------
+// NO ZOOMING ON A PHONE OR TABLET
+// ---------------------------------------------------------------------
+// The <meta viewport> line at the top of this file asks for no zooming, and
+// "touch-action: none" in the style block turns the gestures off. Together
+// that is enough on a computer and on Android.
+//
+// Safari on iOS is the problem. It has IGNORED user-scalable=no since iOS 10
+// — Apple took the setting away so that a page cannot trap a reader who needs
+// to make the text bigger — and it does not let touch-action stop a pinch.
+// So on an iPad we refuse the two zooming gestures one at a time.
+//
+// 1. THE PINCH. Safari reports a pinch as its own "gesture" events, which no
+//    other browser sends. Refusing them stops the pinch.
+document.addEventListener("gesturestart",  (e) => e.preventDefault(), { passive: false });
+document.addEventListener("gesturechange", (e) => e.preventDefault(), { passive: false });
+document.addEventListener("gestureend",    (e) => e.preventDefault(), { passive: false });
+
+// 2. THE DOUBLE TAP. Two quick taps in the same spot also zoom in. The FIRST
+//    tap must go through — it is how you fire, and how you start a game — so
+//    we refuse only the second one, when it lands soon after the one before.
+//    Refusing a touch end holds back the tap that Safari would have turned
+//    into a zoom. It cannot hurt the game, because every control in here
+//    listens for "pointerdown", which has already happened by then.
+const DOUBLE_TAP_MS = 400; // two taps closer together than this would zoom
+let lastTapAt = 0;
+document.addEventListener("touchend", (e) => {
+  // The name box is the one place that needs its taps left alone: they put
+  // the cursor in the text field and press the buttons.
+  if (e.target && e.target.closest && e.target.closest("#nameentry")) {
+    lastTapAt = 0;
+    return;
+  }
+  const now = Date.now();
+  if (now - lastTapAt < DOUBLE_TAP_MS) e.preventDefault();
+  lastTapAt = now;
+}, { passive: false });
 
 // ---------------------------------------------------------------------
 // TOUCH CONTROLS — wire the on-screen buttons (phones/tablets) to the

@@ -218,6 +218,38 @@ wiped, so pressing it at 16,000 points does not quietly cost you the Electric
 Arc. It leaves the high-score board alone, though; that is for runs you play out
 to the end.
 
+### No zooming 🚫🔍
+
+The board is one fixed size that already fits your screen. If you could zoom in,
+part of it would go off the edge — usually the score along the top, or your own
+ship. In the middle of a fight that is a hard thing to get back from. So on a
+phone or a tablet the game does not zoom.
+
+Two gestures had to be turned off, and each one needs a different answer:
+
+| The gesture | What stops it |
+|-------------|---------------|
+| Pinch | Safari's own `gesturestart` / `gesturechange` / `gestureend` events, refused |
+| Double tap | The second tap is refused, if it comes less than `DOUBLE_TAP_MS` after the first |
+| Drag and scroll | `touch-action: none` in the style block |
+
+The `<meta name="viewport">` line at the top of `index.html` asks for no zooming
+as well. That line is enough on a computer and on Android. **Safari on iOS has
+ignored `user-scalable=no` since iOS 10** — Apple took the setting away so that a
+page cannot trap a reader who needs to make the text bigger. That is why the two
+gestures are turned off one at a time in the script instead.
+
+The **first** tap always goes through. It is how you fire, and how you start a
+game. Only the second of a fast pair is refused, and refusing it costs you
+nothing, because every control in the game listens for `pointerdown` — which has
+already happened by the time the touch ends.
+
+The **name box** keeps all of its taps. It needs them to put the cursor in the
+text field and to press its buttons, and there is nothing to zoom in there.
+
+`DOUBLE_TAP_MS` is **400**. Make it bigger to refuse taps that are further
+apart, or smaller to let more of them through.
+
 ## The same speed on every device ⏱️
 
 The game keeps its own clock, so it plays at the same speed on a phone, a
