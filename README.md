@@ -340,6 +340,44 @@ frames of that iPad, four times the steps in each, still the same speed.
 steps one frame may make up; both are worked out from `GAME_SPEED`, so the
 12-frames-a-second floor stays put however fast you set it.
 
+### The Frost Thrower ❄️
+
+The same gun as the Flamethrower, turned cold. Same cone, same reach, same
+spread, same small bite. It sets nothing alight. What it does instead is
+**stop** things.
+
+| What it does | When |
+|--------------|------|
+| **Slows** what it touches to two fifths of its speed | at once, and for half a second after you swing away |
+| **Freezes** an animal solid | after **two seconds** of spray on it |
+| **Holds** it frozen | for as long as you keep the spray on it |
+| Lets it go | **one second** after you stop |
+
+Frozen means frozen. A frozen animal does not walk, does not **come down with
+the herd** when it turns at the edge, and cannot shoot. That last pair is the
+whole point of the gun: it is the only one in the game that stops a wave
+reaching your line at all, rather than racing it. The Big Chick can be frozen
+too, and a frozen chick lays no eggs.
+
+Because the herd is slowed animal by animal, a sweep **pulls it out of shape**.
+The columns you are pointing at fall behind the ones you are not, and the neat
+grid smears. That is the gun working.
+
+One number is **not** the Flamethrower's: the **tank**. Freezing costs two
+seconds of spray before anything is frozen at all, and the Flamethrower's
+3.5-second tank would leave only a second and a half of holding afterwards — so
+"frozen for as long as you hold it" would hardly exist. `ICE_TANK` is double, at
+seven seconds: two to freeze, five to hold, one more after you let go. It fills
+at the same rate, so it is also twice the wait.
+
+What it is **not** is a way to win a fight. Its bite is the Flamethrower's
+eighth, with none of the fire behind it, so it takes about **450 seconds** to
+beat the Big Chick. Bring it to stay alive, not to clear a board.
+
+The knobs are `ICE_SLOW`, `ICE_SLOW_TIME`, `ICE_FREEZE_AT`, `ICE_HOLD`,
+`ICE_BITE`, `ICE_TANK` and `ICE_PRICE`, all together near the top of
+`index.html`.
+
 ### Seconds, and steps ⏳
 
 Everything in the game is timed in **steps**, and the game takes
@@ -459,6 +497,7 @@ takes to beat at the default `GAME_SPEED` of 2 — double these if you set it to
 | Scout | ~16–22 s |
 | Rapid Fire | ~35–40 s |
 | Flamethrower | ~40 s — it lights the chicken, but one chicken is not a herd |
+| Frost Thrower | ~450 s — it can **freeze** the chicken, but it can barely hurt it |
 
 Rapid Fire is the slow way to do it, and that's its own trade-off: half-strength
 bullets are the worst possible thing to bring to something with real armour.
@@ -550,6 +589,7 @@ back to exactly where you were — the new ship is in your hands immediately.
 | **Double Rapid** | score 9,000 in one game | Rapid Fire with two barrels. **Hold** the button and it pours out ten **pairs** a second. Each bullet is half strength, like Rapid Fire's, so a pair downs an ordinary animal where a single bullet leaves it standing. |
 | **Red Laser** | score 10,000 in one game | A red beam that smashes clean through every animal it touches (and melts their shots). Burns for **2 seconds**, then reloads in under half of one — so it is lit five sixths of the time, and one burn carries you nearly the whole width of a wave. |
 | **Electric Arc** | score 15,000 in one game | Lightning instead of a laser: the current **jumps sideways** from animal to animal, up to three deep either side of the beam. Burns for 2.5 seconds, then reloads for half a second. |
+| **Frost Thrower** | fill the bank to 500,000 | **Hold** and it sprays cold instead of fire. Everything it touches walks at **two fifths** of its speed; hold it on one animal for **two seconds** and that animal **freezes solid** — it stops walking, stops coming down with the herd, and stops shooting. Keep holding and it stays frozen; let go and it has one second left. Seven seconds of fuel a tank. |
 | **Flamethrower** | fill the bank to 250,000 | **Hold** the button and it pours out fire. It burns what it touches **and sets it alight**, and the fire goes on eating long after you have swung away. Slow on any one animal, frightening on a herd. Three and a half seconds of fuel in a tank. |
 
 Rapid Fire, the Double Rapid and the Flamethrower are the three ships you
@@ -567,12 +607,14 @@ it measures the bank.
 
 ### The bank 🏦
 
-The Flamethrower costs **250,000**, which is far more than one game can make. So
-it is not bought with one game.
+**Two** ships are paid for out of the bank: the Flamethrower at **250,000** and
+the Frost Thrower at **500,000**. Both are far more than one game can make, so
+neither is bought with one game.
 
 **Every point you score, in every game you play, goes into the bank as well as
 onto the scoreboard.** The bank keeps what it is given. It fills a little each
-time you play — over days — and when it reaches 250,000 the ship is yours.
+time you play — over days — and when it reaches a ship's price, that ship is
+yours. The running total stays on screen until you own both of them.
 
 Three things are worth knowing about it:
 
@@ -728,7 +770,7 @@ frame, with branches forking off it and dying away, and every jump crackles at
 its own brightness — so it gutters and flickers like a live wire instead of
 sitting there like a painted line.
 
-### A shop of nine 🏪
+### A shop of ten 🏪
 
 Past eight ships one column of cards is too short to hold a ship's name, what it
 does and what it costs without one line landing on another. So the shop goes

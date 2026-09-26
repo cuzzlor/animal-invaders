@@ -372,6 +372,16 @@ const FLAME_ROCKET_ART = spr([
   "ROO.sssss.OOR", "RO..sssss..OR", "R...WsssW...R", "...GGGGGGG...",
   "....OYYYO....", ".....YOY.....",
 ]);
+// THE FROST THROWER — the same rocket as the FLAMETHROWER, line for line,
+// painted cold: electric blue outside, cyan inside, a white core where the
+// other one runs yellow.
+const FROST_ROCKET_ART = spr([
+  "......W......", ".....WCW.....", "....WCCCW....", "...eCCWCCe...",
+  "..eeCCWCCee..", "..eCWWWWWCe..", "..eCWDDDWCe..", "..eCWDCDWCe..",
+  "..eCWDDDWCe..", "..eCWWWWWCe..", "..eCsssssCe..", ".eCCsssssCCe.",
+  "eCC.sssss.CCe", "eC..sssss..Ce", "e...WsssW...e", "...GGGGGGG...",
+  "....CWWWC....", ".....WCW.....",
+]);
 const COW_ART = spr([
   ".HH.......HH.", "HHKH.....HKHH", ".KWWWWWWWWWK.", ".WWKKWWWKKWW.",
   "WWWKKWWWKKWWW", "WWWWWWWWWWWWW", "WWKWWWWWWWKWW", ".WWWWWWWWWWW.",
@@ -728,9 +738,70 @@ const FIRE_TICK    = 40;
 const FIRE_BITE    = 0.25; // health the fire takes at each bite
 const FLAME_DRAG   = 0.8;  // how much of your usual speed you keep while burning
 const FLAME_PRICE  = 250000; // what it costs — paid into the bank, not in one game
+// ---------------------------------------------------------------------
+// THE FROST THROWER — the same gun, turned cold.
+//   It sprays the same cone as the FLAMETHROWER and takes the same small
+// bite, but it does not set anything alight. What it does instead is STOP
+// things:
+//   * SLOW. Anything in the spray walks at ICE_SLOW of its speed, and stays
+//     slowed for ICE_SLOW_TIME after you swing away.
+//   * FREEZE. Hold the spray on one animal for ICE_FREEZE_AT — two seconds —
+//     and it freezes solid: it does not walk, it does not drop with the herd,
+//     and it cannot shoot.
+//   * HOLD. While it is still in the spray the freeze is renewed every step,
+//     so it stays frozen for as long as you keep pointing at it. Let go and
+//     it has ICE_HOLD — one second — left.
+//   A frozen animal not dropping is the whole point of the gun: it is the one
+// gun in the game that stops a wave reaching your line at all.
+// ---------------------------------------------------------------------
+//   ONE number is not the flamethrower's: the TANK. Freezing costs two
+// seconds of spray before anything is frozen at all, and the flame's 3.5s
+// tank would leave only a second and a half of holding afterwards — so
+// "frozen for as long as you hold it" would hardly exist. ICE_TANK is
+// double, which buys two seconds to freeze, five to hold, and one more
+// after you let go. It fills at the same rate, so it is also twice the wait.
+const ICE_TANK      = stepsFor(7);    // twice the flame's tank — see above
+const ICE_SLOW      = 0.4;            // how much of its speed a chilled animal keeps
+const ICE_SLOW_TIME = stepsFor(0.5);  // how long the chill lasts once you swing away
+const ICE_FREEZE_AT = stepsFor(2);    // steps in the spray before it freezes solid
+const ICE_HOLD      = stepsFor(1);    // how long it stays frozen after you stop
+const ICE_BITE      = FLAME_BITE;     // the same small bite the flame itself takes
+const ICE_PRICE     = 500000;         // paid into the bank, not in one game
+// What each spray is painted in. The two guns are the same shape, so the
+// colours are all that tell them apart — they hang off the gun rather than
+// being written into drawFlame(), which draws both.
+const FLAME_PAINT = {
+  glow: "#ff6a00",
+  coats: [
+    { wide: 1.00, far: 1.00, color: "#ff3a00", alpha: 0.40 },
+    { wide: 0.72, far: 0.88, color: "#ff8c1a", alpha: 0.46 },
+    { wide: 0.44, far: 0.70, color: "#ffd23d", alpha: 0.52 },
+    { wide: 0.22, far: 0.42, color: "#fff3c4", alpha: 0.62 },
+  ],
+  puffNear: "#ffe680", puffFar: "#ff7a1a",
+  gauge: "#ffd23d", dry: "#ff3a00", heat: "#ff8c1a",
+};
+const FROST_PAINT = {
+  glow: "#2ea8ff",
+  coats: [
+    { wide: 1.00, far: 1.00, color: "#0b4fd0", alpha: 0.40 },
+    { wide: 0.72, far: 0.88, color: "#2ea8ff", alpha: 0.46 },
+    { wide: 0.44, far: 0.70, color: "#7ef9ff", alpha: 0.52 },
+    { wide: 0.22, far: 0.42, color: "#eafcff", alpha: 0.62 },
+  ],
+  puffNear: "#eafcff", puffFar: "#3fbaff",
+  gauge: "#7ef9ff", dry: "#2e6bd0", heat: "#7ef9ff",
+};
 const FLAME_GUN = {
   tank: FLAME_TANK, fill: FLAME_FILL, reach: FLAME_REACH, mouth: FLAME_MOUTH,
   spread: FLAME_SPREAD, catchAt: FLAME_CATCH, drag: FLAME_DRAG,
+  paint: FLAME_PAINT,
+};
+// The same cone, the same reach, the same tank. Only what it DOES differs.
+const FROST_GUN = {
+  tank: ICE_TANK, fill: FLAME_FILL, reach: FLAME_REACH, mouth: FLAME_MOUTH,
+  spread: FLAME_SPREAD, catchAt: FLAME_CATCH, drag: FLAME_DRAG,
+  paint: FROST_PAINT, ice: true,
 };
 
 // `damage` is how much of an animal one bullet takes off. Animals have 1
@@ -794,6 +865,12 @@ const SHIPS = [
     fire: "flame", damage: 1, reload: 0, flame: FLAME_GUN,
     blurb: ["HOLD: it burns them AND sets them ALIGHT.",
             "The fire eats on. " + secs(FLAME_TANK) + " of fuel a tank."],
+  },
+  {
+    id: "frost", name: "FROST THROWER", art: FROST_ROCKET_ART, bank: ICE_PRICE,
+    fire: "flame", damage: 1, reload: 0, flame: FROST_GUN,
+    blurb: ["HOLD: it SLOWS what it touches, then",
+            "FREEZES it after " + secs(ICE_FREEZE_AT) + ", for as long as you hold."],
   },
 ];
 
@@ -967,7 +1044,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-09-26 crown";
+const BUILD = "2026-09-26 frost";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
@@ -1216,6 +1293,14 @@ function herdHp() { return plan ? plan.hp : 1; }
 // How long this level's shots hold you still, in frames. 0 on every level
 // but the ice one, and on every wave of the endless game.
 function freezeTime() { return plan ? plan.freeze : 0; }
+// tankOf(): how much fuel the ship you are flying holds. Reading FLAME_TANK
+// here instead would have handed the FROST THROWER the flamethrower's
+// smaller tank, and its freeze would have run out half way through a hold.
+function tankOf() {
+  const gun = currentShip().flame;
+  return gun ? gun.tank : FLAME_TANK;
+}
+
 // How wide across a thing is. Everything is one CELL except the boss.
 function sizeOf(inv) { return inv.size || CELL; }
 
@@ -1237,6 +1322,9 @@ function buildLevel() {
       maxHp: plan.bossHp,
       fire: 0,             // steps of burning left, once something sets it alight
       fireTick: 0,         // steps until the fire takes its next bite
+      chill: 0,            // steps of SLOW left, from the FROST THROWER
+      frost: 0,            // steps it has been held in the frost so far
+      froze: 0,            // steps of FROZEN left — it cannot walk, drop or shoot
       size: BOSS_SIZE,     // everything else is CELL (40) across
       boss: true,
     });
@@ -1264,6 +1352,9 @@ function buildLevel() {
           maxHp: herdHp(),     // what it started with, so we can show it fading
           fire: 0,             // steps of burning left, once the FLAMETHROWER lights it
           fireTick: 0,         // steps until the fire takes its next bite
+          chill: 0,            // steps of SLOW left, from the FROST THROWER
+          frost: 0,            // steps it has been held in the frost so far
+          froze: 0,            // steps of FROZEN left — it cannot walk, drop or shoot
         });
       }
     }
@@ -1308,7 +1399,7 @@ function buildLevel() {
   iced = 0;           // a new wave starts you thawed out, whatever hit you last
   beamTimer = 0;      // a fresh wave means a cooled-off, fully loaded gun
   beamCooldown = 0;
-  flameFuel = FLAME_TANK;  // ...and a full tank of fuel
+  flameFuel = tankOf();    // ...and a full tank of fuel, this ship's own size
   flameLit = false;
   flameDry = false;
   gunTimer = 0;
@@ -2233,7 +2324,7 @@ function update() {
   let hitEdge = false;
   for (const inv of invaders) {
     if (!inv.alive) continue;
-    inv.x += step * invaderDir;
+    inv.x += step * invaderDir * coldStep(inv);
     const half = sizeOf(inv) / 2;
     if (inv.x > W - half || inv.x < half) hitEdge = true;
   }
@@ -2241,6 +2332,10 @@ function update() {
     invaderDir *= -1;
     for (const inv of invaders) {
       if (!inv.alive) continue;
+      // A frozen animal does not come down with the rest. That is the whole
+      // of what the FROST THROWER is for: it is the one gun that stops a
+      // wave reaching your line at all, rather than racing it.
+      if (inv.froze > 0) continue;
       // A row's drop for the herd; the boss only sags a little, or it would
       // be on top of you before you'd got through its health.
       inv.y += inv.boss ? BOSS_DROP : 20;
@@ -2290,8 +2385,11 @@ function update() {
   // lays a whole CLUTCH at once, spread out across its width, with the middle
   // one aimed at you — so there's a gap to run to, but you have to pick it.
   if (boss) {
-    if (shotTimer > 0) shotTimer--;
-    if (shotTimer === 0) {
+    // A frozen chick lays nothing. The herd's own shooter is picked in
+    // pickShooter(), which leaves frozen animals out; the boss does not go
+    // through there, so it needs saying here as well.
+    if (shotTimer > 0 && boss.froze <= 0) shotTimer--;
+    if (shotTimer === 0 && boss.froze <= 0) {
       const startY = boss.y + sizeOf(boss) / 2;
       const fallTime = Math.max(1, (player.y - startY) / shotSpeed);
       for (let i = 0; i < BOSS_CLUTCH; i++) {
@@ -2426,7 +2524,11 @@ function update() {
       // held on it over and over to see it off.
       if (inv.heat >= limit) {
         inv.heat = 0;
-        if (licked > 0) {
+        if (licked > 0 && flameGun.ice) {
+          // The FROST THROWER takes the same small bite and lights nothing.
+          // Its work is the cold, which is counted in its own loop below.
+          inv.hp -= ICE_BITE;
+        } else if (licked > 0) {
           // The flame takes its small bite AND sets the animal alight, both
           // at once. Something already alight is simply re-lit, so its fire
           // never runs down while you are still pointing at it.
@@ -2450,6 +2552,28 @@ function update() {
       inv.heat--; // out of it — cool back down
     }
   }
+  // --- THE COLD ---
+  // Every animal carries its own. `frost` counts the steps it has spent in
+  // the spray; at ICE_FREEZE_AT — two seconds — it freezes. While it is
+  // still in the spray the freeze is RENEWED every step, so it stays frozen
+  // for as long as you keep pointing at it; let go and ICE_HOLD is what it
+  // has left. Out of the spray all three wind back down at the same rate
+  // they wound up, so a long gap costs you the two seconds again.
+  const icy = flameLit && flameGun && flameGun.ice;
+  for (const inv of invaders) {
+    if (!inv.alive) continue;
+    const cold = icy ? flameHeat(inv.x, inv.y, sizeOf(inv)) : 0;
+    if (cold > 0) {
+      inv.chill = ICE_SLOW_TIME;
+      if (inv.frost < ICE_FREEZE_AT) inv.frost++;
+      if (inv.frost >= ICE_FREEZE_AT) inv.froze = ICE_HOLD;
+    } else {
+      if (inv.chill > 0) inv.chill--;
+      if (inv.frost > 0) inv.frost--;
+      if (inv.froze > 0) inv.froze--;
+    }
+  }
+
   // ONE boom for the whole column, however many animals went up together —
   // a handful of overlapping explosions would just be noise.
   if (melted > 0) playExplosionSound();
@@ -2665,7 +2789,9 @@ function hit(ax, ay, bx, by, size) {
 // columns, fewer animals can fire at you. Picks a random column each time.
 // ---------------------------------------------------------------------
 function pickShooter() {
-  const alive = invaders.filter((inv) => inv.alive);
+  // A FROZEN animal cannot shoot, so it is not even in the draw. It still
+  // stands in its column though, so the one behind it can still fire past.
+  const alive = invaders.filter((inv) => inv.alive && inv.froze <= 0);
   if (alive.length === 0) return null;
   // Pick a random living animal, then find the lowest one in its column.
   const pick = alive[Math.floor(Math.random() * alive.length)];
@@ -2674,6 +2800,14 @@ function pickShooter() {
     if (Math.abs(inv.x - pick.x) < 1 && inv.y > front.y) front = inv;
   }
   return front;
+}
+
+// coldStep(): how much of its speed an animal keeps this frame. Frozen
+// solid is none of it; merely chilled is ICE_SLOW of it; everything else
+// walks as it always did.
+function coldStep(inv) {
+  if (inv.froze > 0) return 0;
+  return inv.chill > 0 ? ICE_SLOW : 1;
 }
 
 // ---------------------------------------------------------------------
@@ -2919,7 +3053,7 @@ function equipShip(ship) {
   beamTimer = 0;
   beamCooldown = 0;
   bolts = [];
-  flameFuel = FLAME_TANK;   // and the new ship arrives with a full tank
+  flameFuel = tankOf();     // and the new ship arrives with a full tank of ITS own
   flameLit = false;
   flameDry = false;
   saveShop();
@@ -3364,8 +3498,10 @@ function waveTag() {
 // nothing at all, once the ship the bank pays for is yours. A number with
 // nothing left to say is clutter, and both these screens are full.
 function bankLine() {
-  const ship = SHIPS.find((s) => s.bank);
-  return ship && !unlocked(ship) ? "   •   bank: " + bank : "";
+  // TWO ships are paid for from the bank now, so the running total stays on
+  // screen until BOTH of them are yours — not until the first one is.
+  const owing = SHIPS.some((s) => s.bank && !unlocked(s));
+  return owing ? "   •   bank: " + bank : "";
 }
 
 function unlockedLine() {
@@ -3510,6 +3646,13 @@ const CARD_LONGEST = SHIPS.reduce((most, sh) =>
 const CARD_TEXT_PT = Math.max(9, Math.min(CARD_TIGHT ? 14 : 15,
   Math.floor(CARD_TEXT_ROOM / (CARD_LONGEST * 0.6))));
 // One card's box. Down the left column first, then the right.
+// Which keys pick a ship. There is no key for ten, so 0 means the tenth —
+// saying "1-10" would send you hunting for a key that is not there.
+function shipKeys() {
+  return SHIPS.length < 10 ? "1–" + SHIPS.length
+                           : "1–9" + (SHIPS.length >= 10 ? " and 0" : "");
+}
+
 function shopCard(i) {
   const col = Math.floor(i / SHOP_ROWS), row = i % SHOP_ROWS;
   return { x: SHOP_SIDE + col * (SHOP_CARD_W + SHOP_COLGAP),
@@ -3533,7 +3676,7 @@ function drawShop() {
   ctx.fillStyle = "#888";
   ctx.font = "17px 'Courier New', monospace";
   ctx.fillText("Most ships are earned in ONE big game." +
-               "   •   The last one fills the bank up slowly", W / 2, 116);
+               "   •   The last two fill the bank up slowly", W / 2, 116);
 
   for (let i = 0; i < SHIPS.length; i++) {
     const ship = SHIPS[i];
@@ -3606,7 +3749,7 @@ function drawShop() {
   ctx.textAlign = "center";
   ctx.fillStyle = "#888";
   ctx.font = "17px 'Courier New', monospace";
-  ctx.fillText("Tap a ship you've earned to fly it (or press 1–" + SHIPS.length + ")" +
+  ctx.fillText("Tap a ship you've earned to fly it (or press " + shipKeys() + ")" +
                "   •   Esc goes back", W / 2, 922);
 }
 
@@ -3660,12 +3803,9 @@ function drawBurning(inv, size) {
 // coats ADD their light where they lie over one another, the same trick the
 // beams use.
 // ---------------------------------------------------------------------
-const FLAME_COATS = [
-  { wide: 1.00, far: 1.00, color: "#ff3a00", alpha: 0.40 },
-  { wide: 0.72, far: 0.88, color: "#ff8c1a", alpha: 0.46 },
-  { wide: 0.44, far: 0.70, color: "#ffd23d", alpha: 0.52 },
-  { wide: 0.22, far: 0.42, color: "#fff3c4", alpha: 0.62 },
-];
+//   The FROST THROWER is drawn by this same function. Its cone is the same
+// shape and the same size; only gun.paint differs, so the two sprays can
+// never drift apart on the screen.
 const FUEL_BAR = 90; // how wide the fuel gauge is, in pixels
 // How finely the fire is drawn. Both are worked out from the flame's length,
 // so a longer flame is torn into more pieces and carries more lumps rather
@@ -3675,11 +3815,12 @@ const FLAME_PUFFS = Math.max(9, Math.round(FLAME_REACH / 45)); // lumps riding u
 const FLAME_CROWN = Math.max(3, Math.round(FLAME_SPREAD / 45)); // tongues across the tip
 
 function drawFlame(x, noseY, gun) {
+  const paint = gun.paint || FLAME_PAINT;
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
-  ctx.shadowColor = "#ff6a00";
+  ctx.shadowColor = paint.glow;
   ctx.shadowBlur = 18;
-  for (const coat of FLAME_COATS) {
+  for (const coat of paint.coats) {
     const far = gun.reach * coat.far;
     ctx.globalAlpha = coat.alpha;
     ctx.fillStyle = coat.color;
@@ -3713,7 +3854,7 @@ function drawFlame(x, noseY, gun) {
     const t = Math.random();
     const half = flameHalf(gun, t) * 0.8;
     ctx.globalAlpha = 0.28 + Math.random() * 0.24;
-    ctx.fillStyle = t < 0.45 ? "#ffe680" : "#ff7a1a";
+    ctx.fillStyle = t < 0.45 ? paint.puffNear : paint.puffFar;
     ctx.beginPath();
     ctx.arc(x + (Math.random() * 2 - 1) * half, noseY - gun.reach * t,
             4 + (1 - t) * 4 + Math.random() * 7, 0, Math.PI * 2);
@@ -3724,6 +3865,44 @@ function drawFlame(x, noseY, gun) {
 // torn(): a little more, or a little less, than the flame's true width —
 // the wobble that makes an edge look like fire.
 function torn() { return 0.78 + Math.random() * 0.44; }
+
+// ---------------------------------------------------------------------
+// drawFrozen(): the cold on one animal.
+//   Merely CHILLED is a thin blue wash over it, so a sweep leaves a visible
+// wake through the herd. FROZEN is a solid block of ice: a pale square a
+// little bigger than the animal, with a bright rim and two struck facets
+// across it, so a frozen animal reads as stopped from right across the
+// board rather than as slightly blue.
+// ---------------------------------------------------------------------
+function drawFrozen(inv, size) {
+  const solid = inv.froze > 0;
+  const half = size / 2;
+  ctx.save();
+  if (solid) {
+    const block = half * 1.18;
+    ctx.globalAlpha = 0.40;
+    ctx.fillStyle = "#7ef9ff";
+    ctx.fillRect(inv.x - block, inv.y - block, block * 2, block * 2);
+    ctx.globalAlpha = 0.9;
+    ctx.strokeStyle = "#eafcff";
+    ctx.lineWidth = Math.max(2, size * 0.06);
+    ctx.strokeRect(inv.x - block, inv.y - block, block * 2, block * 2);
+    // Two struck facets, so the block reads as ice and not as a blue window.
+    ctx.globalAlpha = 0.75;
+    ctx.beginPath();
+    ctx.moveTo(inv.x - block, inv.y - block * 0.15);
+    ctx.lineTo(inv.x - block * 0.15, inv.y - block);
+    ctx.moveTo(inv.x + block * 0.2, inv.y + block);
+    ctx.lineTo(inv.x + block, inv.y + block * 0.2);
+    ctx.stroke();
+  } else {
+    // Chilled: a wash that fades out as the chill wears off.
+    ctx.globalAlpha = 0.34 * (inv.chill / ICE_SLOW_TIME);
+    ctx.fillStyle = "#7ef9ff";
+    ctx.fillRect(inv.x - half, inv.y - half, size, size);
+  }
+  ctx.restore();
+}
 
 // ---------------------------------------------------------------------
 // LIGHTNING — the ELECTRIC ARC's beam and its jumps are drawn as torn,
@@ -3937,6 +4116,11 @@ function draw() {
       // already burning down and what still needs the flame — which is the
       // whole skill of that gun.
       if (inv.fire > 0) drawBurning(inv, size);
+      // ...and something the FROST THROWER has hold of carries its cold the
+      // same way: a blue cast while it is merely slowed, a block of ice once
+      // it is frozen solid. One look tells you which of the herd is still
+      // walking and which has stopped.
+      if (inv.froze > 0 || inv.chill > 0) drawFrozen(inv, size);
       // An animal held in a beam glows brighter and brighter until it goes —
       // red under the LASER, electric blue under the ARC — so you can see the
       // beam working, and see it cool off again if you swing away too soon.
@@ -3951,7 +4135,9 @@ function draw() {
         // how much LIGHTS one in `catchAt`. Either way it is the number the
         // glow has to fill up against.
         ctx.globalAlpha = 0.75 * Math.min(1, inv.heat / (heatGun.burn || heatGun.catchAt));
-        ctx.fillStyle = heatGun.jagged ? "#5fd8ff" : heatGun.catchAt ? "#ff8c1a" : "#ff3b3b";
+        ctx.fillStyle = heatGun.jagged ? "#5fd8ff"
+                      : heatGun.paint ? heatGun.paint.heat
+                      : heatGun.catchAt ? "#ff8c1a" : "#ff3b3b";
         ctx.fillRect(inv.x - size / 2, inv.y - size / 2, size, size);
         ctx.restore();
       }
@@ -4051,7 +4237,9 @@ function draw() {
   if (flameG) {
     if (flameLit) drawFlame(player.x, noseY, flameG);
     if (flameFuel < flameG.tank) {
-      drawReloadBar(flameFuel / flameG.tank, flameDry ? "#ff3a00" : "#ffd23d", FUEL_BAR);
+      const fuelPaint = flameG.paint || FLAME_PAINT;
+      drawReloadBar(flameFuel / flameG.tank,
+                    flameDry ? fuelPaint.dry : fuelPaint.gauge, FUEL_BAR);
     }
   }
 
