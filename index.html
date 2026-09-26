@@ -425,6 +425,32 @@ const BIG_CHICK_ART = spr([
   "......OO......OO......",   // and two skinny legs
   ".....OOOO....OOOO.....",
 ]);
+// THE RAINBOW CHICK — the same baby, grown up, from stage 30 on. It has
+// thrown the eggshell away and wears a rainbow crown instead, so you can see
+// at a glance that this is the hard one. Everything below the crown is the
+// chick you already know, line for line.
+const RAINBOW_CHICK_ART = spr([
+  "....R..O..Y..g..e..v..",   // six points of a rainbow crown
+  "...RR.OO.YY.gg.ee.vv..",
+  "...RRROOOYYYgggeeevvv.",   // and the band they stand on
+  ".......ffffffff.......",   // fluff peeking out from under it
+  ".....ffffffffffff.....",
+  "....ffffffffffffff....",
+  "...YYYYYYYYYYYYYYYY...",
+  "..YYYYYYYYYYYYYYYYYY..",
+  "..YYYKKKYYYYYYKKKYYY..",   // two enormous eyes
+  "..YYYKWKYYYYYYKWKYYY..",
+  ".YYYYKKKYYYYYYKKKYYYY.",
+  ".YYYYYYYYOOOOYYYYYYYY.",   // and a beak
+  ".YYYYYYYYOOOOYYYYYYYY.",
+  "..YYYYYYYYOOYYYYYYYY..",
+  "..YYaaaYYYYYYYYaaaYY..",   // stubby little wings it can't fly with
+  "..YYaaaaYYYYYYaaaaYY..",
+  "...YYaaaYYYYYYaaaYY...",
+  "....YYYYYYYYYYYYYY....",
+  "......OO......OO......",   // and two skinny legs
+  ".....OOOO....OOOO.....",
+]);
 // The eggs it throws. Bigger than a chicken's, and already cracking.
 const BOSS_EGG_ART = spr([
   "....WWW....", "..WWWWWWW..", ".WWWWWWWWW.", ".WWWWRWWWW.",
@@ -690,7 +716,7 @@ const FLAME_SPREAD = FLAME_MOUTH + FLAME_TAPER * FLAME_REACH; // width at the ti
 // them, and all twenty burn down at once behind you while you go and light
 // the next lot.
 // ---------------------------------------------------------------------
-const FLAME_CATCH  = 40;   // heat before the flame bites and lights (20 steps at the nose)
+const FLAME_CATCH  = 80;   // heat before the flame bites and lights (40 steps at the nose)
 const FLAME_BITE   = 0.125; // health the flame itself takes at each bite
 const FIRE_TIME    = stepsFor(4); // how long a thing stays alight once lit
 // Steps between one bite of the fire and the next. The fire eats at HALF the
@@ -813,6 +839,11 @@ const BOSS_SPEED   = 0.9; // how fast it sweeps to begin with
 const BOSS_RAGE    = 1.6; // how much FASTER it sweeps once nearly beaten
 const BOSS_DROP    = 5;   // how far it comes down each time it turns around
 const BOSS_POINTS  = 500; // what beating it is worth
+// From stage 30 the chick comes back CROWNED: a rainbow crown where the
+// eggshell used to be, and twice the health. Every boss stage from there on
+// is the crowned one — the game only gets harder as you climb.
+const CROWN_STAGE  = BOSS_EVERY * 2; // the first stage it wears the crown: 30
+const CROWN_HP     = 2;   // how many times its health the crowned one has
 const BOSS_CLUTCH  = 3;   // how many eggs it lays at once
 const BOSS_RELOAD  = 110; // frames between clutches (smaller = more eggs)
 const EGG_RADIUS   = 60;  // how far an exploding egg's blast reaches, in pixels
@@ -936,7 +967,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-09-26 slowfire";
+const BUILD = "2026-09-26 crown";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
@@ -1153,6 +1184,7 @@ function levelPlan() {
       reload: L.reload || SHOT_RELOAD,
       aim: L.aim === undefined ? AIM_CHANCE : L.aim,
       hp: L.hp || 1, boss: !!L.boss, bossHp: L.bossHp || BOSS_HP,
+      crowned: !!L.crowned,
       // One kind of animal for the whole herd, and how long its shots hold
       // you. Both are off unless the level asks for them.
       herd: herdKind(L.herd), freeze: L.freeze || 0,
@@ -1166,7 +1198,9 @@ function levelPlan() {
     speed: 1 + (stage - 1) * STAGE_SPEEDUP,
     reload: SHOT_RELOAD, aim: AIM_CHANCE,
     hp: stage > TOUGH_AFTER ? TOUGH_HP : 1,
-    boss: stage % BOSS_EVERY === 0, bossHp: BOSS_HP,
+    boss: stage % BOSS_EVERY === 0,
+    crowned: stage >= CROWN_STAGE,
+    bossHp: stage >= CROWN_STAGE ? BOSS_HP * CROWN_HP : BOSS_HP,
     herd: null, freeze: 0,
     waves: 1,      // in ENDLESS every wave IS a stage, so a stage is one wave
     title: null,
@@ -1196,7 +1230,7 @@ function buildLevel() {
       x: W / 2,
       y: BOSS_TOP,
       alive: true,
-      animal: BIG_CHICK_ART,
+      animal: plan.crowned ? RAINBOW_CHICK_ART : BIG_CHICK_ART,
       shot: BOSS_EGG_ART,
       heat: 0,
       hp: plan.bossHp,
@@ -2184,7 +2218,7 @@ function update() {
   if (boss) {
     // The BIG CHICK sweeps on its own. It gets ANGRIER the more you hurt it:
     // by the time it's nearly beaten it's charging back and forth.
-    const hurt = 1 - boss.hp / BOSS_HP;
+    const hurt = 1 - boss.hp / (boss.maxHp || BOSS_HP);
     step = BOSS_SPEED * (1 + hurt * BOSS_RAGE) * speedScale;
   } else {
     // The fewer animals are left, the faster they go (classic tension!).
@@ -3865,7 +3899,7 @@ function draw() {
   const bossNow = state !== "start" ? theBoss() : null;
   if (bossNow) {
     const barW = 380, barX = (W - barW) / 2, barY = 40, barH = 14;
-    const left = Math.max(0, bossNow.hp / BOSS_HP);
+    const left = Math.max(0, bossNow.hp / (bossNow.maxHp || BOSS_HP));
     ctx.fillStyle = "rgba(255,255,255,0.12)";
     roundRectPath(barX, barY, barW, barH, 7);
     ctx.fill();

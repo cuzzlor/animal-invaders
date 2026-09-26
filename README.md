@@ -408,6 +408,26 @@ comes down on its own, still wearing the top of its egg as a hat — and it take
 **45 hits** to see off, where an ordinary animal takes one. A bar across the top
 shows how much of it is left. It's back again on stage 30, 45, and so on.
 
+### The Rainbow Chick 🌈🐣
+
+From **stage 30** the chick comes back grown up. It has thrown the eggshell away
+and wears a **rainbow crown** instead — six coloured points, so you can tell at a
+glance which one you are fighting — and it has **twice the health: 90 hits.**
+
+Every boss stage from 30 on is the crowned one. The game only gets harder as you
+climb, so there is no going back to the easy chick.
+
+It is more than twice the fight. Stage 30 also sweeps faster than stage 15,
+because every endless stage is faster than the one before, and a faster chick is
+harder to hold a beam on. Measured with the Red Laser: **1,080 steps at stage 15
+and 3,398 at stage 30** — three times over, not two. Wind its health back to 45
+and it takes 1,576, so the health itself accounts for a little over double and
+the speed accounts for the rest.
+
+`CROWN_STAGE` is the stage it first turns up, and `CROWN_HP` is how many times
+the ordinary chick's health it has. The **levels** game keeps its own chicks and
+its own numbers; the crown belongs to the endless game.
+
 It lays **clutches of three eggs that EXPLODE.** The middle egg of every clutch
 is aimed at wherever you're standing, and wherever an egg lands it blows a hole
 in it — so hiding behind a base doesn't work for long. It will take your cover
@@ -424,7 +444,8 @@ Two things make it a fair fight rather than a nasty one:
   finish the fight out in the open.
 
 It gets faster and faster as you wear it down, so the last few hits are the
-hardest. Beating it is worth **500 points**, plus the usual stage bonus.
+hardest. That is measured against **its own** health, not against a fixed number,
+so the crowned chick starts as calm as the plain one and works up the same way. Beating it is worth **500 points**, plus the usual stage bonus.
 
 Different ships make very different work of it. Roughly, how long one chicken
 takes to beat at the default `GAME_SPEED` of 2 — double these if you set it to 1:
@@ -437,7 +458,7 @@ takes to beat at the default `GAME_SPEED` of 2 — double these if you set it to
 | Blast Cannon | ~9–14 s |
 | Scout | ~16–22 s |
 | Rapid Fire | ~35–40 s |
-| Flamethrower | ~33 s — it lights the chicken, but one chicken is not a herd |
+| Flamethrower | ~40 s — it lights the chicken, but one chicken is not a herd |
 
 Rapid Fire is the slow way to do it, and that's its own trade-off: half-strength
 bullets are the worst possible thing to bring to something with real armour.
@@ -586,11 +607,15 @@ slow it is, are the bargain of it, and they change how you play:
   fills, two things happen at once: the flame takes a **bite** out of the animal,
   and the animal **catches fire**. See below.
 - **It is far slower than either beam.** Held on one animal at the mouth of the
-  flame it takes about **100 steps** to finish it. The Red Laser sees one off in
+  flame it takes about **161 steps** to finish it. The Red Laser sees one off in
   16 and the Electric Arc in 26. It works by holding a lot of the herd at once,
   not by being quick with any one animal.
+- **It is slow to catch.** Heat has to build to `FLAME_CATCH` before anything
+  happens at all, and that is **80**. The flame puts in 2 a step at its mouth and
+  1 at its tip, so an animal held right over the nose catches after **40 steps**
+  and one out at the far end after **80**.
 - **It bites harder the closer they are.** An animal at the mouth of the flame
-  takes heat twice as fast as one at the tip — that is where the 15 and the 30
+  takes heat twice as fast as one at the tip — that is where the 40 and the 80
   come from.
 - **The flame spreads.** It leaves the nose 26 pixels across and is about 302
   across by the end of its reach — wide enough to hold **five columns** of the
@@ -612,10 +637,12 @@ The fire is what gives it back. Once something is alight:
   fire, not the flame, is where almost all of this gun's damage comes from.
 - **It eats slowly.** A fire does the same three animals' worth of damage it
   always did, but it takes twice as long to do it: twelve bites a third of a
-  second apart, not a sixth. One animal held at the mouth of the flame used to
-  take 80 steps and now takes 100; a 2-health one takes 180 where it took 126.
+  second apart, not a sixth.
   Slow is the point of this gun. You light a row and go and light the next while
-  the first burns down behind you.
+  the first burns down behind you. End to end — the wait to catch, then the fire
+  eating — an ordinary animal held at the mouth takes **161 steps** and a tough
+  one **252**. Both still fit inside one tank of fuel, which is what keeps the
+  gun usable.
 - It burns **on its own**. You can swing the flame away, reload, or run for your
   life, and it goes on eating.
 - **Nothing puts it out.** It burns for its four seconds and then dies down by
@@ -728,7 +755,8 @@ Flamethrower has `bank` instead of `need`, because it is paid for out of the
 bank rather than out of one run.
 
 Want to meet the Big Chick without playing fifteen stages? Change `BOSS_EVERY`
-to `1` and it turns up straight away. `BOSS_HP` makes it tougher or softer,
+to `1` and it turns up straight away — and `CROWN_STAGE` to `1` for the crowned
+one. `BOSS_HP` makes it tougher or softer,
 `BOSS_CLUTCH` is how many eggs it lays at once, and `BOSS_RELOAD` is how long
 it waits between clutches — a smaller number means more eggs.
 
