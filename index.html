@@ -169,13 +169,13 @@
   #touch button {
     position: fixed;
     bottom: 20px;
-    width: 60px;
-    height: 60px;
+    width: 68px;
+    height: 68px;
     border-radius: 50%;
     border: 2px solid rgba(255, 255, 255, 0.4);
     background: rgba(255, 255, 255, 0.12);
     color: #fff;
-    font-size: 24px;
+    font-size: 27px;
     font-family: inherit;
     -webkit-user-select: none;
     user-select: none;
@@ -183,10 +183,13 @@
     touch-action: none; /* stops scrolling/zooming when you press a button */
   }
   #touch button:active { background: rgba(255, 255, 255, 0.3); }
-  /* FIRE on the LEFT, the ◀ ▶ arrows on the RIGHT. */
-  #btn-fire  { left: 20px; font-size: 28px; }
-  #btn-right { right: 20px; }
-  #btn-left  { right: 88px; }
+  /* FIRE on the LEFT, the ◀ ▶ arrows on the RIGHT. Each one carries the
+     "#touch" as well, so that the flame's bigger font-size WINS: an id on its
+     own (#btn-fire) loses to an id AND a tag name (#touch button) above, and
+     for a long time the flame was quietly drawn at the arrows' size. */
+  #touch #btn-fire  { left: 20px; font-size: 31px; }
+  #touch #btn-right { right: 20px; }
+  #touch #btn-left  { right: 96px; }
   @media (pointer: coarse) {
     #touch { display: block; }
     p { display: none; } /* keyboard hints don't help on a touch screen */
@@ -1073,7 +1076,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-09-26 frostbite";
+const BUILD = "2026-09-27 thumbs";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player

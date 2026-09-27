@@ -218,6 +218,26 @@ wiped, so pressing it at 16,000 points does not quietly cost you the Electric
 Arc. It leaves the high-score board alone, though; that is for runs you play out
 to the end.
 
+### The thumb buttons 👍
+
+On a phone or tablet three round buttons appear along the bottom of the screen:
+**FIRE** on the left, and the **◀ ▶ arrows** on the right, where your thumbs
+already are. A mouse computer never shows them — the rule that shows them asks
+for `@media (pointer: coarse)`, which is only true for a finger.
+
+They are **68 pixels across**, 8 apart, and 20 in from each edge. That is up
+from 60: a thumb is a blunt instrument, and the old circles were easy to clip
+the edge of in a fight. Apple asks for at least 44, so there is room to spare.
+Even three of them side by side need only 252 pixels, and the narrowest phone
+gives 320.
+
+Everything about them is in one rule, `#touch button`, near the top of
+`index.html`. One warning if you change the flame's size: its rule must start
+with `#touch`, as it does now. `#btn-fire` on its own is an id, `#touch button`
+is an id AND a tag name, and the longer one wins — so a plain `#btn-fire` rule
+is quietly ignored. The flame asked to be bigger than the arrows for a long
+time and was drawn at exactly their size.
+
 ### No zooming 🚫🔍
 
 The board is one fixed size that already fits your screen. If you could zoom in,
