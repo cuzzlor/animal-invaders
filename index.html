@@ -471,6 +471,15 @@ const BOSS_EGG_ART = spr([
   ".WWWWRWWWW.", ".WWWWWWWWW.", "..WWWWWWW..", "...WWWWW...",
   "....WWW....",
 ]);
+// The chunk of ice the BIG CHICK throws when it bursts out of a freeze —
+// see BOSS_BREAK below. It is drawn point-down, because that is the way it
+// travels, and it is the biggest thing that falls in this game.
+const ICE_SHARD_ART = spr([
+  "....WWWW....", "...WCCCCW...", "..WCCCCCCW..", ".WCCeeeeCCW.",
+  "WCCeeWWeeCCW", "WCCeeWWeeCCW", ".WCCeeeeCCW.", ".sWCCeeCCWs.",
+  "..WCCeeCCW..", "...WCeeCW...", "...WCeeCW...", "....WCCW....",
+  "....WCCW....", ".....WW.....",
+]);
 
 // The five things the animals throw at you.
 const MILK_ART = spr([
@@ -957,6 +966,30 @@ const BOSS_CLUTCH  = 3;   // how many eggs it lays at once
 const BOSS_RELOAD  = 110; // frames between clutches (smaller = more eggs)
 const EGG_RADIUS   = 60;  // how far an exploding egg's blast reaches, in pixels
 const EGG_BOOM     = 2.6; // how big the bang LOOKS
+// --- IT BREAKS OUT OF THE ICE ---
+// Everything else the FROST THROWER catches stays frozen for as long as you
+// hold the spray on it. The BIG CHICK does not. It is far too big to hold:
+// BOSS_BREAK after it goes solid it SHATTERS the block, and throws the
+// biggest piece straight at you. That piece costs you SHARD_COST of your
+// three hearts, so freezing a boss is no longer free — it buys you three
+// seconds of no eggs, and you pay for them by getting out of the way.
+//   The block cracks visibly for the last SHARD_CRACK, so the shard is
+// never a surprise: you are told, and then you move.
+//   SHARD_CRACK MUST BE SHORTER THAN ICE_HOLD. Once the crack shows, the
+// chick still needs SHARD_CRACK more steps of being frozen — and a block you
+// have taken the spray off has only ICE_HOLD left in it. Make the two equal
+// and whether letting go calls the whole thing off comes down to one step.
+// Shorter, and the crack is a promise: you cannot take it back by letting
+// go, you can only get out of the way. A test holds the gap.
+const BOSS_BREAK   = stepsFor(3);    // frozen this long, and it bursts out
+const SHARD_CRACK  = stepsFor(0.75); // ...cracking for the last of it
+const SHARD_COST   = 3;   // hearts a chunk of that ice takes off you
+const SHARD_SPLASH = 1;   // ...or off you standing in its blast behind cover
+const SHARD_SPEED  = 2;   // how many times an egg's speed it comes down at
+const SHARD_SIZE   = 56;  // how big it is drawn, in pixels
+const SHARD_RADIUS = 70;  // how far the blast reaches when it lands
+const SHARD_BOOM   = 3;   // how big that bang LOOKS
+const ICE_BITS = ["#ffffff", "#eafcff", "#7ef9ff", "#2ea8ff"]; // it throws cold
 
 // --- TWO WAYS TO PLAY: LEVELS, and ENDLESS ---
 // ENDLESS is the game as it has always been: wave after wave, each one
@@ -1076,7 +1109,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-09-27 thumbs";
+const BUILD = "2026-09-27 breakout";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
@@ -1357,6 +1390,7 @@ function buildLevel() {
       chill: 0,            // steps of SLOW left, from the FROST THROWER
       frost: 0,            // steps it has been held in the frost so far
       froze: 0,            // steps of FROZEN left — it cannot walk, drop or shoot
+      held: 0,             // steps it has been frozen SO FAR, for BOSS_BREAK
       size: BOSS_SIZE,     // everything else is CELL (40) across
       boss: true,
     });
@@ -2482,7 +2516,7 @@ function update() {
   }
   // Move shots down (and sideways for angled ones); drop ones that leave the screen.
   for (const m of shots) {
-    m.y += shotSpeed;
+    m.y += shotSpeed * (m.speed || 1); // the ice shard is the only fast one
     m.x += m.vx;
   }
   shots = shots.filter((m) => m.y < H + 20 && m.x > -20 && m.x < W + 20);
@@ -2607,6 +2641,19 @@ function update() {
       if (inv.frost > 0) inv.frost--;
       if (inv.froze > 0) inv.froze--;
     }
+    // Only the BIG CHICK breaks out; nothing in the herd is strong enough.
+    // `held` counts the steps it has spent solid, whether you are still
+    // spraying or it is running down the last of ICE_HOLD — so the three
+    // seconds are three seconds of frozen, not three seconds of holding the
+    // button. Let it thaw all the way and the count starts again.
+    if (inv.boss) {
+      if (inv.froze > 0) {
+        inv.held++;
+        if (inv.held >= BOSS_BREAK) breakIce(inv, shotSpeed * SHARD_SPEED);
+      } else {
+        inv.held = 0;
+      }
+    }
   }
 
   // ONE boom for the whole column, however many animals went up together —
@@ -2628,7 +2675,10 @@ function update() {
   // The flame burns their falling shots out of the air as well — but only
   // the ones that have come down far enough to be IN it. A shot still up at
   // the top sails through, which is the whole bargain of this gun.
-  if (flameLit) shots = shots.filter((m) => flameHeat(m.x, m.y, m.size || 28) === 0);
+  // A chunk of ice is the one thing a spray does not burn out of the air —
+  // and the spray that threw it at you is a COLD one. Without this the shard
+  // would fly straight back into the jet that made it and never arrive.
+  if (flameLit) shots = shots.filter((m) => m.shard || flameHeat(m.x, m.y, m.size || 28) === 0);
 
   // Your bullets hitting animals. A bullet takes its ship's `dmg` off the
   // animal's health — a full-strength one downs it outright, while the RAPID
@@ -2668,7 +2718,15 @@ function update() {
   // don't chip — they go OFF, and take a hole out of the base with them.
   for (const m of shots) {
     if (m.y > H + 20) continue;
-    if (m.explodes) {
+    if (m.shard) {
+      // The ice shatters on your cover, or on the ground beside you. Cover
+      // is what this attack is FOR: a base takes the three hearts, and all
+      // you wear is the splash.
+      if (hitBase(m.x, m.y, true) || m.y > player.y + CELL / 2) {
+        shardBlast(m.x, m.y, false);
+        m.y = H + 999;
+      }
+    } else if (m.explodes) {
       // An egg lands on cover, or on the ground down at your level.
       if (hitBase(m.x, m.y, true) || m.y > player.y + CELL / 2) {
         eggBlast(m.x, m.y);
@@ -2690,6 +2748,9 @@ function update() {
     if (m.y > H + 20) continue;
     if (invuln === 0 && hit(m.x, m.y, player.x, player.y, CELL)) {
       m.y = H + 999;       // remove this shot
+      // The chick's ice, head-on: SHARD_COST hearts, not one. It is the
+      // hardest hit in the game, and it is the only one you are warned about.
+      if (m.shard) { shardBlast(m.x, m.y, true); continue; }
       if (m.explodes) { eggBlast(m.x, m.y); continue; }
       hurtPlayer(true);    // a life, a bang, and the ice if this level has it
     }
@@ -2880,6 +2941,63 @@ function hitBase(x, y, peek) {
 }
 
 // ---------------------------------------------------------------------
+// breakIce(): the BIG CHICK has been frozen for BOSS_BREAK and bursts out.
+// The block goes off in a shower of cold, and the biggest piece is aimed at
+// wherever you are standing at that moment.
+//   Everything cold about the chick is wiped, not just the freeze: it has to
+// be held in the spray for the full ICE_FREEZE_AT again before it will go
+// solid a second time. With a tank of three seconds that is as fast as you
+// could freeze it anyway, so the chick is never quiet for long.
+// ---------------------------------------------------------------------
+function breakIce(boss, speed) {
+  boss.froze = 0;
+  boss.frost = 0;
+  boss.chill = 0;
+  boss.held  = 0;
+  spawnExplosion(boss.x, boss.y, 4, ICE_BITS);
+  shockwaves.push({ x: boss.x, y: boss.y, life: 0, radius: sizeOf(boss) * 0.75,
+                    color: "#7ef9ff", flash: "#eafcff" });
+  playExplosionSound(true);
+  // Aimed the way the boss aims the middle egg of a clutch: how far across
+  // you are, divided by how long the ice takes to get down to you. It is
+  // capped at AIM_MAX like everything else, so it can never fly sideways —
+  // stand far enough over and the shard lands short of you.
+  const startY = boss.y + sizeOf(boss) / 2;
+  const fall = Math.max(1, (player.y - startY) / speed);
+  let vx = (player.x - boss.x) / fall;
+  vx = Math.max(-AIM_MAX, Math.min(AIM_MAX, vx));
+  shots.push({
+    x: boss.x, y: startY, emoji: ICE_SHARD_ART, vx: vx,
+    size: SHARD_SIZE, speed: SHARD_SPEED, shard: true,
+  });
+}
+
+// ---------------------------------------------------------------------
+// shardBlast(): that chunk of ice arrives. `direct` says whether it caught
+// you head-on or shattered on something first.
+//   Head-on is SHARD_COST hearts — the whole three, and the run with them.
+// On your cover it is the cover that pays: a hole the size of the egg's,
+// and SHARD_SPLASH for you if you are standing in the pieces. So the base
+// you are told to protect is also the thing that saves you here.
+// ---------------------------------------------------------------------
+function shardBlast(x, y, direct) {
+  spawnExplosion(x, y, SHARD_BOOM, ICE_BITS);
+  shockwaves.push({ x: x, y: y, life: 0, radius: SHARD_RADIUS,
+                    color: "#7ef9ff", flash: "#eafcff" });
+  playExplosionSound(true);
+  for (const base of bases) {
+    for (const blk of base.blocks) {
+      if (blk.alive && Math.hypot(blk.x - x, blk.y - y) <= SHARD_RADIUS) blk.alive = false;
+    }
+  }
+  if (direct) { hurtPlayer(false, SHARD_COST); return; }
+  // Only the splash left. The blast has already made its own noise.
+  if (invuln === 0 && Math.hypot(player.x - x, player.y - y) <= SHARD_RADIUS) {
+    hurtPlayer(false, SHARD_SPLASH);
+  }
+}
+
+// ---------------------------------------------------------------------
 // eggBlast(): one of the BIG CHICK's eggs goes off. Unlike your own
 // BLAST CANNON, this one leaves the animals alone and goes after your
 // side of the board: it blows a hole clean through a base, and if you're
@@ -2907,6 +3025,9 @@ function eggBlast(x, y) {
 // hurtPlayer(): something got through. This is the ONLY place a life is
 // taken, so a hit costs exactly the same whether a shot reached you or an
 // egg went off beside you.
+//   `cost` is how many hearts it takes. Everything in the game takes one,
+// and passing nothing gets you one — the BIG CHICK's ice shard is the only
+// thing that asks for more.
 //   On a level with `freeze` in the table (the ICE FLOE), the same hit
 // also holds you still for freezeTime() frames: you cannot move and you
 // cannot shoot until the ice lets go. The flashing safe time is stretched
@@ -2914,8 +3035,8 @@ function eggBlast(x, y) {
 // second shot you had no way to dodge — the cost is the seconds, not the
 // rest of your lives.
 // ---------------------------------------------------------------------
-function hurtPlayer(boom) {
-  lives--;
+function hurtPlayer(boom, cost = 1) {
+  lives -= cost;
   iced = freezeTime();
   invuln = Math.max(SAFE_TIME, iced);
   spawnExplosion(player.x, player.y, 2.5);  // a BIG blast where you got hit
@@ -2965,7 +3086,7 @@ function bombBlast(x, y) {
 }
 
 const BOOM_COLORS = ["#ffffff", "#ffd34d", "#ff8c1a", "#ff4d4d"];
-function spawnExplosion(x, y, scale = 1) {
+function spawnExplosion(x, y, scale = 1, colors = BOOM_COLORS) {
   const count = Math.round(16 * scale);
   for (let i = 0; i < count; i++) {
     const angle = Math.random() * Math.PI * 2;
@@ -2976,7 +3097,7 @@ function spawnExplosion(x, y, scale = 1) {
       vy: Math.sin(angle) * speed,
       life: 0,
       maxLife: (18 + Math.random() * 16) * scale,
-      color: BOOM_COLORS[Math.floor(Math.random() * BOOM_COLORS.length)],
+      color: colors[Math.floor(Math.random() * colors.length)],
     });
   }
 }
@@ -3901,6 +4022,18 @@ function drawFlame(x, noseY, gun) {
 // the wobble that makes an edge look like fire.
 function torn() { return 0.78 + Math.random() * 0.44; }
 
+// The cracks that run across the BIG CHICK's block in the last second, as
+// fractions of the block's half-width, so they scale with it. They are a
+// FIXED set rather than fresh random kinks every frame: a crack that moves
+// is a shimmer, and a crack that stays put is a crack that is spreading.
+const ICE_CRACKS = [
+  [[0, 0], [ 0.22, -0.30], [ 0.10, -0.62], [ 0.34, -1.00]],
+  [[0, 0], [-0.28,  0.18], [-0.20,  0.52], [-0.48,  0.86]],
+  [[0, 0], [ 0.30,  0.24], [ 0.62,  0.20], [ 0.88,  0.50]],
+  [[0, 0], [-0.24, -0.26], [-0.58, -0.34], [-0.84, -0.66]],
+  [[0, 0], [ 0.34, -0.06], [ 0.70, -0.22], [ 1.00, -0.14]],
+];
+
 // ---------------------------------------------------------------------
 // drawFrozen(): the cold on one animal.
 //   Merely CHILLED is a thin blue wash over it, so a sweep leaves a visible
@@ -3930,6 +4063,29 @@ function drawFrozen(inv, size) {
     ctx.moveTo(inv.x + block * 0.2, inv.y + block);
     ctx.lineTo(inv.x + block, inv.y + block * 0.2);
     ctx.stroke();
+    // The BIG CHICK is coming out of this. For the last SHARD_CRACK the
+    // block splits, wider and brighter every step, so the shard that
+    // follows is something you were shown rather than something that
+    // happened to you.
+    const due = inv.boss ? inv.held - (BOSS_BREAK - SHARD_CRACK) : -1;
+    if (due > 0) {
+      const t = Math.min(1, due / SHARD_CRACK);
+      ctx.globalAlpha = 0.25 + 0.75 * t;
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = Math.max(2, size * 0.02 + size * 0.05 * t);
+      ctx.lineJoin = "round";
+      for (const crack of ICE_CRACKS) {
+        ctx.beginPath();
+        ctx.moveTo(inv.x + crack[0][0] * block, inv.y + crack[0][1] * block);
+        for (let i = 1; i < crack.length; i++) {
+          // Each crack grows out from the middle as the second runs down.
+          const reach = Math.min(1, t * crack.length / i);
+          ctx.lineTo(inv.x + crack[i][0] * block * reach,
+                     inv.y + crack[i][1] * block * reach);
+        }
+        ctx.stroke();
+      }
+    }
   } else {
     // Chilled: a wash that fades out as the chill wears off.
     ctx.globalAlpha = 0.34 * (inv.chill / ICE_SLOW_TIME);
@@ -4316,7 +4472,7 @@ function draw() {
     // A white-hot flash fills the blast for the first moment...
     if (t < 0.5) {
       ctx.globalAlpha = (1 - t * 2) * 0.55;
-      ctx.fillStyle = "#fff3b0";
+      ctx.fillStyle = r.flash || "#fff3b0";
       ctx.beginPath();
       ctx.arc(r.x, r.y, radius * 0.9, 0, Math.PI * 2);
       ctx.fill();
