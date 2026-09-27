@@ -983,9 +983,11 @@ const EGG_BOOM     = 2.6; // how big the bang LOOKS
 // go, you can only get out of the way. A test holds the gap.
 const BOSS_BREAK   = stepsFor(3);    // frozen this long, and it bursts out
 const SHARD_CRACK  = stepsFor(0.75); // ...cracking for the last of it
+const SHARD_CLUTCH = 5;   // pieces the block breaks into, all thrown at once
 const SHARD_COST   = 3;   // hearts a chunk of that ice takes off you
 const SHARD_SPLASH = 1;   // ...or off you standing in its blast behind cover
 const SHARD_SPEED  = 2;   // how many times an egg's speed it comes down at
+const SHARD_LEAN   = SHOT_ANGLE * 1.6; // how far the outside pieces fly wide
 const SHARD_SIZE   = 56;  // how big it is drawn, in pixels
 const SHARD_RADIUS = 70;  // how far the blast reaches when it lands
 const SHARD_BOOM   = 3;   // how big that bang LOOKS
@@ -1109,7 +1111,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-09-27 breakout";
+const BUILD = "2026-09-27 clutch";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
@@ -2514,10 +2516,16 @@ function update() {
       shotTimer = Math.round(plan.reload / speedScale * (0.4 + 0.6 * aliveCount / totalCount));
     }
   }
-  // Move shots down (and sideways for angled ones); drop ones that leave the screen.
+  // Move shots down (and sideways for angled ones); drop ones that leave the
+  // screen. A shot the FROST THROWER has caught crawls: it keeps ICE_SLOW of
+  // its speed both ways, so it does not simply hang in the air above you, it
+  // carries on toward where it was always going — only slowly enough that you
+  // can walk out from under it.
   for (const m of shots) {
-    m.y += shotSpeed * (m.speed || 1); // the ice shard is the only fast one
-    m.x += m.vx;
+    const cold = m.chill > 0 ? ICE_SLOW : 1;
+    m.y += shotSpeed * (m.speed || 1) * cold; // the ice shard is the only fast one
+    m.x += m.vx * cold;
+    if (m.chill > 0) m.chill--;
   }
   shots = shots.filter((m) => m.y < H + 20 && m.x > -20 && m.x < W + 20);
 
@@ -2672,13 +2680,28 @@ function update() {
     if (!beamGun) beamTimer = 0;
     if (beamCooldown > 0) beamCooldown--;
   }
-  // The flame burns their falling shots out of the air as well — but only
-  // the ones that have come down far enough to be IN it. A shot still up at
-  // the top sails through, which is the whole bargain of this gun.
-  // A chunk of ice is the one thing a spray does not burn out of the air —
-  // and the spray that threw it at you is a COLD one. Without this the shard
+  // What a lit spray does to their falling shots — and the two guns do
+  // different things, which is the clearest difference between them.
+  //   THE FLAMETHROWER BURNS THEM UP. Only the ones that have come down far
+  // enough to be IN it: a shot still up at the top sails through, which is
+  // the whole bargain of that gun.
+  //   THE FROST THROWER CHILLS THEM. Nothing is destroyed. A shot caught in
+  // the cold falls at ICE_SLOW of its speed — the same fraction a chilled
+  // animal walks at — and stays slowed for ICE_SLOW_TIME after it leaves the
+  // spray. So the cold gun does not clear the air in front of you, it gives
+  // you time: a wall of their shots hangs there while you get out from under
+  // it, and every one of them still has to be dodged.
+  //   Its own ice is untouched either way. A chunk of ice does not burn, and
+  // the spray that threw it at you is a COLD one — without this the shard
   // would fly straight back into the jet that made it and never arrive.
-  if (flameLit) shots = shots.filter((m) => m.shard || flameHeat(m.x, m.y, m.size || 28) === 0);
+  if (flameLit && flameGun.ice) {
+    for (const m of shots) {
+      if (m.shard) continue;
+      if (flameHeat(m.x, m.y, m.size || 28) > 0) m.chill = ICE_SLOW_TIME;
+    }
+  } else if (flameLit) {
+    shots = shots.filter((m) => m.shard || flameHeat(m.x, m.y, m.size || 28) === 0);
+  }
 
   // Your bullets hitting animals. A bullet takes its ship's `dmg` off the
   // animal's health — a full-strength one downs it outright, while the RAPID
@@ -2958,18 +2981,29 @@ function breakIce(boss, speed) {
   shockwaves.push({ x: boss.x, y: boss.y, life: 0, radius: sizeOf(boss) * 0.75,
                     color: "#7ef9ff", flash: "#eafcff" });
   playExplosionSound(true);
-  // Aimed the way the boss aims the middle egg of a clutch: how far across
-  // you are, divided by how long the ice takes to get down to you. It is
-  // capped at AIM_MAX like everything else, so it can never fly sideways —
-  // stand far enough over and the shard lands short of you.
+  // The block does not come apart into one piece. It throws SHARD_CLUTCH of
+  // them at once, laid out and aimed exactly the way the chick lays a clutch
+  // of eggs: spread across its width, the MIDDLE one aimed at wherever you
+  // are standing, and the outside ones leaning out by a different amount
+  // every time — so there is a gap to run to, but you have to pick it, and
+  // it is not the same gap twice.
   const startY = boss.y + sizeOf(boss) / 2;
   const fall = Math.max(1, (player.y - startY) / speed);
-  let vx = (player.x - boss.x) / fall;
-  vx = Math.max(-AIM_MAX, Math.min(AIM_MAX, vx));
-  shots.push({
-    x: boss.x, y: startY, emoji: ICE_SHARD_ART, vx: vx,
-    size: SHARD_SIZE, speed: SHARD_SPEED, shard: true,
-  });
+  for (let i = 0; i < SHARD_CLUTCH; i++) {
+    const spread = SHARD_CLUTCH === 1 ? 0 : (i / (SHARD_CLUTCH - 1)) * 2 - 1;
+    const aimed = i === (SHARD_CLUTCH - 1) / 2;
+    // Aimed: how far across you are, divided by how long the ice takes to
+    // get down to you. Capped at AIM_MAX like every aimed shot in the game,
+    // so it can never fly sideways — stand far enough over and it lands short.
+    let vx = aimed ? (player.x - boss.x) / fall
+                   : spread * SHARD_LEAN * (0.5 + Math.random());
+    vx = Math.max(-AIM_MAX, Math.min(AIM_MAX, vx));
+    shots.push({
+      x: boss.x + spread * sizeOf(boss) * 0.3, y: startY,
+      emoji: ICE_SHARD_ART, vx: vx,
+      size: SHARD_SIZE, speed: SHARD_SPEED, shard: true,
+    });
+  }
 }
 
 // ---------------------------------------------------------------------
@@ -4379,7 +4413,20 @@ function draw() {
   }
 
   // Draw the falling shots — each one is its animal's own thing.
-  for (const m of shots) drawThing(m.emoji, m.x, m.y, m.size || 28);
+  for (const m of shots) {
+    drawThing(m.emoji, m.x, m.y, m.size || 28);
+    // A blue wash over anything the cold has hold of, fading as it wears
+    // off — the same tell a chilled animal wears, so one look says which of
+    // the shots coming at you are the slow ones.
+    if (m.chill > 0) {
+      const box = (m.size || 28) * 0.9;
+      ctx.save();
+      ctx.globalAlpha = 0.42 * (m.chill / ICE_SLOW_TIME);
+      ctx.fillStyle = "#7ef9ff";
+      ctx.fillRect(m.x - box / 2, m.y - box / 2, box, box);
+      ctx.restore();
+    }
+  }
 
   // The beam: a soft glow with a white-hot core, running from the ship's nose
   // to the top of the screen. It's drawn in "lighter" mode so it ADDS light to
