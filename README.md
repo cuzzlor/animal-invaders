@@ -619,19 +619,57 @@ takes to beat at the default `GAME_SPEED` of 2 — double these if you set it to
 
 | Ship | How long |
 |------|----------|
-| Red Laser | ~6 s — a beam can't miss something that big |
-| Twin Blaster | ~12 s |
-| Electric Arc | ~12 s |
+| Red Laser | **~4 s** — a beam can't miss something that big |
+| Electric Arc | **~6 s** |
 | Blast Cannon | ~9–14 s |
+| Twin Blaster | ~12 s |
+| Flamethrower | **~15 s** — it lights the chicken, and the fire does the rest |
+| Frost Thrower | **~16 s** — and it can **freeze** the chicken, though not hold it (below) |
 | Scout | ~16–22 s |
 | Rapid Fire | ~35–40 s |
-| Flamethrower | ~40 s — it lights the chicken, but one chicken is not a herd |
-| Frost Thrower | ~48 s — it can **freeze** the chicken, but not hold it (below) |
 
 Rapid Fire is the slow way to do it, and that's its own trade-off: half-strength
 bullets are the worst possible thing to bring to something with real armour.
 The beams do best, because you never have to lead a target that's sweeping
 across the screen.
+
+#### The four guns you HOLD bite harder on a chicken
+
+The Red Laser, the Electric Arc, the Flamethrower and the Frost Thrower all
+work the same way: **hold** heat, or cold, on one animal until it gives. One
+bite is one whole animal. That is a fair bargain against a herd and a rotten
+one against the Big Chick, which is forty-five animals in one bird — and the
+crowned one ninety.
+
+So each of the four bites harder **on a chicken**. Nothing else in the game
+changed: a herd takes exactly what it always did, and so do the bullet ships
+and the Blast Cannon.
+
+| Gun | Bites | Big Chick, before → after | Rainbow Chick |
+|---|---|---|---|
+| Red Laser | **×1.5** | 6.1 s → **3.9 s** | 12.6 s → **8.2 s** |
+| Electric Arc | **×2** | 12.2 s → **6.2 s** | 24.4 s → **12.2 s** |
+| Flamethrower | **×4** | 58.6 s → **15.2 s** | 117.3 s → **29.6 s** |
+| Frost Thrower | **×3** | 48.1 s → **15.6 s** | 96.1 s → **31 s** |
+
+**Not the same number for all four.** They were more than nine times apart
+before — the slowest of them took 117 seconds on the crowned chick where the
+quickest took 13 — and one multiplier for all four would have left the
+Flamethrower slow and made the Red Laser trivial. These four numbers bring them
+within **3.8×** of each other, with the Red Laser still the quickest.
+
+The Flamethrower's number also covers **the fire it leaves behind**, which is
+where most of that gun's damage really comes from — three animals' worth
+against the flame's own eighth. Without it the gun's bonus would have been
+almost nothing. The fire goes on burning after you have swung away and after
+you have changed ships, so it asks the animal whether it is a chicken rather
+than asking a gun that may not be lit any more.
+
+`BOSS_BEAM_BITE`, `BOSS_ARC_BITE`, `BOSS_FLAME_BITE` and `BOSS_ICE_BITE` are the
+four numbers, near the top of `index.html`. Every one is a whole number or a
+half, so every bite stays an **exact binary fraction** — a 2.4 there gives a
+bite of 2.399999999998337, and an animal left standing on a sliver of health no
+bite can ever take off. A test holds that for all four.
 
 ### It breaks out of the ice 🧊💥
 
@@ -783,8 +821,8 @@ back to exactly where you were — the new ship is in your hands immediately.
 | **Double Rapid** | score 9,000 in one game | Rapid Fire with two barrels. **Hold** the button and it pours out ten **pairs** a second. Each bullet is half strength, like Rapid Fire's, so a pair downs an ordinary animal where a single bullet leaves it standing. |
 | **Red Laser** | score 10,000 in one game | A red beam that smashes clean through every animal it touches (and melts their shots). Burns for **2 seconds**, then reloads in under half of one — so it is lit five sixths of the time, and one burn carries you nearly the whole width of a wave. |
 | **Electric Arc** | score 15,000 in one game | Lightning instead of a laser: the current **jumps sideways** from animal to animal, up to three deep either side of the beam. Burns for 2.5 seconds, then reloads for half a second. |
-| **Frost Thrower** | fill the bank to 500,000 | **Hold** and it sprays cold instead of fire. Everything it touches walks at **two fifths** of its speed; hold it on one animal for **four tenths of a second** and that animal **freezes solid** — it stops walking, stops coming down with the herd, and stops shooting. Keep holding and it stays frozen; let go and it has one second left. Bites seven sixteenths of an animal at a time, three times a second at the mouth, so three fills see one off. Three seconds of fuel a tank, and it refills in under two. It **chills their falling shots** rather than burning them up, so the air in front of you is slowed, never cleared. The **Big Chick** is the one thing it cannot hold: three seconds and it shatters the ice, and all five pieces come at you, three hearts each. |
-| **Flamethrower** | fill the bank to 250,000 | **Hold** the button and it pours out fire. It burns what it touches **and sets it alight**, and the fire goes on eating long after you have swung away. Slow on any one animal, frightening on a herd. Three and a half seconds of fuel in a tank. |
+| **Frost Thrower** | fill the bank to 500,000 | **Hold** and it sprays cold instead of fire. Everything it touches walks at **two fifths** of its speed; hold it on one animal for **four tenths of a second** and that animal **freezes solid** — it stops walking, stops coming down with the herd, and stops shooting. Keep holding and it stays frozen; let go and it has one second left. Bites seven sixteenths of an animal at a time, three times a second at the mouth, so three fills see one off. Three seconds of fuel a tank, and it refills in under two. It **chills their falling shots** rather than burning them up, so the air in front of you is slowed, never cleared. It bites **three times** as hard on a chicken. The **Big Chick** is the one thing it cannot hold: three seconds and it shatters the ice, and all five pieces come at you, three hearts each. |
+| **Flamethrower** | fill the bank to 250,000 | **Hold** the button and it pours out fire. It burns what it touches **and sets it alight**, and the fire goes on eating long after you have swung away. Slow on any one animal, frightening on a herd. Three and a half seconds of fuel in a tank. It bites **four times** as hard on a chicken, fire and all — which took it from 59 seconds against one to 15. |
 
 Rapid Fire, the Double Rapid and the Flamethrower are the three ships you
 **hold** the button for; every other one fires once per press.

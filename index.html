@@ -664,9 +664,27 @@ const BEAM_RELOAD  = 48;   // steps it reloads for afterwards
 const BEAM_WIDTH   = 18;   // how wide the beam's bright core is, in pixels
 const BEAM_BURN    = 14;   // steps an animal must be held in the beam before it melts
 const BEAM_DRAG    = 0.65; // how much of your usual speed you steer at while firing
+// --- THE FOUR GUNS YOU HOLD, AGAINST THE BIG CHICK ---
+// The RED LASER, the ELECTRIC ARC, the FLAMETHROWER and the FROST THROWER
+// all work the same way: hold heat, or cold, on ONE animal until it gives.
+// One bite is one whole animal, which is a fair bargain against a herd and
+// a rotten one against the BIG CHICK — which is forty-five animals in one
+// bird, and the crowned one ninety. Held on it without a pause and never
+// missing, the flame took 59 seconds, and 117 on the crowned chick.
+//   So each of the four bites harder on a chicken. NOT by the same amount:
+// they were ten times apart to begin with, and one number for all four
+// would have left the flame slow and made the laser trivial. These bring
+// the four of them within sight of one another.
+//   Every one of them is a whole number or a half, so every bite stays an
+// exact binary fraction — see "Seconds, and steps" in the README. Nothing
+// here touches the herd: the bonus is read off `inv.boss`.
+const BOSS_BEAM_BITE  = 1.5; // RED LASER — already the quickest of the four
+const BOSS_ARC_BITE   = 2;   // ELECTRIC ARC — its current gutters, so it is slower
+const BOSS_FLAME_BITE = 4;   // FLAMETHROWER, and the fire it leaves behind
+const BOSS_ICE_BITE   = 3;   // FROST THROWER
 const LASER_BEAM = {
   time: BEAM_TIME, reload: BEAM_RELOAD, width: BEAM_WIDTH,
-  burn: BEAM_BURN, drag: BEAM_DRAG, arc: 0,
+  burn: BEAM_BURN, drag: BEAM_DRAG, arc: 0, bossBite: BOSS_BEAM_BITE,
   color: "#ff4d4d", glow: "rgba(255,60,60,0.28)",
 };
 // The ELECTRIC ARC burns longer, and its current WALKS out sideways through
@@ -686,6 +704,7 @@ const BOLT_HOPS    = 3;    // how many animals out from the beam it can walk
 const VOLT_BEAM = {
   time: BOLT_TIME, reload: BOLT_RELOAD, width: BEAM_WIDTH,
   burn: 26, drag: 0.55, arc: BOLT_ARC, jump: BOLT_JUMP, hops: BOLT_HOPS,
+  bossBite: BOSS_ARC_BITE,
   color: "#7ef9ff", glow: "rgba(126,249,255,0.26)", jagged: true,
 };
 
@@ -836,13 +855,13 @@ const FROST_PAINT = {
 const FLAME_GUN = {
   tank: FLAME_TANK, fill: FLAME_FILL, reach: FLAME_REACH, mouth: FLAME_MOUTH,
   spread: FLAME_SPREAD, catchAt: FLAME_CATCH, drag: FLAME_DRAG,
-  paint: FLAME_PAINT,
+  paint: FLAME_PAINT, bossBite: BOSS_FLAME_BITE,
 };
 // The same cone, the same reach, the same tank. Only what it DOES differs.
 const FROST_GUN = {
   tank: ICE_TANK, fill: ICE_FILL, reach: FLAME_REACH, mouth: FLAME_MOUTH,
   spread: FLAME_SPREAD, catchAt: ICE_CATCH, drag: FLAME_DRAG,
-  paint: FROST_PAINT, ice: true,
+  paint: FROST_PAINT, ice: true, bossBite: BOSS_ICE_BITE,
 };
 
 // `damage` is how much of an animal one bullet takes off. Animals have 1
@@ -1139,7 +1158,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-09-27 twenty";
+const BUILD = "2026-09-27 bosshunt";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
@@ -2629,19 +2648,25 @@ function update() {
       // held on it over and over to see it off.
       if (inv.heat >= limit) {
         inv.heat = 0;
+        // Each of these four bites harder on a chicken, and by its own
+        // amount — see BOSS_BEAM_BITE and the three beside it. A herd is
+        // untouched: `bite` is 1 for everything that is not the boss.
+        const bite = inv.boss
+          ? (licked > 0 ? flameGun.bossBite : beamGun.bossBite)
+          : 1;
         if (licked > 0 && flameGun.ice) {
           // The FROST THROWER takes the same small bite and lights nothing.
           // Its work is the cold, which is counted in its own loop below.
-          inv.hp -= ICE_BITE;
+          inv.hp -= ICE_BITE * bite;
         } else if (licked > 0) {
           // The flame takes its small bite AND sets the animal alight, both
           // at once. Something already alight is simply re-lit, so its fire
           // never runs down while you are still pointing at it.
           if (inv.fire <= 0) inv.fireTick = FIRE_TICK; // a new fire waits one tick
           inv.fire = FIRE_TIME;
-          inv.hp -= FLAME_BITE;
+          inv.hp -= FLAME_BITE * bite;
         } else {
-          inv.hp -= 1;   // a beam takes a whole animal where the flame takes an eighth
+          inv.hp -= 1 * bite; // a beam takes a whole animal where the flame takes an eighth
         }
         if (inv.hp <= 0) {
           inv.alive = false;
@@ -2847,7 +2872,12 @@ function update() {
     inv.fire--;
     if (--inv.fireTick > 0) continue;
     inv.fireTick = FIRE_TICK;
-    inv.hp -= FIRE_BITE;
+    // The fire is most of what the FLAMETHROWER does — three animals' worth
+    // against the flame's own eighth — so leaving it out would have made the
+    // gun's bonus almost nothing. It burns on after you have swung away, and
+    // after you have swapped ships, so it asks the ANIMAL whether it is a
+    // chicken rather than asking a gun that may not be lit any more.
+    inv.hp -= inv.boss ? FIRE_BITE * BOSS_FLAME_BITE : FIRE_BITE;
     if (inv.hp <= 0) {
       inv.alive = false;
       inv.fire = 0;
