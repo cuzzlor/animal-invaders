@@ -33,13 +33,18 @@ remembers your choice.
 12% faster than the one before. It never ends. You play it for a score, and the
 Big Chick turns up every 15 stages.
 
-**LEVELS** is a set course with a finish. There are **10 levels**. Level 1 is
+**LEVELS** is a set course with a finish. There are **20 levels**. Level 1 is
 gentle: ten animals, slow, and they hardly ever shoot back. Each level puts more
 animals on the screen, moves them faster, and lets them shoot more often. Level
 5 is the Big Chick — a kinder one than the endless game's, 30 hits instead of
-45. From level 7 on, a level can be **more than one wave** (see below). Level 10
-is two Big Chicks, one after the other. Beat that and you have **finished the
-game**.
+45. From level 7 on, a level can be **more than one wave** (see below).
+
+The **second ten** are a step up from the first, and not a gentle one. Every one
+of levels 11 to 20 is faster than every one of levels 1 to 10, aims harder, and
+puts at least as many animals on the screen. From level 15 the herd takes
+**three hits** instead of two, and levels 14 and 20 are the **crowned** chicken
+of the endless game's stage 30 — the rainbow crown, and the health that comes
+with it. Level 20 is two of them. Beat that and you have **finished the game**.
 
 | Level | Name | What comes at you | Waves | How fast |
 |-------|------|-------------------|-------|----------|
@@ -52,12 +57,49 @@ game**.
 | 7 | THE STAMPEDE | 4 rows of 8 cows, two hits each | **2** | 1.25 |
 | 8 | THE TREETOPS | 3 rows of 8 monkeys — they aim at you 4 shots in 5 | **2** | 1.35 |
 | 9 | THE DEEP FREEZE | 4 rows of 8 penguins, and the ice again | **3** | 1.40 |
-| 10 | THE LAST CHICK | two Big Chicks, 45 hits each | **2** | 1.30 |
+| 10 | THE ANGRY CHICK | two Big Chicks, 45 hits each | **2** | 1.30 |
+| 11 | THE ORCHARD | 6 rows of 8 monkeys, two hits each | **2** | 1.45 |
+| 12 | THE MUDBATH | 6 rows of 9 pigs, two hits each | **2** | 1.55 |
+| 13 | THE BLIZZARD | 5 rows of 9 penguins — **the ice again** | **3** | 1.65 |
+| 14 | THE RAINBOW CHICK | the **crowned** boss, 100 hits | 1 | 1.45 |
+| 15 | THE THUNDERHEAD | 5 rows of 9, and **three hits each** from here on | **2** | 1.80 |
+| 16 | THE HENHOUSE | 5 rows of 9 chickens | **2** | 1.90 |
+| 17 | THE GLACIER | 4 rows of 9 penguins, **and the ice** | **3** | 2.00 |
+| 18 | THE PADDOCK | 4 rows of 9 cows | **3** | 2.10 |
+| 19 | THE WHITEOUT | 4 rows of 9, mixed, **and the ice** | **4** | 2.20 |
+| 20 | THE LAST CHICK | two **crowned** chickens, 100 hits each | **2** | 1.70 |
 
 "How fast" is measured against the endless game's FIRST wave, which is 1. So the
 animals in level 1 move at a bit under half that speed. A boss's number means
 how fast the chicken sweeps, which is not the same thing as a herd's, so the two
 kinds of level are only worth comparing to their own kind.
+
+#### Why the late levels are SMALLER
+
+Levels 17 to 19 put **fewer** animals on the screen than levels 15 and 16, and
+that is on purpose. There is a clock running on every herd level: the animals
+come down a step every time they turn at the edge, and a **wider** herd has less
+room to slide, so it turns more often and lands on your cover sooner. Ten
+columns across is not a tenth harder than nine — it is a different clock.
+
+Measured, with the same pilot in the Red Laser: how long the herd takes to reach
+your cover if you never fire, against how long it takes to clear one wave.
+
+| Level | Clock | One wave | Room |
+|---|---|---|---|
+| 1 THE FARMYARD | 300 s | 1.6 s | 183× |
+| 4 THE STORM | 114 s | 3.5 s | 33× |
+| 9 THE DEEP FREEZE | 82 s | 4.1 s | 20× |
+| 13 THE BLIZZARD | 49 s | 4.2 s | 11× |
+| 15 THE THUNDERHEAD | 44 s | 8.2 s | 5.4× |
+| 16 THE HENHOUSE | 42 s | 11.1 s | **3.8×** |
+| 19 THE WHITEOUT | 42 s | 8.4 s | 5.0× |
+
+An early build had levels 18 and 19 at **ten columns and five or six rows**, and
+neither of them could be cleared at all — the herd was on the cover before a
+good gun could get through it. So the late levels get their difficulty from
+**speed, aim, armour and the number of waves**, and the herds stay at nine
+across. Harder should mean faster, not longer.
 
 ### Waves 🌊
 
@@ -132,7 +174,7 @@ only the start screen that gives its room to the levels, because choosing one
 is what you came to that screen to do. The level you have reached is remembered
 on this device.
 
-The two games keep **separate high-score boards**. A 6-level run is worth a few
+The two games keep **separate high-score boards**. A level run is worth a few
 thousand points, and an endless run can climb for ever — one board would mean a
 level game never got onto it. Your **ships are shared**: a good level run earns
 them the same way an endless run does.
@@ -140,10 +182,18 @@ them the same way an endless run does.
 ### Add a level, or change one 🛠️
 
 Find `const LEVELS` in `index.html`. Each level is one line. Add a line and you
-have eleven levels. Nothing else needs changing, because the screens count the
-table themselves: `LEVEL 3/10` becomes `LEVEL 3/11` on its own, and the list on
-the start screen lays itself out to fit — one wide column up to six levels, then
-two narrower ones, and shorter lines again if it has to.
+have twenty-one levels. Nothing else needs changing, because the screens count
+the table themselves: `LEVEL 3/20` becomes `LEVEL 3/21` on its own, and the list
+on the start screen lays itself out to fit — **one** wide column up to six
+levels, **two** narrower ones after that, and **three** once two columns would
+leave a line too thin to put a finger on (which is what twenty levels does). The
+writing on a line is sized from the longest name in the table, so renaming a
+level longer shrinks the type rather than running it into the standing on the
+right.
+
+The first ten levels can also be picked with the number keys (`1`–`9`, and `0`
+for ten). Past ten there are no keys left, so those are tapped — which is how
+every one of them is picked on a tablet anyway.
 
 | In the line | What it does |
 |-------------|--------------|

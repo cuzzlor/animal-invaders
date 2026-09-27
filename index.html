@@ -1044,7 +1044,35 @@ const LEVELS = [
     herd: "monkey", waves: 2 },
   { name: "THE DEEP FREEZE", rows: 4, cols: 8, speed: 1.40, reload: 40, aim: 0.70, hp: 2,
     herd: "penguin", freeze: FREEZE_TIME, waves: 3 },
-  { name: "THE LAST CHICK", boss: true,      speed: 1.30, bossHp: 45, waves: 2 },
+  { name: "THE ANGRY CHICK", boss: true,     speed: 1.30, bossHp: 45, waves: 2 },
+  // --- THE SECOND TEN ---
+  // Every one of these is faster than the last, and the aim keeps climbing
+  // with it. Three things change that the first ten never did:
+  //   * From THE THUNDERHEAD the herd takes THREE hits, not two.
+  //   * The herd grows to five rows of nine, and then to ten across.
+  //   * The chicken comes back CROWNED — the rainbow crown of the endless
+  //     game's stage 30, and the health that goes with it.
+  //   `reload` keeps coming down, but only so far: MAX_SHOTS lets three of
+  // their shots fall at once and no more, so past about 26 a smaller reload
+  // buys them almost nothing. Speed, aim and sheer numbers do the work.
+  { name: "THE ORCHARD",   rows: 6, cols: 8, speed: 1.45, reload: 36, aim: 0.82, hp: 2,
+    herd: "monkey", waves: 2 },
+  { name: "THE MUDBATH",   rows: 6, cols: 9, speed: 1.55, reload: 34, aim: 0.84, hp: 2,
+    herd: "pig", waves: 2 },
+  { name: "THE BLIZZARD",  rows: 5, cols: 9, speed: 1.65, reload: 32, aim: 0.86, hp: 2,
+    herd: "penguin", freeze: FREEZE_TIME, waves: 3 },
+  { name: "THE RAINBOW CHICK", boss: true, crowned: true, speed: 1.45, bossHp: 100 },
+  { name: "THE THUNDERHEAD", rows: 5, cols: 9, speed: 1.80, reload: 30, aim: 0.88, hp: 3,
+    waves: 2 },
+  { name: "THE HENHOUSE",  rows: 5, cols: 9, speed: 1.90, reload: 28, aim: 0.90, hp: 3,
+    herd: "chicken", waves: 2 },
+  { name: "THE GLACIER",   rows: 4, cols: 9, speed: 2.00, reload: 26, aim: 0.92, hp: 3,
+    herd: "penguin", freeze: FREEZE_TIME, waves: 3 },
+  { name: "THE PADDOCK",   rows: 5, cols: 9, speed: 2.10, reload: 25, aim: 0.94, hp: 3,
+    herd: "cow", waves: 3 },
+  { name: "THE WHITEOUT",  rows: 4, cols: 9, speed: 2.20, reload: 24, aim: 0.96, hp: 3,
+    freeze: FREEZE_TIME, waves: 4 },
+  { name: "THE LAST CHICK", boss: true, crowned: true, speed: 1.70, bossHp: 100, waves: 2 },
 ];
 
 // Find one kind of animal by its name, for a level that wants a herd of
@@ -1111,7 +1139,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-09-27 clutch";
+const BUILD = "2026-09-27 twenty";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
@@ -3642,18 +3670,53 @@ const SLV_TOP = 410; // where the first line sits — level with the board
 const SLV_BOT = 660; // and where the last line must END, clear of the row of
                      // buttons at 678. Between them is all the room there is.
 const SLV_GAP = 7;   // the space between two lines
-// Past six levels one column of lines would be too squashed to read, so the
-// list goes into TWO columns and fills the left one first. Six or fewer and
-// it is the single wide column it has always been.
-const SLV_COLS = LEVELS.length > 6 ? 2 : 1;
+const SLV_COLGAP = 18;   // the space between two columns
+const SLV_ROOM = 860;    // all the width the list may use, edge to edge
+// A line thinner than this is too fine to put a finger on. Past that point
+// the list takes another COLUMN rather than another shave off the height.
+const SLV_MIN_H = 26;
+// How tall one line would be at this many columns: as tall as 42, or as tall
+// as will FIT, whichever is smaller. So adding a level makes every line a
+// little shorter instead of pushing the last one down under the buttons.
+function slvRowH(cols) {
+  const rows = Math.ceil(LEVELS.length / cols);
+  return Math.min(42, Math.floor((SLV_BOT - SLV_TOP - (rows - 1) * SLV_GAP) / rows));
+}
+// Six or fewer levels and it is the single wide column it has always been.
+// Past six, one column would be too squashed to read, so it goes to TWO —
+// and past the point where two would leave a line too thin to tap, to THREE.
+// At twenty levels two columns give an 18px line and three give 29px.
+const SLV_COLS = LEVELS.length <= 6 ? 1 : slvRowH(2) >= SLV_MIN_H ? 2 : 3;
 const SLV_ROWS = Math.ceil(LEVELS.length / SLV_COLS);
-const SLV_W = SLV_COLS === 1 ? 460 : 330; // how wide one line is
-const SLV_COLGAP = 18;                    // the space between the two columns
-// How tall one line is: as tall as 42, or as tall as will FIT, whichever is
-// smaller. So adding a level makes every line a little shorter instead of
-// pushing the last one down underneath the buttons.
-const SLV_H = Math.min(42, Math.floor(
-  (SLV_BOT - SLV_TOP - (SLV_ROWS - 1) * SLV_GAP) / SLV_ROWS));
+const SLV_H = slvRowH(SLV_COLS);
+// How wide one line is. One column has never filled the screen — a 460px
+// line centred is the look — but two and three share out all the room there
+// is, because a narrow line is what makes a long name run into its standing.
+const SLV_W = SLV_COLS === 1 ? 460
+  : Math.floor((SLV_ROOM - (SLV_COLS - 1) * SLV_COLGAP) / SLV_COLS);
+// What sits where inside a line, measured off how wide the line IS rather
+// than tuned by hand for each column count — so a third column needs no new
+// numbers, only narrower ones.
+const SLV_NUM_X  = Math.round(SLV_W * 0.067);
+const SLV_FACE_X = Math.round(SLV_W * 0.164);
+const SLV_NAME_X = Math.round(SLV_W * 0.236);
+const SLV_FOOT_PT = SLV_W >= 400 ? 13 : SLV_W >= 300 ? 12 : 11;
+// How big a level's NAME is set. Not picked by hand: it is worked out from
+// the longest line there is, the same way the shop sizes a ship's blurb.
+// Three things share a line — the name, its "x3" wave tag, and where you
+// stand on it — and the standing is backed up against the right-hand end,
+// so the name gets whatever is left over. Courier is a typewriter face:
+// every letter is exactly 0.6 of the size across, which is what makes this
+// a sum and not a guess. Rename a level longer and the writing shrinks;
+// nothing runs into anything.
+// A narrow line gets the short words for where you stand ("★ HERE" rather
+// than "★ YOU ARE HERE"). ONE flag decides it, and both levelStanding() and
+// the sum below read it — a name sized against the short words while the
+// long ones were painted is exactly how two of them end up on top of
+// each other.
+const SLV_TIGHT = SLV_W < 400;
+const SLV_STAND_CH = SLV_TIGHT ? 8 : 14; // "✓ BEATEN", or "★ YOU ARE HERE"
+const SLV_NAME_GAP = 8;   // the least space between a name and its standing
 function startLevelRow(i) {
   const col = Math.floor(i / SLV_ROWS);   // down the left column, then the right
   const row = i % SLV_ROWS;
@@ -3666,7 +3729,7 @@ function startLevelRow(i) {
 // A face for each line, so the levels do not all look the same. The boss
 // level shows the chicken itself, which is fair warning.
 function levelFace(i) {
-  if (LEVELS[i].boss) return BIG_CHICK_ART;
+  if (LEVELS[i].boss) return LEVELS[i].crowned ? RAINBOW_CHICK_ART : BIG_CHICK_ART;
   // A level made of one animal shows THAT animal — the list should not
   // promise you cows and then give you a wall of penguins.
   const only = herdKind(LEVELS[i].herd);
@@ -3704,7 +3767,7 @@ function unlockedLine() {
 // A two-column line is narrower, so the longest of these has to be shorter
 // or it runs into the level's name.
 function levelStanding(i) {
-  const tight = SLV_COLS > 1;
+  const tight = SLV_TIGHT;
   if (finished && i === LEVELS.length - 1) return tight ? "✓ DONE" : "✓ FINISHED";
   if (i + 1 === bestLevel) return tight ? "★ HERE" : "★ YOU ARE HERE";
   return levelOpen(i + 1) ? "✓ BEATEN" : "LOCKED";
@@ -3716,6 +3779,16 @@ function levelWaves(i) {
   const many = LEVELS[i].waves || 1;
   return many > 1 ? "x" + many : "";
 }
+
+// See SLV_STAND_CH above: the size that fits the worst line in the table.
+const SLV_NAME_PT = Math.max(9, Math.min(SLV_W >= 400 ? 18 : 16, Math.floor(
+  LEVELS.reduce((pt, L, i) => {
+    const tag = levelWaves(i);
+    const tagW = tag ? 6 + tag.length * 0.6 * SLV_FOOT_PT : 0;
+    const room = SLV_W - SLV_NAME_X - 14 - SLV_STAND_CH * 0.6 * SLV_FOOT_PT
+                 - SLV_NAME_GAP - tagW;
+    return Math.min(pt, room / (L.name.length * 0.6));
+  }, 99))));
 
 function drawStartLevels() {
   // No heading: "TAP A LEVEL to play it" is already written above, and a
@@ -3736,31 +3809,32 @@ function drawStartLevels() {
     ctx.strokeStyle = here ? "#ffd34d" : open ? "#7ef9ff" : "#444";
     ctx.stroke();
 
-    // The number you can also press on a keyboard.
+    // Which level this is. The first ten can also be pressed on a keyboard
+    // (1-9, and 0 for ten); past that the line is tapped, the same as it is
+    // on a tablet, where none of them has a key.
     ctx.textAlign = "center";
     ctx.fillStyle = open ? "#888" : "#555";
     ctx.font = "16px 'Courier New', monospace";
-    ctx.fillText(String(i + 1), r.x + 22, mid);
+    ctx.fillText(String(i + 1), r.x + SLV_NUM_X, mid);
 
     // A face from the level. A level you have not reached is a dark shape,
     // not a picture: what is on it is part of what you are playing for.
     ctx.globalAlpha = open ? 1 : 0.22;
-    drawThing(levelFace(i), r.x + 54, mid, Math.min(30, r.h - 6));
+    drawThing(levelFace(i), r.x + SLV_FACE_X, mid, Math.min(30, r.h - 6));
     ctx.globalAlpha = 1;
 
-    // Its name, in a smaller hand when the lines are the narrow two-column
-    // sort, so a long one still clears the standing on the right.
-    const tight = SLV_COLS > 1;
+    // Its name, in a smaller hand the narrower the lines are, so a long one
+    // still clears the standing on the right.
     ctx.textAlign = "left";
     ctx.fillStyle = open ? "#fff" : "#888";
-    ctx.font = (tight ? 16 : 18) + "px 'Courier New', monospace";
-    ctx.fillText(LEVELS[i].name, r.x + 78, mid);
+    ctx.font = SLV_NAME_PT + "px 'Courier New', monospace";
+    ctx.fillText(LEVELS[i].name, r.x + SLV_NAME_X, mid);
     // How many herds it throws at you, if it is more than one. Small and
     // grey, tucked in after the name — a warning, not a heading. The name is
     // measured rather than guessed at, so it cannot be landed on.
     const many = levelWaves(i);
     if (many) {
-      const nameEnd = r.x + 78 + ctx.measureText(LEVELS[i].name).width;
+      const nameEnd = r.x + SLV_NAME_X + ctx.measureText(LEVELS[i].name).width;
       ctx.fillStyle = open ? "#888" : "#555";
       ctx.font = "12px 'Courier New', monospace";
       ctx.fillText(many, nameEnd + 6, mid);
@@ -3769,7 +3843,7 @@ function drawStartLevels() {
     // ...and where you stand on it, backed up against the right-hand end so
     // it cannot run into the name however long either of them gets.
     ctx.textAlign = "right";
-    ctx.font = (tight ? 12 : 13) + "px 'Courier New', monospace";
+    ctx.font = SLV_FOOT_PT + "px 'Courier New', monospace";
     ctx.fillStyle = here ? "#ffd34d" : open ? "#5fd66f" : "#666";
     ctx.fillText(levelStanding(i), r.x + r.w - 14, mid);
   }
