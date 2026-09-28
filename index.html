@@ -901,18 +901,35 @@ const FROST_GUN = {
 //     simply walk away from anything chasing it. So the missile takes
 //     SEEK_EDGE of the herd's OWN step as a floor under its speed, and
 //     outruns whatever it is pointed at however fast the game has become.
-//   It also does not chip your own cover. A guided thing steers round the
-// bases; only a dumb bullet ploughs into them. Without that rule it would
-// miss every time you fired from under one, which is most of the time.
+//     Under its own steam it is SLOWER than a plain bullet — it is a missile
+//     that steers, not a shot that is fired, and you get to watch it go. The
+//     floor is what stops "slower" ever meaning "too slow to catch it".
+//   It also goes ROUND your own cover rather than through it. A base is
+// solid to a missile; a dumb bullet is the only thing that ploughs into your
+// own roof. Getting round one is done in two moves and never a diagonal, so
+// that it cannot clip a corner on the way:
+//   * OUTSIDE the cover — above the band of bases or below it — it lines
+//     itself up with a column the bases do not stand in. It does that
+//     SIDEWAYS, at its own height, where there is nothing to hit.
+//   * INSIDE the band it only goes straight up or straight down. It got in
+//     by a clear column and blocks only ever disappear, so that column is
+//     still clear; sideways in there is how you fly into a wall.
+//   The column it picks is the clear one nearest the ANIMAL rather than the
+// one nearest itself, so it comes out of the cover already pointing the
+// right way. It holds that choice until it is through, or a herd walking
+// overhead would have it dithering between two gaps.
 //   It is not bought with points at all. It costs GEMS, and a gem is won by
 // beating a level — ONE for each level, the first time you beat it, and
 // never again however often you go back to it. Twenty gems is every level in
 // the game beaten once, so the missile is what finishing the course buys.
+const SEEK_SPEED = 3;         // how fast a missile flies — UNDER a plain bullet's 5
 const SEEK_EDGE  = 1.5;       // ...of the herd's own step, as a floor on its speed
 const GEM_PRICE  = 20;        // gems for the missile — every level, as it stands
 const GEM_COLOR  = "#6fe08a"; // the gem's own green, for its bar and its count
 const SEEK_COLOR = "#ff5fd0"; // the streak it draws, in the ship's own magenta
 const SEEK_TAIL  = 16;        // how long that streak is — it trails the TURN
+const SEEK_CLEAR = 7;         // the berth it gives a base block, in pixels
+const SEEK_LOOK  = 6;         // ...and how finely it hunts sideways for a way through
 
 // `damage` is how much of an animal one bullet takes off. Animals have 1
 // health to begin with, so damage 1 downs them in a single hit and 0.5 takes
@@ -944,8 +961,8 @@ const SHIPS = [
   {
     id: "seek", name: "GUIDED MISSILE", art: SEEK_ROCKET_ART, gems: GEM_PRICE,
     fire: "single", damage: 1, reload: 0, seek: true,
-    blurb: ["The SCOUT's gun with a LOCK on it —",
-            "one shot at a time, and it CANNOT miss."],
+    blurb: ["The SCOUT's gun with a LOCK on it. Slower,",
+            "steers ROUND cover, and it CANNOT miss."],
   },
   {
     id: "triple", name: "TRIPLE BLASTER", art: TRIPLE_ROCKET_ART, need: 8500,
@@ -1224,7 +1241,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-09-28 gems";
+const BUILD = "2026-09-28 roundcover";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
@@ -1334,6 +1351,7 @@ let bullets;       // YOUR shots going up:   array of {x, y, dmg}
 let shots;         // animal shots coming down: array of {x, y, emoji}
 let bases;         // the shields: array of { blocks: [{x, y, alive}] }
 let baseTop;       // top edge of the cover — the herd eats it from here down
+let baseBot;       // ...and its bottom edge. Between the two is SOLID to a missile.
 let crunch;        // steps until the next crunch of cover being eaten
 let particles;     // explosion bits: array of {x, y, vx, vy, life, maxLife, color}
 let shockwaves;    // BLAST CANNON blast rings: array of {x, y, life}
@@ -1609,6 +1627,7 @@ function buildLevel() {
     bases.push({ blocks: blocks });
   }
   baseTop = baseY;  // nothing above this line can be touching the cover
+  baseBot = baseY + BASE_BLOCKS_H * BASE_BLOCK; // ...and nothing below this one
   crunch = 0;
 
   // Re-centre the player and clear the air.
@@ -2536,18 +2555,57 @@ function update() {
   // goes at whatever it has locked onto, however far round that is, at a
   // speed the herd cannot beat. See SEEK_EDGE.
   const seeking = bullets.some((b) => b.seek);
-  const seekRun = seeking ? Math.max(PLAYER_BULLET_SPEED, herdStep() * SEEK_EDGE) : 0;
+  const seekRun = seeking ? Math.max(SEEK_SPEED, herdStep() * SEEK_EDGE) : 0;
   for (const b of bullets) {
     if (!b.seek) { b.y -= PLAYER_BULLET_SPEED; continue; }
     // Hold the lock while that animal lives; take the nearest when it dies.
     if (!b.lock || !b.lock.alive) b.lock = nearestAnimal(b.x, b.y);
     // Nothing left to chase — the wave is down. Fly on out of the top.
     if (!b.lock) { b.y -= PLAYER_BULLET_SPEED; continue; }
-    const dx = b.lock.x - b.x, dy = b.lock.y - b.y;
+    // Where it is heading THIS step. Straight at the animal, unless your own
+    // cover is in the way — see the note on the ship at the top.
+    let goX = b.lock.x, goY = b.lock.y;
+    const side = coverSide(b.y), theirs = coverSide(b.lock.y);
+    if (side === 0) {
+      // In among the bases. Straight up or straight down the column it came
+      // in by, and nothing else: that column is clear and the ones either
+      // side of it may not be.
+      goX = b.x;
+      b.gap = undefined;
+      // Level with the animal and still a way off sideways — there is
+      // nothing useful to do in here. Leave the cover by the nearer edge
+      // and come at it again from outside.
+      if (Math.abs(goY - b.y) < 0.5) {
+        goY = b.y - baseTop < baseBot - b.y ? baseTop - 1 : baseBot + 1;
+      }
+    } else if (theirs !== side) {
+      // Opposite sides of the cover, so it has to get through. Line up with
+      // a way through FIRST — sideways, at this height, where there is
+      // nothing to hit — and only then cross.
+      if (theirs === 0) {
+        // The animal is down IN the cover, eating it. Then the only column
+        // that will do is the animal's own — it has chewed that one clear —
+        // and it is worth working out afresh each step, because the animal
+        // is walking along and taking the hole with it.
+        b.gap = seekGap(b.lock.x, b.x);
+      } else if (b.gap === undefined) {
+        // Already standing in a clear column? Then that is the way through
+        // and there is nothing to go round. Only a missile with a base over
+        // its head goes hunting, and then it hunts near the ANIMAL, so that
+        // it comes out of the cover already pointing the right way.
+        b.gap = baseBlocked(b.x) ? seekGap(b.lock.x, b.x) : b.x;
+      }
+      goX = b.gap;
+      if (Math.abs(b.x - b.gap) > 0.5) goY = b.y;   // still lining up: stay level
+    } else {
+      b.gap = undefined;   // same side of the cover — nothing in the way
+    }
+    const dx = goX - b.x, dy = goY - b.y;
     const away = Math.hypot(dx, dy) || 1;
     b.fx = dx / away; b.fy = dy / away;    // where it points, for the streak
-    // Never step PAST it: the last run of all lands ON the animal, and the
-    // hit is then found by the same hit() every other bullet goes through.
+    // Never step PAST what it is going for: the last run of all lands on the
+    // animal, and the hit is then found by the same hit() every other bullet
+    // goes through.
     const run = Math.min(seekRun, away);
     b.x += b.fx * run;
     b.y += b.fy * run;
@@ -2934,9 +2992,10 @@ function update() {
       }
     }
     // Your bullets also chip away at the bases (don't shoot your own cover!).
-    // A GUIDED MISSILE does not: it steers round them. Without that it would
-    // bury itself in your own roof every time you fired from under a base,
-    // and "it cannot miss" would be a lie.
+    // A GUIDED MISSILE never reaches one — it goes round, and a test holds
+    // that it is never inside a block. This line is belt and braces: if the
+    // steering ever did let one touch a base, the missile would be swallowed
+    // by your own roof rather than quietly knocking it down.
     if (!b.seek && b.y > -20 && hitBase(b.x, b.y)) b.y = -999;
   }
   bullets = bullets.filter((b) => b.y > -20);
@@ -3159,6 +3218,51 @@ function herdStep() {
   const total = Math.max(1, plan.rows * plan.cols);
   const speedMult = 1 + (1 - alive / total) * 3;
   return INVADER_SPEED * speedMult * speedScale;
+}
+
+// ---------------------------------------------------------------------
+// coverSide(): which side of your cover something is on — -1 above the
+// bases, 1 below them, 0 in among them. A GUIDED MISSILE steers by it.
+// ---------------------------------------------------------------------
+function coverSide(y) { return y < baseTop ? -1 : y > baseBot ? 1 : 0; }
+
+// ---------------------------------------------------------------------
+// baseBlocked(): is a base still standing in this column? SEEK_CLEAR is
+// the berth a missile keeps, so that it passes a base rather than shaving
+// it. A column with NO living block in it is a way through; one with a
+// single block left in it is not, however much of the rest has gone.
+// ---------------------------------------------------------------------
+function baseBlocked(x) {
+  for (const base of bases) {
+    for (const blk of base.blocks) {
+      if (!blk.alive) continue;
+      if (Math.abs(blk.x - x) < BASE_BLOCK / 2 + SEEK_CLEAR) return true;
+    }
+  }
+  return false;
+}
+
+// ---------------------------------------------------------------------
+// seekGap(): the clear column nearest to `want` — where the animal is —
+// hunting outwards a little at a time. Where both sides are equally near
+// the animal, the one nearer the missile wins, so it does not cross the
+// screen for nothing. That tie is broken the same way every time, so the
+// same game still plays out the same way twice.
+//   The last line can only be reached if every column on the screen were
+// blocked, which three bases with gaps between them cannot do. It is there
+// so that a missile flies on rather than hanging in the air.
+// ---------------------------------------------------------------------
+function seekGap(want, from) {
+  if (!baseBlocked(want)) return want;
+  for (let d = SEEK_LOOK; d <= W; d += SEEK_LOOK) {
+    const left = want - d, right = want + d;
+    const leftOk  = left >= CELL / 2 && !baseBlocked(left);
+    const rightOk = right <= W - CELL / 2 && !baseBlocked(right);
+    if (leftOk && rightOk) return Math.abs(left - from) <= Math.abs(right - from) ? left : right;
+    if (leftOk) return left;
+    if (rightOk) return right;
+  }
+  return want;
 }
 
 // ---------------------------------------------------------------------

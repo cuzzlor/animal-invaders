@@ -848,7 +848,7 @@ back to exactly where you were — the new ship is in your hands immediately.
 | **Rapid Fire** | score 2,500 in one game | **Hold** the button and it pours out ten shots a second — but each one only hits half as hard, so most animals take two. |
 | **Twin Blaster** | score 5,000 in one game | Two cannons — two bullets every shot, so you clear the herd twice as fast. |
 | **Blast Cannon** | score 6,000 in one game | Lobs a shell that **blows up** where it lands, clearing whatever it hits and the whole ring of animals around it — **six** at a time in the thick of the herd, four along its bottom edge. A shell does **5** damage, so a tough herd costs it nothing. A quarter of a second to reload. |
-| **Guided Missile** | **20 gems** — beat every level once | The Scout's gun with a **lock** on it. One bullet at a time, full strength, no reload — the Scout's numbers exactly. The bullet does not fly straight up: it takes the animal **nearest to it** and steers all the way in, and if that animal goes down first it locks onto the next nearest. **It cannot miss.** It flies *at* the animal rather than upwards, so there is no angle it cannot make; it is never slower than the herd it is chasing; and it steers round your own cover instead of burying itself in it. |
+| **Guided Missile** | **20 gems** — beat every level once | The Scout's gun with a **lock** on it. One bullet at a time, full strength, no reload — the Scout's numbers exactly. The bullet does not fly straight up: it takes the animal **nearest to it** and steers all the way in, and if that animal goes down first it locks onto the next nearest. **It cannot miss.** It flies *at* the animal rather than upwards, so there is no angle it cannot make; it is never slower than the herd it is chasing; and it goes **around** your own cover rather than through it. It is **slower** than every other bullet in the game — you watch it go. |
 | **Triple Blaster** | score 8,500 in one game | Three cannons instead of two. The middle barrel stands **forward** on the ship, so its bullet leaves from further up the screen — the three fly as an arrowhead with the point in front, and the middle one lands first. |
 | **Double Rapid** | score 9,000 in one game | Rapid Fire with two barrels. **Hold** the button and it pours out ten **pairs** a second. Each bullet is half strength, like Rapid Fire's, so a pair downs an ordinary animal where a single bullet leaves it standing. |
 | **Red Laser** | score 10,000 in one game | A red beam that smashes clean through every animal it touches (and melts their shots). Burns for **2 seconds**, then reloads in under half of one — so it is lit five sixths of the time, and one burn carries you nearly the whole width of a wave. |
@@ -884,10 +884,52 @@ true:
 |---|---|
 | It flies **at** the animal, not upwards | A missile level with its target flies sideways at it. A bullet that insists on climbing sails over the heads of a herd that has come down to your own height — which is exactly when you need the shot. |
 | It is **never slower than the herd** | A bullet flies at 5 pixels a step. A herd speeds up as you clear it, to four times its own speed, so two animals left late in Endless slide at **14 pixels a step** — nearly three times a bullet — and would simply walk away from anything chasing them. The missile takes **1.5x the herd's own step** as a floor under its speed. |
-| It steers **round your own cover** | Only a dumb bullet ploughs into your own roof. Without this rule it would miss every time you fired from under a base, which is most of the time. |
+| It goes **around your own cover** | A base is solid to a missile, and only a dumb bullet ploughs into your own roof. Without a way round it would miss every time you fired from under a base, which is most of the time. |
 
 It also never steps **past** what it is chasing: the last run of all lands on the
 animal.
+
+#### How it gets round a base
+
+Two moves, never a diagonal, so it cannot clip a corner:
+
+- **Outside the cover** — above the band of bases or below it — it lines up with a
+  column the bases do not stand in. It does that **sideways**, at its own height,
+  where there is nothing to hit.
+- **Inside the band** it only goes straight up or straight down. It got in through
+  a clear column, and blocks only ever disappear, so that column is still clear.
+  Sideways in there is how you fly into a wall.
+
+The column it picks is the clear one nearest the **animal**, not the one nearest
+itself, so it comes out of the cover already pointing the right way — unless it is
+already standing in a clear column, in which case it simply goes up. It holds that
+choice until it is through, or a herd walking overhead would have it dithering
+between two gaps.
+
+A column counts as a way through only if **every** block in it has gone. One block
+left is a wall. So a hole you have blown right through a base is a shortcut the
+missile will use, and a half-eaten one is not.
+
+If an animal is down **among** the bases eating them, the missile follows that
+animal's own column — it has chewed one clear — and works it out afresh each step,
+because the animal is walking along and taking the hole with it.
+
+Watched step by step over 440 flights on every level, plus a sweep with the herd
+down inside the cover, **a missile is never once standing in a block of your own
+cover**. Two hundred of those 440 flights had to go round a base to manage it.
+
+#### It is slow
+
+A plain bullet flies at 5 pixels a step. A missile flies at **3**, and a detour
+round a base costs it more on top. Crossing the screen takes it about **two
+seconds**, where the Scout's bullet takes just over one.
+
+That is the other half of what 20 gems buys: a gun that cannot miss, and that you
+have to be patient with. There is no reload, so you can put as many in the air as
+you can press for, and they queue up and arrive one after another.
+
+The floor under its speed still applies — it is never slower than the herd it is
+chasing, however fast the game has become. `SEEK_SPEED` is the number.
 
 Fired from every spot along the line, on all twenty levels and across Endless
 1–45, **616 missiles out of 616 landed**. The Scout, in the very same runs, landed
@@ -899,8 +941,9 @@ you cannot pick off a column, save the top row for last, or leave one alive on
 purpose. It is one bullet at a time, where the Twin Blaster costs less and fires
 two.
 
-The knobs are `SEEK_EDGE`, `GEM_PRICE`, `SEEK_COLOR` and `SEEK_TAIL`, near the
-ships at the top of `index.html`.
+The knobs are `SEEK_SPEED`, `SEEK_EDGE`, `SEEK_CLEAR`, `GEM_PRICE`, `SEEK_COLOR`
+and `SEEK_TAIL`, near the ships at the top of `index.html`. `SEEK_CLEAR` is the
+berth it gives a base block — make it bigger and it swings wider.
 
 ### Gems 💎
 
