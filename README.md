@@ -446,6 +446,38 @@ Because the herd is slowed animal by animal, a sweep **pulls it out of shape**.
 The columns you are pointing at fall behind the ones you are not, and the neat
 grid smears. That is the gun working.
 
+#### Why the herd turns only on the step it *crosses* the line
+
+The herd drops a row every time it turns around at a screen edge, and it turns
+because one animal has gone over the line. To get back inside, that animal has
+**one step** — the step it takes straight after the turn. A herd at full speed
+always makes it: it came over the line by at most one step, so one step back
+always clears it.
+
+The cold breaks that. A **chilled** animal only walks back at two fifths of a
+step, which is not far enough, and a **frozen** one does not walk back at all.
+Left to steer the herd, either of them sits over the line turning it **every
+single step** — that is **120 rows a second**, and the whole wave lands on your
+head in about a third of a second.
+
+So an animal only counts as hitting an edge on the step it **crosses** it. One
+that is still hanging over the line after the turn has already been counted
+once. A frozen animal cannot cross anything, because it never moves.
+
+This was a real bug, and it is what a frozen animal at the edge looked like
+before the fix:
+
+| Held over the line by | The herd turned | It fell |
+|---|---|---|
+| A **chilled** animal | 60 times in 300 steps | 1,200px |
+| A **frozen** animal | every step, the whole time you held it | 2,400px in one second |
+| Nothing — a herd at full speed | **once** | 20px |
+
+Spraying the edge of a herd, over 161 different line-ups: **58%** of them lost
+the game inside three seconds. Now none of them do, and the worst half-second
+anywhere is one row. The tank makes no difference either way — the fall starts
+inside the first one.
+
 The **tank** is three seconds, a little under the Flamethrower's three and a
 half, and it fills at **1.75 a step** where the flame fills at 1:
 

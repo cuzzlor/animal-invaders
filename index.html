@@ -1165,7 +1165,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-09-28 oneshard";
+const BUILD = "2026-09-28 edgefix";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
@@ -2446,12 +2446,29 @@ function update() {
   // Move them sideways. If any hits an edge, the whole herd drops and
   // reverses direction. The boss is far too wide to use CELL here, so we
   // measure each one by its own size.
+  //   Only the step an animal CROSSES the line counts, which is why the
+  // position before the move is kept. One still hanging over the edge after
+  // the turn has already been counted once, and counting it again would flip
+  // the herd straight back and drop it another row — and another, and
+  // another, one every step, until it got back inside.
+  //   A herd at full speed never notices: it came over the line by at most
+  // one step, so the one step it takes after the turn always carries it back
+  // inside. The FROST THROWER is what makes this matter. A chilled animal
+  // only walks back at ICE_SLOW, which is not far enough, and a FROZEN one
+  // does not walk back AT ALL: it sits over the line for as long as you hold
+  // it there. Counting either of them again turned the herd every single
+  // step — 120 rows a second — and dropped the whole wave on your head.
+  // Keeping the comparison to the step it crosses fixes all of it at once,
+  // and a frozen animal cannot cross anything, because it never moves.
   let hitEdge = false;
   for (const inv of invaders) {
     if (!inv.alive) continue;
+    const was = inv.x;
     inv.x += step * invaderDir * coldStep(inv);
     const half = sizeOf(inv) / 2;
-    if (inv.x > W - half || inv.x < half) hitEdge = true;
+    const wasOut = was > W - half || was < half;
+    const nowOut = inv.x > W - half || inv.x < half;
+    if (nowOut && !wasOut) hitEdge = true;
   }
   if (hitEdge) {
     invaderDir *= -1;
