@@ -848,7 +848,7 @@ back to exactly where you were — the new ship is in your hands immediately.
 | **Rapid Fire** | score 2,500 in one game | **Hold** the button and it pours out ten shots a second — but each one only hits half as hard, so most animals take two. |
 | **Twin Blaster** | score 5,000 in one game | Two cannons — two bullets every shot, so you clear the herd twice as fast. |
 | **Blast Cannon** | score 6,000 in one game | Lobs a shell that **blows up** where it lands, clearing whatever it hits and the whole ring of animals around it — **six** at a time in the thick of the herd, four along its bottom edge. A shell does **5** damage, so a tough herd costs it nothing. A quarter of a second to reload. |
-| **Guided Missile** | score 7,000 in one game | The Scout's gun with a **lock** on it. One bullet at a time, full strength, no reload — the Scout's numbers exactly. The bullet does not fly straight up: it takes the animal **nearest to it** and steers all the way in, and if that animal goes down first it locks onto the next nearest. **It cannot miss.** It flies *at* the animal rather than upwards, so there is no angle it cannot make; it is never slower than the herd it is chasing; and it steers round your own cover instead of burying itself in it. |
+| **Guided Missile** | **20 gems** — beat every level once | The Scout's gun with a **lock** on it. One bullet at a time, full strength, no reload — the Scout's numbers exactly. The bullet does not fly straight up: it takes the animal **nearest to it** and steers all the way in, and if that animal goes down first it locks onto the next nearest. **It cannot miss.** It flies *at* the animal rather than upwards, so there is no angle it cannot make; it is never slower than the herd it is chasing; and it steers round your own cover instead of burying itself in it. |
 | **Triple Blaster** | score 8,500 in one game | Three cannons instead of two. The middle barrel stands **forward** on the ship, so its bullet leaves from further up the screen — the three fly as an arrowhead with the point in front, and the middle one lands first. |
 | **Double Rapid** | score 9,000 in one game | Rapid Fire with two barrels. **Hold** the button and it pours out ten **pairs** a second. Each bullet is half strength, like Rapid Fire's, so a pair downs an ordinary animal where a single bullet leaves it standing. |
 | **Red Laser** | score 10,000 in one game | A red beam that smashes clean through every animal it touches (and melts their shots). Burns for **2 seconds**, then reloads in under half of one — so it is lit five sixths of the time, and one burn carries you nearly the whole width of a wave. |
@@ -874,6 +874,9 @@ it measures the bank.
 The Scout's gun with a lock on it. Same one bullet at a time, same full
 strength, same no reload. You stop lining the ship up and just press fire.
 
+It is the one ship that is not bought with points at all. It costs **20 gems**,
+and gems come from beating levels — see [Gems](#gems-) below.
+
 **It cannot miss**, and three rules are what make that true rather than nearly
 true:
 
@@ -896,13 +899,48 @@ you cannot pick off a column, save the top row for last, or leave one alive on
 purpose. It is one bullet at a time, where the Twin Blaster costs less and fires
 two.
 
-The knobs are `SEEK_EDGE`, `SEEK_PRICE`, `SEEK_COLOR` and `SEEK_TAIL`, near the
+The knobs are `SEEK_EDGE`, `GEM_PRICE`, `SEEK_COLOR` and `SEEK_TAIL`, near the
 ships at the top of `index.html`.
+
+### Gems 💎
+
+**Beat a level and you win a gem. The first time, and only the first time.**
+
+Go back and beat it again and you get the score, not another gem. There are
+**20 levels and the Guided Missile costs 20 gems**, so the missile is exactly
+what beating every level in the game buys — and there is no other way to get
+it. No score, however big, opens it.
+
+| | |
+|---|---|
+| Beat a level you have never beaten | **+1 gem** |
+| Beat it again | nothing |
+| Clear a wave of a multi-wave level | nothing — the **level** pays, not the wave |
+| Clear a stage of Endless | nothing — gems come from levels |
+
+The WELL DONE screen shows the gem as you win it, and says nothing at all when
+you have already had that level's gem. That is the rule, on the screen.
+
+What is written down on your device is **which levels have paid**, not how many
+gems you hold. "The first time" is a fact about a level, and a count on its own
+cannot tell you whether the level you just beat is one you also beat last week.
+
+**A game you had already part-played keeps what it earned.** The first time the
+game runs without a gem list it works one out from how far you had got: every
+level below the furthest you have reached, plus the last one if you had finished
+the course. Somebody who had beaten fourteen levels starts with thirteen gems,
+not nothing. It happens once — after that there is a real list, and it is left
+alone.
+
+`GEM_PRICE` is what the missile costs and it lives with the ship near the top of
+`index.html`. Make it smaller and the missile arrives before you have finished
+the game.
 
 ### The bank 🏦
 
 **Two** ships are paid for out of the bank: the Flamethrower at **250,000** and
-the Frost Thrower at **500,000**. Both are far more than one game can make, so
+the Frost Thrower at **500,000**. (A third, the Guided Missile, is paid for in
+**gems** instead — see above.) Both are far more than one game can make, so
 neither is bought with one game.
 
 **Every point you score, in every game you play, goes into the bank as well as

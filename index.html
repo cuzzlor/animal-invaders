@@ -301,6 +301,7 @@ const SPRITE_PAL = {
   'g': '#6fe08a', 'v': '#a86cf0', // green & violet, for two of the ships
   'e': '#2ea8ff',                 // electric blue, for the ELECTRIC ARC
   'z': '#ff5fd0', 'Z': '#a3178a', // hot & deep magenta, for the GUIDED MISSILE
+  'j': '#1f7a45',                 // deep green, the GEM's underside ('g' is its face)
   'f': '#ffec99', 'a': '#e0a51e', // pale fluff & deep yellow, for the BIG CHICK
 };
 // spr(): wraps a grid of strings so the game knows "this is a sprite".
@@ -355,6 +356,15 @@ const BOMB_ROCKET_ART = spr([
   "vvv.sssss.vvv", "vv..sssss..vv", "v...WsssW...v", "...GGGGGGG...",
   "....OOOOO....", ".....OYO.....",
 ]);
+// A GEM. One is won for each level, the first time you beat it, and twenty
+// of them buy the GUIDED MISSILE. Eleven across and nine down: a cut stone
+// with a white top face, a bright body and a deep green underside.
+const GEM_ART = spr([
+  ".WWWWWWWWW.", "WgggWWWgggW", "WggWgggWggW", ".jgggWgggj.",
+  ".jjgggggjj.", "..jjgggjj..", "...jjgjj...", "....jgj....",
+  ".....j.....",
+]);
+
 // A seeker's eye at the tip, which is the whole ship: it looks where it is
 // going, and where it is going is wherever the nearest animal is.
 const SEEK_ROCKET_ART = spr([
@@ -894,8 +904,13 @@ const FROST_GUN = {
 //   It also does not chip your own cover. A guided thing steers round the
 // bases; only a dumb bullet ploughs into them. Without that rule it would
 // miss every time you fired from under one, which is most of the time.
+//   It is not bought with points at all. It costs GEMS, and a gem is won by
+// beating a level — ONE for each level, the first time you beat it, and
+// never again however often you go back to it. Twenty gems is every level in
+// the game beaten once, so the missile is what finishing the course buys.
 const SEEK_EDGE  = 1.5;       // ...of the herd's own step, as a floor on its speed
-const SEEK_PRICE = 7000;      // between the BLAST CANNON and the TRIPLE BLASTER
+const GEM_PRICE  = 20;        // gems for the missile — every level, as it stands
+const GEM_COLOR  = "#6fe08a"; // the gem's own green, for its bar and its count
 const SEEK_COLOR = "#ff5fd0"; // the streak it draws, in the ship's own magenta
 const SEEK_TAIL  = 16;        // how long that streak is — it trails the TURN
 
@@ -927,7 +942,7 @@ const SHIPS = [
   // whole of the difference. shootBullets() hands the flag to the bullet
   // and update() does the steering.
   {
-    id: "seek", name: "GUIDED MISSILE", art: SEEK_ROCKET_ART, need: SEEK_PRICE,
+    id: "seek", name: "GUIDED MISSILE", art: SEEK_ROCKET_ART, gems: GEM_PRICE,
     fire: "single", damage: 1, reload: 0, seek: true,
     blurb: ["The SCOUT's gun with a LOCK on it —",
             "one shot at a time, and it CANNOT miss."],
@@ -1209,7 +1224,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-09-28 guided";
+const BUILD = "2026-09-28 gems";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
@@ -1365,6 +1380,49 @@ function unfinishByAddingALevel() {
 }
 unfinishByAddingALevel();
 
+// --- GEMS ---
+// A gem for every level, the FIRST time you beat it. Beat it again and you
+// get the score, not another gem.
+//   What is written down is WHICH levels have paid, not how many gems you
+// hold. "The first time" is a fact about a level, and a count on its own
+// cannot tell you whether the level you have just beaten is one you also
+// beat last week. Twenty numbers is nothing to store, and it is the truth.
+const GEM_KEY = "ai-gems";
+let gemLevels = [];
+try {
+  const raw = JSON.parse(localStorage.getItem(GEM_KEY));
+  if (Array.isArray(raw)) {
+    gemLevels = raw.filter((n) => typeof n === "number" && n >= 1 && n <= LEVELS.length);
+  }
+} catch (e) {}
+function saveGems() {
+  try { localStorage.setItem(GEM_KEY, JSON.stringify(gemLevels)); } catch (e) {}
+}
+function gems() { return gemLevels.length; }
+function hasGem(n) { return gemLevels.indexOf(n) >= 0; }
+// Win one, and say whether it WAS won — the screens use the answer to decide
+// whether to shout about it, and beating a level twice must not shout twice.
+function awardGem(n) {
+  if (n < 1 || n > LEVELS.length || hasGem(n)) return false;
+  gemLevels.push(n);
+  saveGems();
+  return true;
+}
+// A game with levels already beaten BEFORE gems existed must not be asked to
+// beat them again. There is no record to read the first time, so the record
+// there IS gets read instead: every level below the furthest you have
+// reached has been beaten, and the last one too if you finished the course.
+// It runs once — after that there is a gem list, and this leaves it alone.
+function seedGemsFromProgress() {
+  let raw = null;
+  try { raw = localStorage.getItem(GEM_KEY); } catch (e) {}
+  if (raw !== null) return;
+  for (let n = 1; n < bestLevel; n++) gemLevels.push(n);
+  if (finished) awardGem(LEVELS.length);
+  saveGems();
+}
+seedGemsFromProgress();
+
 function inLevels() { return mode === "levels"; }
 function saveMode() { try { localStorage.setItem(MODE_KEY, mode); } catch (e) {} }
 function saveRung() { try { localStorage.setItem(RUNG_KEY, String(bestLevel)); } catch (e) {} }
@@ -1389,6 +1447,7 @@ let gameOverHandled; // did we already deal with this game over (save score etc.
 let enteringName;  // true while the "new high score!" name box is open
 let lastEntry;     // the run you just saved, so we can highlight it gold
 let justUnlocked = []; // ships the run you just finished earned, to shout about
+let gemJustWon = false; // did the level you have just beaten pay a gem?
 
 // Remember which keys are currently held down.
 const keys = {};
@@ -1582,6 +1641,8 @@ function newGame(startState) {
   wave = 1;              // the first wave of whatever level you are on
   banked = 0;            // nothing of THIS run is in the bank yet...
   bankAtRunStart = bank; // ...and this is what the bank held before it began
+  gemsAtRunStart = gems();
+  gemJustWon = false;
   lives = STARTING_LIVES;
   stage = 1;
   state = startState;
@@ -1777,6 +1838,10 @@ function nextStage() {
     buildLevel();
     return;
   }
+  // A GEM for the level — the first time you beat it, and only then. This
+  // sits above the split below so that the last level pays exactly like
+  // every other one: the YOU WIN screen is still a level being beaten.
+  gemJustWon = awardGem(stage);
   // LEVELS stops at the end of every level. Clearing the LAST one finishes
   // the whole game; clearing any other says WELL DONE, opens the one after
   // it, and puts you back on the list to choose what to play next.
@@ -3349,6 +3414,7 @@ let bank = 0;
 try { bank = Math.max(0, Number(localStorage.getItem(BANK_KEY)) || 0); } catch (e) {}
 let banked = 0;            // how much of THIS run has gone in already
 let bankAtRunStart = bank; // what the bank held when this run began
+let gemsAtRunStart = gems(); // ...and how many gems, for the same reason
 let bankSaved = bank;      // what was last written down in the browser's store
 const BANK_STEP = 250;     // points the bank must grow by before it is written again
 
@@ -3376,6 +3442,7 @@ function bankPoints() {
 // same way. Nothing keeps a list of "ships I own" — there is nothing to go
 // out of step with.
 function unlocked(ship) {
+  if (ship.gems) return gems() >= ship.gems;
   if (ship.bank) return bank >= ship.bank;
   return bestRun >= ship.need;
 }
@@ -3385,7 +3452,9 @@ function unlocked(ship) {
 // game-over screen, the WELL DONE screen and the YOU WIN screen can never
 // disagree about what you have just won.
 function shipsWonThisRun() {
-  return SHIPS.filter((s) => s.bank
+  return SHIPS.filter((s) => s.gems
+    ? (gemsAtRunStart < s.gems && gems() >= s.gems)
+    : s.bank
     ? (bankAtRunStart < s.bank && bank >= s.bank)
     : (s.need > 0 && bestRun < s.need && score >= s.need));
 }
@@ -3908,6 +3977,13 @@ function bankLine() {
   return owing ? "   •   bank: " + bank : "";
 }
 
+// gemLine(): "   •   gems: 14/20" to tack on the end of a line, the same way
+// bankLine() does, and nothing at all once the ship gems pay for is yours.
+function gemLine() {
+  const owing = SHIPS.some((s) => s.gems && !unlocked(s));
+  return owing ? "   •   gems: " + gems() + "/" + GEM_PRICE : "";
+}
+
 function unlockedLine() {
   if (justUnlocked.length === 1) {
     return "★ NEW SHIP UNLOCKED: " + justUnlocked[0].name + " ★";
@@ -4011,6 +4087,8 @@ function drawStartLevels() {
 // the line at the foot of the screen. So the height is not fixed: it is
 // worked out from how many ships there are. Add a ship and they all get a
 // little shorter together, and none of them falls off the bottom.
+const SHOP_TOP_PT   = 26;  // the size of the counts line above the cards...
+const SHOP_TOP_EDGE = 16;  // ...and the room it must leave at each side
 const SHOP_CARD_TOP = 128; // where the first ship card starts
 const SHOP_CARD_BOT = 838; // the last card must finish ABOVE the buttons at 848
 let SHOP_CARD_GAP = 6;     // the space between two cards — see just below
@@ -4086,12 +4164,20 @@ function drawShop() {
   ctx.font = "42px 'Courier New', monospace";
   ctx.fillText("SHIP SHOP", W / 2, 62);
   ctx.fillStyle = "#ffd34d";
-  ctx.font = "26px 'Courier New', monospace";
-  ctx.fillText("BEST RUN: " + bestRun + "   •   BANK: " + bank, W / 2, 94);
+  // Three counts on one line now, and the bank can run to seven digits, so
+  // the size is worked out from the line rather than picked. Courier is a
+  // typewriter face — every letter is 0.6 of the size across — which makes
+  // that a sum. SHOP_TOP_PT is the size it has always been, and the line
+  // only ever gets SMALLER than that.
+  const tally = "BEST RUN: " + bestRun + "   •   BANK: " + bank +
+                "   •   GEMS: " + gems() + "/" + GEM_PRICE;
+  const fit = Math.min(SHOP_TOP_PT, Math.floor((W - 2 * SHOP_TOP_EDGE) / (0.6 * tally.length)));
+  ctx.font = fit + "px 'Courier New', monospace";
+  ctx.fillText(tally, W / 2, 94);
   ctx.fillStyle = "#888";
   ctx.font = "17px 'Courier New', monospace";
-  ctx.fillText("Most ships are earned in ONE big game." +
-               "   •   The last two fill the bank up slowly", W / 2, 116);
+  ctx.fillText("Most ships are earned in ONE big game.   •   Two fill the bank" +
+               "   •   One costs GEMS", W / 2, 116);
 
   for (let i = 0; i < SHIPS.length; i++) {
     const ship = SHIPS[i];
@@ -4135,6 +4221,7 @@ function drawShop() {
     ctx.fillStyle = flying ? "#ffd34d" : mine ? "#5fd66f" : "#777";
     ctx.fillText(flying ? "★ FLYING THIS ONE"
                  : mine ? (ship.need === 0 ? "✓ ALWAYS YOURS" : "✓ EARNED")
+                 : ship.gems ? "LOCKED — win " + ship.gems + " gems"
                  : ship.bank ? "LOCKED — the bank must reach " + ship.bank
                  : "LOCKED — score " + ship.need + " in one game",
                  tx, y + CARD_FOOT_Y);
@@ -4145,18 +4232,21 @@ function drawShop() {
       // the bank against the price. It gets the bottom line of the card to
       // itself, clear of the writing above.
       const barW = CARD_BAR_W;
-      const got  = ship.bank ? bank : bestRun;
-      const want = ship.bank ? ship.bank : ship.need;
+      const got  = ship.gems ? gems() : ship.bank ? bank : bestRun;
+      const want = ship.gems ? ship.gems : ship.bank ? ship.bank : ship.need;
       ctx.fillStyle = "rgba(255,255,255,0.12)";
       ctx.fillRect(tx, y + CARD_BAR_Y, barW, 4);
-      ctx.fillStyle = ship.bank ? "#ff8c1a" : "#7ef9ff";
+      ctx.fillStyle = ship.gems ? GEM_COLOR : ship.bank ? "#ff8c1a" : "#7ef9ff";
       ctx.fillRect(tx, y + CARD_BAR_Y, barW * Math.min(1, got / want), 4);
       ctx.fillStyle = "#666";
       ctx.font = (CARD_TIGHT ? 11 : 13) + "px 'Courier New', monospace";
       // Short labels. This line sits to the RIGHT of the bar, so what room
       // is left is small, and the number is the part that has to be read.
       // "in the bank: 249999" ran off the edge of the card; "bank:" does not.
-      ctx.fillText((ship.bank ? "bank: " : "best: ") + got,
+      // The gem count says what it is OUT OF, because twenty is a number you
+      // can picture and 249,999 is not.
+      ctx.fillText(ship.gems ? "gems: " + got + " of " + want
+                   : (ship.bank ? "bank: " : "best: ") + got,
                    tx + barW + 8, y + CARD_BAR_Y + 3);
     }
   }
@@ -4859,7 +4949,7 @@ function draw() {
     ctx.font = "18px 'Courier New', monospace";
     ctx.fillText("Move with ← →   •   Shoot with Space", W / 2, 330);
     ctx.fillText("Flying: " + currentShip().name + "   •   best run: " + bestRun +
-                 bankLine(), W / 2, 360);
+                 bankLine() + gemLine(), W / 2, 360);
     // Which copy of the game this is — see BUILD, up at the top. Small and
     // grey, because it is only there for the day a phone will not update.
     // The build, and the frames a second this device is really managing. Both
@@ -4898,7 +4988,7 @@ function draw() {
     } else {
       ctx.fillStyle = "#888";
       ctx.font = "20px 'Courier New', monospace";
-      ctx.fillText("Best run: " + bestRun + bankLine(), W / 2, 254);
+      ctx.fillText("Best run: " + bestRun + bankLine() + gemLine(), W / 2, 254);
     }
     // While the name box is up, that HTML pop-up covers the middle — don't
     // draw the board or the buttons behind it. Once you've saved (or if you
@@ -4926,25 +5016,44 @@ function draw() {
     ctx.fillText("LEVEL " + stage + " — " + LEVELS[stage - 1].name, W / 2, 382);
     ctx.font = "22px 'Courier New', monospace";
     ctx.fillText("Score: " + score, W / 2, 418);
+    // What comes under the score is not always the same: a gem is only won
+    // the FIRST time you beat a level, and a ship only now and then. So the
+    // lines are laid one under the next from a cursor, rather than each
+    // having a fixed place of its own with a hole where it would have been.
+    let cy = 466;
     // Which level that just opened, which is the reason to go back and pick.
     const opened = stage + 1;
     if (opened <= LEVELS.length) {
       ctx.fillStyle = "#7ef9ff";
       ctx.font = "22px 'Courier New', monospace";
       ctx.fillText("LEVEL " + opened + " — " + LEVELS[opened - 1].name +
-                   " is open now", W / 2, 466);
+                   " is open now", W / 2, cy);
+      cy += 40;
+    }
+    // The GEM. Beating this level again says nothing here, which is the rule
+    // — one gem a level, the first time — made plain on the screen.
+    if (gemJustWon) {
+      ctx.font = "21px 'Courier New', monospace";
+      const won = "+1 GEM   —   " + gems() + " of " + GEM_PRICE;
+      const half = ctx.measureText(won).width / 2;
+      drawThing(GEM_ART, W / 2 + 18 - half - 20, cy, 26);
+      ctx.fillStyle = GEM_COLOR;
+      ctx.fillText(won, W / 2 + 18, cy);
+      cy += 40;
     }
     if (justUnlocked.length > 0) {
       ctx.fillStyle = "#ffd34d";
       ctx.font = "21px 'Courier New', monospace";
-      ctx.fillText(unlockedLine(), W / 2, 506);
+      ctx.fillText(unlockedLine(), W / 2, cy);
+      cy += 40;
     }
+    cy += 6;
     ctx.fillStyle = "#7ef9ff";
     ctx.font = "19px 'Courier New', monospace";
-    ctx.fillText("▶  TAP to play it now", W / 2, 552);
+    ctx.fillText("▶  TAP to play it now", W / 2, cy);
     ctx.fillStyle = "#888";
     ctx.font = "17px 'Courier New', monospace";
-    ctx.fillText("...or wait, and choose a level instead", W / 2, 586);
+    ctx.fillText("...or wait, and choose a level instead", W / 2, cy + 34);
   }
 
   // You finished the course. This screen only ever appears in LEVELS —
@@ -4959,7 +5068,11 @@ function draw() {
     ctx.fillText("YOU WIN!", W / 2, 148);
     ctx.fillStyle = "#fff";
     ctx.font = "22px 'Courier New', monospace";
-    ctx.fillText("All " + LEVELS.length + " levels beaten", W / 2, 192);
+    // The last level pays its gem like every other one, and on this screen
+    // that gem is usually the twentieth — so it goes on the line that is
+    // already about having beaten everything.
+    ctx.fillText("All " + LEVELS.length + " levels beaten" +
+                 (gemJustWon ? "   •   +1 GEM" : ""), W / 2, 192);
     ctx.fillText("Score: " + score, W / 2, 224);
     if (justUnlocked.length > 0) {
       ctx.fillStyle = "#ffd34d";
