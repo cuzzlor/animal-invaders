@@ -848,6 +848,7 @@ back to exactly where you were — the new ship is in your hands immediately.
 | **Rapid Fire** | score 2,500 in one game | **Hold** the button and it pours out ten shots a second — but each one only hits half as hard, so most animals take two. |
 | **Twin Blaster** | score 5,000 in one game | Two cannons — two bullets every shot, so you clear the herd twice as fast. |
 | **Blast Cannon** | score 6,000 in one game | Lobs a shell that **blows up** where it lands, clearing whatever it hits and the whole ring of animals around it — **six** at a time in the thick of the herd, four along its bottom edge. A shell does **5** damage, so a tough herd costs it nothing. A quarter of a second to reload. |
+| **Guided Missile** | score 7,000 in one game | The Scout's gun with a **lock** on it. One bullet at a time, full strength, no reload — the Scout's numbers exactly. The bullet does not fly straight up: it takes the animal **nearest to it** and steers all the way in, and if that animal goes down first it locks onto the next nearest. **It cannot miss.** It flies *at* the animal rather than upwards, so there is no angle it cannot make; it is never slower than the herd it is chasing; and it steers round your own cover instead of burying itself in it. |
 | **Triple Blaster** | score 8,500 in one game | Three cannons instead of two. The middle barrel stands **forward** on the ship, so its bullet leaves from further up the screen — the three fly as an arrowhead with the point in front, and the middle one lands first. |
 | **Double Rapid** | score 9,000 in one game | Rapid Fire with two barrels. **Hold** the button and it pours out ten **pairs** a second. Each bullet is half strength, like Rapid Fire's, so a pair downs an ordinary animal where a single bullet leaves it standing. |
 | **Red Laser** | score 10,000 in one game | A red beam that smashes clean through every animal it touches (and melts their shots). Burns for **2 seconds**, then reloads in under half of one — so it is lit five sixths of the time, and one burn carries you nearly the whole width of a wave. |
@@ -855,8 +856,8 @@ back to exactly where you were — the new ship is in your hands immediately.
 | **Frost Thrower** | fill the bank to 500,000 | **Hold** and it sprays cold instead of fire. Everything it touches walks at **two fifths** of its speed; hold it on one animal for **four tenths of a second** and that animal **freezes solid** — it stops walking, stops coming down with the herd, and stops shooting. Keep holding and it stays frozen; let go and it has one second left. Bites seven sixteenths of an animal at a time, three times a second at the mouth, so three fills see one off. Three seconds of fuel a tank, and it refills in under two. It **chills their falling shots** rather than burning them up, so the air in front of you is slowed, never cleared. It bites **three times** as hard on a chicken. The **Big Chick** is the one thing it cannot hold: three seconds and it shatters the ice, and the piece that comes at you costs three hearts. |
 | **Flamethrower** | fill the bank to 250,000 | **Hold** the button and it pours out fire. It burns what it touches **and sets it alight**, and the fire goes on eating long after you have swung away. Slow on any one animal, frightening on a herd. Three and a half seconds of fuel in a tank. It bites **four times** as hard on a chicken, fire and all — which took it from 59 seconds against one to 15. |
 
-Rapid Fire, the Double Rapid and the Flamethrower are the three ships you
-**hold** the button for; every other one fires once per press.
+Rapid Fire, the Double Rapid, the Flamethrower and the Frost Thrower are the
+four ships you **hold** the button for; every other one fires once per press.
 
 The Triple Blaster's arrowhead keeps its shape the whole way up, because every
 bullet in the game flies at the same speed. `TRIPLE_SPREAD` is how far out the
@@ -867,6 +868,36 @@ see which ones need one more.
 The shop shows a bar creeping toward each ship, so you can see how close you
 are. For most ships the bar measures your best single run. For the Flamethrower
 it measures the bank.
+
+### The Guided Missile 🎯
+
+The Scout's gun with a lock on it. Same one bullet at a time, same full
+strength, same no reload. You stop lining the ship up and just press fire.
+
+**It cannot miss**, and three rules are what make that true rather than nearly
+true:
+
+| Rule | Why it is needed |
+|---|---|
+| It flies **at** the animal, not upwards | A missile level with its target flies sideways at it. A bullet that insists on climbing sails over the heads of a herd that has come down to your own height — which is exactly when you need the shot. |
+| It is **never slower than the herd** | A bullet flies at 5 pixels a step. A herd speeds up as you clear it, to four times its own speed, so two animals left late in Endless slide at **14 pixels a step** — nearly three times a bullet — and would simply walk away from anything chasing them. The missile takes **1.5x the herd's own step** as a floor under its speed. |
+| It steers **round your own cover** | Only a dumb bullet ploughs into your own roof. Without this rule it would miss every time you fired from under a base, which is most of the time. |
+
+It also never steps **past** what it is chasing: the last run of all lands on the
+animal.
+
+Fired from every spot along the line, on all twenty levels and across Endless
+1–45, **616 missiles out of 616 landed**. The Scout, in the very same runs, landed
+165 of 440. Against the last two animals of Endless 44 — the fastest herd in the
+game — the missile landed 22 of 22 and the Scout 3 of 22.
+
+What you give up is **choosing**. The missile takes the animal nearest to it, so
+you cannot pick off a column, save the top row for last, or leave one alive on
+purpose. It is one bullet at a time, where the Twin Blaster costs less and fires
+two.
+
+The knobs are `SEEK_EDGE`, `SEEK_PRICE`, `SEEK_COLOR` and `SEEK_TAIL`, near the
+ships at the top of `index.html`.
 
 ### The bank 🏦
 
@@ -1034,12 +1065,17 @@ frame, with branches forking off it and dying away, and every jump crackles at
 its own brightness — so it gutters and flickers like a live wire instead of
 sitting there like a painted line.
 
-### A shop of ten 🏪
+### A shop of eleven 🏪
 
 Past eight ships one column of cards is too short to hold a ship's name, what it
 does and what it costs without one line landing on another. So the shop goes
 into **two columns**, the same as the level list does — and two columns make the
 cards **taller**, not shorter.
+
+Eleven ships is one more than the number row has keys for. `0` has always meant
+ten; `-` now means **eleven**, because that is the key that comes next along the
+top row. Slipping the Guided Missile in at number five would otherwise have
+quietly cost the Frost Thrower the key it always had.
 
 A narrow card has no room for a FLY THIS button beside it, so **the whole card
 is the button**. Again the same as the level list, where you tap a line rather

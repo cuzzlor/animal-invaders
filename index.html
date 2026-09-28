@@ -300,6 +300,7 @@ const SPRITE_PAL = {
   'r': '#8c1f1f', 'L': '#ffd7d7', // deep red & hot laser-white, for the ships
   'g': '#6fe08a', 'v': '#a86cf0', // green & violet, for two of the ships
   'e': '#2ea8ff',                 // electric blue, for the ELECTRIC ARC
+  'z': '#ff5fd0', 'Z': '#a3178a', // hot & deep magenta, for the GUIDED MISSILE
   'f': '#ffec99', 'a': '#e0a51e', // pale fluff & deep yellow, for the BIG CHICK
 };
 // spr(): wraps a grid of strings so the game knows "this is a sprite".
@@ -353,6 +354,15 @@ const BOMB_ROCKET_ART = spr([
   ".vvvWDCDWvvv.", ".vvvWDDDWvvv.", ".vvvWWWWWvvv.", ".vvvsssssvvv.",
   "vvv.sssss.vvv", "vv..sssss..vv", "v...WsssW...v", "...GGGGGGG...",
   "....OOOOO....", ".....OYO.....",
+]);
+// A seeker's eye at the tip, which is the whole ship: it looks where it is
+// going, and where it is going is wherever the nearest animal is.
+const SEEK_ROCKET_ART = spr([
+  "......C......", ".....zCz.....", "....zzCzz....", "...zzzCzzz...",
+  "..zzzzzzzzz..", "..zzWWWWWzz..", "..zzWDDDWzz..", "..zzWDCDWzz..",
+  "..zzWDDDWzz..", "..zzWWWWWzz..", "..zzssssszz..", ".zzzssssszzz.",
+  "ZZz.sssss.zZZ", "ZZ..sssss..ZZ", "Z...WsssW...Z", "...GGGGGGG...",
+  "....zzzzz....", ".....zCz.....",
 ]);
 const LASER_ROCKET_ART = spr([
   "......L......", ".....LLL.....", "....RLLLR....", "...RRRLRRR...",
@@ -864,6 +874,31 @@ const FROST_GUN = {
   paint: FROST_PAINT, ice: true, bossBite: BOSS_ICE_BITE,
 };
 
+// ---------------------------------------------------------------------
+// THE GUIDED MISSILE — the SCOUT's gun, with a lock on it.
+//   One bullet at a time, full strength, no reload: the SCOUT's gun, number
+// for number. The one difference is that the bullet does not fly straight
+// up. It takes the animal NEAREST it and steers all the way in, and if that
+// animal goes down before it arrives it locks onto the next nearest. You do
+// not line the ship up any more. You press fire.
+//   Two rules are what make "it cannot miss" true rather than nearly true.
+//   * IT FLIES AT THE ANIMAL, not upwards. A missile level with its target
+//     flies sideways at it. There is no angle it cannot make, and it can
+//     never fly PAST one: the last step of a run lands ON the animal.
+//   * IT IS NEVER SLOWER THAN THE HERD. A bullet flies at
+//     PLAYER_BULLET_SPEED, which a late ENDLESS herd beats outright — by
+//     stage 45 the herd slides at three times a bullet's speed, and it would
+//     simply walk away from anything chasing it. So the missile takes
+//     SEEK_EDGE of the herd's OWN step as a floor under its speed, and
+//     outruns whatever it is pointed at however fast the game has become.
+//   It also does not chip your own cover. A guided thing steers round the
+// bases; only a dumb bullet ploughs into them. Without that rule it would
+// miss every time you fired from under one, which is most of the time.
+const SEEK_EDGE  = 1.5;       // ...of the herd's own step, as a floor on its speed
+const SEEK_PRICE = 7000;      // between the BLAST CANNON and the TRIPLE BLASTER
+const SEEK_COLOR = "#ff5fd0"; // the streak it draws, in the ship's own magenta
+const SEEK_TAIL  = 16;        // how long that streak is — it trails the TURN
+
 // `damage` is how much of an animal one bullet takes off. Animals have 1
 // health to begin with, so damage 1 downs them in a single hit and 0.5 takes
 // two — and past stage TOUGH_AFTER they have 2, so it's two hits and four.
@@ -887,6 +922,15 @@ const SHIPS = [
     damage: 1, reload: BOMB_RELOAD,
     blurb: ["A shell that BLOWS UP where it lands,",
             "wiping out all nearby. Reloads " + secs(BOMB_RELOAD) + "."],
+  },
+  // No new firing code: it is a `single` like the SCOUT, and `seek` is the
+  // whole of the difference. shootBullets() hands the flag to the bullet
+  // and update() does the steering.
+  {
+    id: "seek", name: "GUIDED MISSILE", art: SEEK_ROCKET_ART, need: SEEK_PRICE,
+    fire: "single", damage: 1, reload: 0, seek: true,
+    blurb: ["The SCOUT's gun with a LOCK on it —",
+            "one shot at a time, and it CANNOT miss."],
   },
   {
     id: "triple", name: "TRIPLE BLASTER", art: TRIPLE_ROCKET_ART, need: 8500,
@@ -1165,7 +1209,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-09-28 edgefix";
+const BUILD = "2026-09-28 guided";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
@@ -2210,7 +2254,8 @@ function shootBullets() {
   } else {
     // `bomb` marks a BLAST CANNON shell — it blows up where it lands
     // instead of just poking the one animal it touched.
-    bullets.push({ x: player.x, y: nose, dmg: ship.damage, bomb: ship.fire === "bomb" });
+    bullets.push({ x: player.x, y: nose, dmg: ship.damage,
+                   bomb: ship.fire === "bomb", seek: !!ship.seek });
   }
   gunTimer = ship.reload;                 // this gun's own reload time
   playShootSound(!!ship.auto);            // a held stream gets a lighter, quicker pew
@@ -2260,10 +2305,14 @@ function fireShot() {
 }
 
 // numberKey(): which number a key press means, or 0 for a key that is not a
-// number at all. "0" means TEN, so a tenth level or a tenth ship still has a
-// key. Anything else answers 0, which is never a level or a ship.
+// number at all. "0" means TEN and "-" means ELEVEN, because those are the
+// keys that come next along the top row and neither number has one of its
+// own. An eleventh ship went in with the GUIDED MISSILE, which would
+// otherwise have pushed the FROST THROWER off the end of the keyboard.
+// Anything else answers 0, which is never a level or a ship.
 function numberKey(key) {
   if (key === "0") return 10;
+  if (key === "-") return 11;
   return /^[1-9]$/.test(key) ? Number(key) : 0;
 }
 
@@ -2417,8 +2466,27 @@ function update() {
   if (gunTimer > 0) gunTimer--;
   if (currentShip().auto && keys[" "] && gunTimer === 0 && iced === 0) shootBullets();
 
-  // --- Move YOUR bullets up; drop ones that fly off the top ---
-  for (const b of bullets) b.y -= PLAYER_BULLET_SPEED;
+  // --- Move YOUR bullets; drop ones that fly off the top ---
+  //   An ordinary bullet goes straight up, and always has. A GUIDED MISSILE
+  // goes at whatever it has locked onto, however far round that is, at a
+  // speed the herd cannot beat. See SEEK_EDGE.
+  const seeking = bullets.some((b) => b.seek);
+  const seekRun = seeking ? Math.max(PLAYER_BULLET_SPEED, herdStep() * SEEK_EDGE) : 0;
+  for (const b of bullets) {
+    if (!b.seek) { b.y -= PLAYER_BULLET_SPEED; continue; }
+    // Hold the lock while that animal lives; take the nearest when it dies.
+    if (!b.lock || !b.lock.alive) b.lock = nearestAnimal(b.x, b.y);
+    // Nothing left to chase — the wave is down. Fly on out of the top.
+    if (!b.lock) { b.y -= PLAYER_BULLET_SPEED; continue; }
+    const dx = b.lock.x - b.x, dy = b.lock.y - b.y;
+    const away = Math.hypot(dx, dy) || 1;
+    b.fx = dx / away; b.fy = dy / away;    // where it points, for the streak
+    // Never step PAST it: the last run of all lands ON the animal, and the
+    // hit is then found by the same hit() every other bullet goes through.
+    const run = Math.min(seekRun, away);
+    b.x += b.fx * run;
+    b.y += b.fy * run;
+  }
   bullets = bullets.filter((b) => b.y > -20);
 
   // --- Move the herd (or the boss) ---
@@ -2430,18 +2498,10 @@ function update() {
   // always was there.
   const totalCount = Math.max(1, plan.rows * plan.cols);
   const boss = theBoss();
-  let step;
-  if (boss) {
-    // The BIG CHICK sweeps on its own. It gets ANGRIER the more you hurt it:
-    // by the time it's nearly beaten it's charging back and forth.
-    const hurt = 1 - boss.hp / (boss.maxHp || BOSS_HP);
-    step = BOSS_SPEED * (1 + hurt * BOSS_RAGE) * speedScale;
-  } else {
-    // The fewer animals are left, the faster they go (classic tension!).
-    // Speed grows from 1x up to about 4x as the herd is wiped out.
-    const speedMult = 1 + (1 - aliveCount / totalCount) * 3;
-    step = INVADER_SPEED * speedMult * speedScale;
-  }
+  // How far they slide this step. It is worked out in herdStep() rather
+  // than here, because a GUIDED MISSILE has to be measured against it and
+  // the missiles move further up the function.
+  const step = herdStep();
 
   // Move them sideways. If any hits an edge, the whole herd drops and
   // reverses direction. The boss is far too wide to use CELL here, so we
@@ -2809,7 +2869,10 @@ function update() {
       }
     }
     // Your bullets also chip away at the bases (don't shoot your own cover!).
-    if (b.y > -20 && hitBase(b.x, b.y)) b.y = -999;
+    // A GUIDED MISSILE does not: it steers round them. Without that it would
+    // bury itself in your own roof every time you fired from under a base,
+    // and "it cannot miss" would be a lie.
+    if (!b.seek && b.y > -20 && hitBase(b.x, b.y)) b.y = -999;
   }
   bullets = bullets.filter((b) => b.y > -20);
 
@@ -3009,6 +3072,44 @@ function pickShooter() {
 function coldStep(inv) {
   if (inv.froze > 0) return 0;
   return inv.chill > 0 ? ICE_SLOW : 1;
+}
+
+// ---------------------------------------------------------------------
+// herdStep(): how far the herd slides sideways in one step. Two things ask:
+// the herd, to walk; and a GUIDED MISSILE, which must never be slower than
+// what it is chasing. One function, so the two can never disagree.
+// ---------------------------------------------------------------------
+function herdStep() {
+  const speedScale = plan.speed;
+  const boss = theBoss();
+  if (boss) {
+    // The BIG CHICK sweeps on its own. It gets ANGRIER the more you hurt it:
+    // by the time it's nearly beaten it's charging back and forth.
+    const hurt = 1 - boss.hp / (boss.maxHp || BOSS_HP);
+    return BOSS_SPEED * (1 + hurt * BOSS_RAGE) * speedScale;
+  }
+  // The fewer animals are left, the faster they go (classic tension!).
+  // Speed grows from 1x up to about 4x as the herd is wiped out.
+  const alive = invaders.filter((inv) => inv.alive).length;
+  const total = Math.max(1, plan.rows * plan.cols);
+  const speedMult = 1 + (1 - alive / total) * 3;
+  return INVADER_SPEED * speedMult * speedScale;
+}
+
+// ---------------------------------------------------------------------
+// nearestAnimal(): the living animal closest to a point — what a GUIDED
+// MISSILE locks onto, both when it is fired and again whenever the one it
+// was chasing goes down before it arrives. Ties go to the one earliest in
+// the herd, so the same game always plays out the same way.
+// ---------------------------------------------------------------------
+function nearestAnimal(x, y) {
+  let best = null, bestAway = Infinity;
+  for (const inv of invaders) {
+    if (!inv.alive) continue;
+    const away = (inv.x - x) * (inv.x - x) + (inv.y - y) * (inv.y - y);
+    if (away < bestAway) { bestAway = away; best = inv; }
+  }
+  return best;
 }
 
 // ---------------------------------------------------------------------
@@ -3963,8 +4064,8 @@ const CARD_TEXT_PT = Math.max(9, Math.min(CARD_TIGHT ? 14 : 15,
 // Which keys pick a ship. There is no key for ten, so 0 means the tenth —
 // saying "1-10" would send you hunting for a key that is not there.
 function shipKeys() {
-  return SHIPS.length < 10 ? "1–" + SHIPS.length
-                           : "1–9" + (SHIPS.length >= 10 ? " and 0" : "");
+  if (SHIPS.length < 10) return "1–" + SHIPS.length;
+  return SHIPS.length < 11 ? "1–9 and 0" : "1–9, 0 and -";
 }
 
 function shopCard(i) {
@@ -4510,11 +4611,31 @@ function draw() {
   ctx.shadowColor = BULLET_COLOR;
   ctx.shadowBlur = 8;
   for (const b of bullets) {
-    if (b.bomb) continue;                 // shells are drawn as balls, below
+    if (b.bomb || b.seek) continue;       // both are drawn their own way below
     ctx.beginPath();
     ctx.moveTo(b.x, b.y);
     ctx.lineTo(b.x, b.y + BULLET_LENGTH); // streak trails BELOW as it flies up
     ctx.stroke();
+  }
+  ctx.shadowBlur = 0;
+
+  // A GUIDED MISSILE is not going straight up, so its streak cannot hang
+  // straight down. It trails back along the way the missile came, which is
+  // what makes a turn look like a turn, and it carries a bright head so you
+  // can see which animal it has picked.
+  ctx.strokeStyle = SEEK_COLOR;
+  ctx.shadowColor = SEEK_COLOR;
+  ctx.shadowBlur = 10;
+  for (const b of bullets) {
+    if (!b.seek) continue;
+    ctx.beginPath();
+    ctx.moveTo(b.x, b.y);
+    ctx.lineTo(b.x - (b.fx || 0) * SEEK_TAIL, b.y - (b.fy === undefined ? -1 : b.fy) * SEEK_TAIL);
+    ctx.stroke();
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, 3, 0, Math.PI * 2);
+    ctx.fill();
   }
   ctx.shadowBlur = 0;
 
