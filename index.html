@@ -1002,11 +1002,18 @@ const EGG_BOOM     = 2.6; // how big the bang LOOKS
 // go, you can only get out of the way. A test holds the gap.
 const BOSS_BREAK   = stepsFor(3);    // frozen this long, and it bursts out
 const SHARD_CRACK  = stepsFor(0.75); // ...cracking for the last of it
-const SHARD_CLUTCH = 5;   // pieces the block breaks into, all thrown at once
+// How many pieces the block breaks into, all thrown at once. ONE is what it
+// throws. Put it up and they are laid out and aimed the way the chick lays a
+// clutch of eggs — spread across its width, the middle one aimed at you, the
+// rest leaning wide by SHARD_LEAN — so the machinery for a fan is still here
+// and costs one number. At 1 the shard comes from the middle and is aimed,
+// and SHARD_LEAN does nothing.
+const SHARD_CLUTCH = 1;
 const SHARD_COST   = 3;   // hearts a chunk of that ice takes off you
 const SHARD_SPLASH = 1;   // ...or off you standing in its blast behind cover
 const SHARD_SPEED  = 2;   // how many times an egg's speed it comes down at
 const SHARD_LEAN   = SHOT_ANGLE * 1.6; // how far the outside pieces fly wide
+                                       // (nothing, while SHARD_CLUTCH is 1)
 const SHARD_SIZE   = 56;  // how big it is drawn, in pixels
 const SHARD_RADIUS = 70;  // how far the blast reaches when it lands
 const SHARD_BOOM   = 3;   // how big that bang LOOKS
@@ -1158,7 +1165,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-09-27 bosshunt";
+const BUILD = "2026-09-28 oneshard";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
@@ -3039,12 +3046,8 @@ function breakIce(boss, speed) {
   shockwaves.push({ x: boss.x, y: boss.y, life: 0, radius: sizeOf(boss) * 0.75,
                     color: "#7ef9ff", flash: "#eafcff" });
   playExplosionSound(true);
-  // The block does not come apart into one piece. It throws SHARD_CLUTCH of
-  // them at once, laid out and aimed exactly the way the chick lays a clutch
-  // of eggs: spread across its width, the MIDDLE one aimed at wherever you
-  // are standing, and the outside ones leaning out by a different amount
-  // every time — so there is a gap to run to, but you have to pick it, and
-  // it is not the same gap twice.
+  // The block throws SHARD_CLUTCH pieces — one, as it is set. See the note
+  // on SHARD_CLUTCH for what happens when it is more than that.
   const startY = boss.y + sizeOf(boss) / 2;
   const fall = Math.max(1, (player.y - startY) / speed);
   for (let i = 0; i < SHARD_CLUTCH; i++) {

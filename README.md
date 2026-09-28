@@ -675,26 +675,20 @@ bite can ever take off. A test holds that for all four.
 
 The **Frost Thrower** freezes the chick the same as it freezes anything else.
 What it cannot do is hold it. **Three seconds after the chick goes solid it
-shatters the block** — and throws **all five pieces** at you at once.
+shatters the block** — and throws the biggest piece straight at you.
 
-They are laid out and aimed the way the chick lays a clutch of eggs: spread
-across its width, the **middle one aimed** at wherever you are standing, and the
-outer four leaning wide by a different amount every time. So there is a gap to
-run to, but you have to pick it, and it is not the same gap twice.
-
-Each piece costs **three hearts**. You start with three, so one that reaches you
-head-on is the whole run — and only one ever needs to.
+That piece costs **three hearts**. You start with three, so one that reaches you
+head-on is the whole run.
 
 You are told it is coming. The block **cracks** for the last three quarters of a
 second, wider and brighter every step. Once the first crack shows you cannot
 call it off: letting go of the trigger no longer thaws the chick in time. All
 you can do is move.
 
-Moving is enough, and five pieces do not change that. Measured from the first
-crack, there is **1.2 seconds** before the ice lands, and you can run **420
-pixels** in it — half the board. Every shard is capped at the same `AIM_MAX`
-every aimed shot in this game is capped at, so none of them can chase you once
-you are far enough across.
+Moving is enough. Measured from the first crack, there is **1.2 seconds** before
+the ice lands, and you can run **420 pixels** in it — half the board. The shard
+is capped at the same `AIM_MAX` every aimed shot in this game is capped at, so
+it cannot chase you once you are far enough across.
 
 Over 30 break-outs, played out in full:
 
@@ -705,8 +699,14 @@ Over 30 break-outs, played out in full:
 | Run, with your cover up | **0 of 30** |
 | Run, starting boxed into a corner | **0 of 30** |
 
-The five pieces make it look far worse than it is. What they really punish is
-standing still, which the single piece already did.
+What it punishes is standing still.
+
+Put `SHARD_CLUTCH` above 1 and the block breaks into that many pieces instead,
+laid out and aimed the way the chick lays a clutch of eggs — spread across its
+width, the middle one aimed at you, the rest leaning wide by `SHARD_LEAN`. It
+was set to 5 for a while. The table above is the same either way: every shard
+is capped at `AIM_MAX`, so a fan of them is no harder to outrun than one, and
+all the extra pieces really do is look frightening.
 
 **Cover works too**, and this is the thing cover is best at. A shard that lands
 on a base blows a hole in it the way an egg does, and you wear the splash — one
@@ -714,13 +714,12 @@ heart — instead of three.
 
 | | |
 |---|---|
-| `SHARD_CLUTCH` | pieces the block breaks into: **5** |
+| `SHARD_CLUTCH` | pieces the block breaks into: **1** |
 | `BOSS_BREAK` | how long it stays frozen: **3 seconds** |
 | `SHARD_CRACK` | how long the block cracks first: **0.75 seconds** |
 | `SHARD_COST` | a shard head-on: **3 hearts** |
 | `SHARD_SPLASH` | caught in the blast behind cover: **1 heart** |
-| `SHARD_SPEED` | they fall **twice** as fast as an egg |
-| `SHARD_LEAN` | how far the outer four fly wide |
+| `SHARD_SPEED` | it falls **twice** as fast as an egg |
 
 `SHARD_CRACK` must stay **shorter than `ICE_HOLD`**. Once the crack shows, the
 chick still needs `SHARD_CRACK` more steps of being frozen, and a block you have
@@ -821,7 +820,7 @@ back to exactly where you were — the new ship is in your hands immediately.
 | **Double Rapid** | score 9,000 in one game | Rapid Fire with two barrels. **Hold** the button and it pours out ten **pairs** a second. Each bullet is half strength, like Rapid Fire's, so a pair downs an ordinary animal where a single bullet leaves it standing. |
 | **Red Laser** | score 10,000 in one game | A red beam that smashes clean through every animal it touches (and melts their shots). Burns for **2 seconds**, then reloads in under half of one — so it is lit five sixths of the time, and one burn carries you nearly the whole width of a wave. |
 | **Electric Arc** | score 15,000 in one game | Lightning instead of a laser: the current **jumps sideways** from animal to animal, up to three deep either side of the beam. Burns for 2.5 seconds, then reloads for half a second. |
-| **Frost Thrower** | fill the bank to 500,000 | **Hold** and it sprays cold instead of fire. Everything it touches walks at **two fifths** of its speed; hold it on one animal for **four tenths of a second** and that animal **freezes solid** — it stops walking, stops coming down with the herd, and stops shooting. Keep holding and it stays frozen; let go and it has one second left. Bites seven sixteenths of an animal at a time, three times a second at the mouth, so three fills see one off. Three seconds of fuel a tank, and it refills in under two. It **chills their falling shots** rather than burning them up, so the air in front of you is slowed, never cleared. It bites **three times** as hard on a chicken. The **Big Chick** is the one thing it cannot hold: three seconds and it shatters the ice, and all five pieces come at you, three hearts each. |
+| **Frost Thrower** | fill the bank to 500,000 | **Hold** and it sprays cold instead of fire. Everything it touches walks at **two fifths** of its speed; hold it on one animal for **four tenths of a second** and that animal **freezes solid** — it stops walking, stops coming down with the herd, and stops shooting. Keep holding and it stays frozen; let go and it has one second left. Bites seven sixteenths of an animal at a time, three times a second at the mouth, so three fills see one off. Three seconds of fuel a tank, and it refills in under two. It **chills their falling shots** rather than burning them up, so the air in front of you is slowed, never cleared. It bites **three times** as hard on a chicken. The **Big Chick** is the one thing it cannot hold: three seconds and it shatters the ice, and the piece that comes at you costs three hearts. |
 | **Flamethrower** | fill the bank to 250,000 | **Hold** the button and it pours out fire. It burns what it touches **and sets it alight**, and the fire goes on eating long after you have swung away. Slow on any one animal, frightening on a herd. Three and a half seconds of fuel in a tank. It bites **four times** as hard on a chicken, fire and all — which took it from 59 seconds against one to 15. |
 
 Rapid Fire, the Double Rapid and the Flamethrower are the three ships you
