@@ -650,12 +650,17 @@ const BULLET_LENGTH = 22;  // how long your shots look (bigger = longer streaks)
 // far UP the screen the middle one starts. The middle barrel stands forward
 // on the ship, so its bullet does too — the three fly as an arrowhead and
 // the middle one lands first.
+const TWIN_SPREAD   = 11; // how far out the TWIN BLASTER's two barrels sit
+const TWIN_WIDE     = 35; // ...and where an upgrade puts them: 70 apart, one
+                          // animal's spacing, so the pair takes two columns
 const TRIPLE_SPREAD = 15; // how far out the two side bullets start, in pixels
 const TRIPLE_LEAD   = 16; // how far ahead of them the middle one starts
 const RAPID_EVERY = 12;  // between RAPID FIRE shots (12 = five a second at GAME_SPEED 1)
+const RAPID_FAST  = 9;   // ...and upgraded: 120/9 rounds to THIRTEEN a second
 const BOMB_RELOAD = 30;  // between BLAST CANNON shells (30 = half a second at GAME_SPEED 1)
 const BOMB_RADIUS = 95;  // how far the blast reaches, in pixels
 const BOMB_CORE   = 44;  // inside this it's full strength; past it, half
+const BOMB_WIDE   = 130; // ...and how far an UPGRADED cannon throws it
 const BOMB_BOOM   = 3.4; // how big the bang LOOKS (bigger = more flying bits)
 // What one shell takes off. An ordinary animal has 1 health, so anything from
 // 1 up downs it outright and this number never showed — it only starts to
@@ -1148,6 +1153,34 @@ const ICE_BITS = ["#ffffff", "#eafcff", "#7ef9ff", "#2ea8ff"]; // it throws cold
 //           the same fight. On a boss level it means that many BIG CHICKS,
 //           one after another.
 const WAVE_SPEEDUP = 0.10; // each wave of a level is this much faster
+// ---------------------------------------------------------------------
+// WHAT ONE UPGRADE DOES — a different thing for every ship.
+//   Each ship can take ONE, and each one buys that ship out of whatever it
+// is worst at rather than simply making it hit harder. A SCOUT gets another
+// heart; a FROST THROWER keeps its grip for three seconds instead of one.
+//   `tells` is what the shop card says, and it has to fit the box on that
+// card — a test holds every one of them to it. `gives` is laid OVER the
+// ship: a plain field replaces the ship's own, and `beam` or `flame` is
+// laid over the GUN inside the ship rather than replacing it, so an
+// upgraded RED LASER keeps its colour and its width and only its burn
+// changes.
+//   Every ship in SHIPS must have an entry here, and a test holds that too.
+// Changing what an upgrade does is changing one line of this table.
+// ---------------------------------------------------------------------
+const UPGRADES = {
+  scout:  { tells: "+1 HEART",   gives: { hearts: 1 } },
+  rapid:  { tells: "13 A SEC",   gives: { reload: RAPID_FAST } },
+  twin:   { tells: "WIDE PAIR",  gives: { spread: TWIN_WIDE } },
+  bomb:   { tells: "BIG BANG",   gives: { radius: BOMB_WIDE } },
+  seek:   { tells: "FULL SPEED", gives: { dash: PLAYER_BULLET_SPEED } },
+  triple: { tells: "5 BARRELS",  gives: { barrels: 5 } },
+  drapid: { tells: "13 PAIRS",   gives: { reload: RAPID_FAST } },
+  laser:  { tells: "BURNS 3s",   gives: { beam:  { time: stepsFor(3) } } },
+  volt:   { tells: "5 DEEP",     gives: { beam:  { hops: 5 } } },
+  flame:  { tells: "FIRE 2x",    gives: { flame: { fireTime: FIRE_TIME * 2 } } },
+  frost:  { tells: "HOLDS 3s",   gives: { flame: { hold: stepsFor(3) } } },
+};
+
 const LEVELS = [
   { name: "THE FARMYARD",  rows: 2, cols: 5, speed: 0.45, reload: 115, aim: 0.10, hp: 1 },
   { name: "THE MEADOW",    rows: 3, cols: 6, speed: 0.62, reload:  90, aim: 0.25, hp: 1 },
@@ -1257,7 +1290,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-10-17 upgrades";
+const BUILD = "2026-10-17 upgrade1";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
@@ -1710,7 +1743,9 @@ function newGame(startState) {
   bankAtRunStart = bank; // ...and this is what the bank held before it began
   gemsAtRunStart = gems();
   gemJustWon = false;
-  lives = STARTING_LIVES;
+  // An upgraded SCOUT carries a fourth heart. It is read here, at the start
+  // of a run, so swapping ships halfway through cannot hand you one.
+  lives = STARTING_LIVES + (currentShip().hearts || 0);
   stage = 1;
   state = startState;
   paused = false;
@@ -2379,23 +2414,36 @@ function shootBullets() {
   const ship = currentShip();
   const nose = player.y - CELL / 2;
   if (ship.fire === "twin") {
-    bullets.push({ x: player.x - 11, y: nose, dmg: ship.damage * gunPower() });
-    bullets.push({ x: player.x + 11, y: nose, dmg: ship.damage * gunPower() });
+    // Two barrels, `spread` out either side of the nose. Upgraded they move
+    // apart to a whole animal's width, so the pair takes two columns at once
+    // instead of both landing on the same animal.
+    const wide = ship.spread || TWIN_SPREAD;
+    bullets.push({ x: player.x - wide, y: nose, dmg: ship.damage });
+    bullets.push({ x: player.x + wide, y: nose, dmg: ship.damage });
   } else if (ship.fire === "triple") {
     // The middle barrel stands forward on the ship, so its bullet starts
     // TRIPLE_LEAD further up the screen than the other two. The three keep
     // that shape the whole way, because every bullet flies at the same
     // speed — an arrowhead going up, with the point in front.
-    bullets.push({ x: player.x - TRIPLE_SPREAD, y: nose, dmg: ship.damage * gunPower() });
-    bullets.push({ x: player.x, y: nose - TRIPLE_LEAD, dmg: ship.damage * gunPower() });
-    bullets.push({ x: player.x + TRIPLE_SPREAD, y: nose, dmg: ship.damage * gunPower() });
+    const barrels = ship.barrels || 3;    // five of them, upgraded
+    const mid = (barrels - 1) / 2;
+    for (let i = 0; i < barrels; i++) {
+      // The MIDDLE barrel stands forward on the ship, so its bullet starts
+      // TRIPLE_LEAD further up the screen than the rest of them.
+      bullets.push({ x: player.x + (i - mid) * TRIPLE_SPREAD,
+                     y: nose - (i === mid ? TRIPLE_LEAD : 0),
+                     dmg: ship.damage });
+    }
   } else {
     // `bomb` marks a BLAST CANNON shell — it blows up where it lands
     // instead of just poking the one animal it touched.
-    // A bullet carries the power it was fired WITH, so upgrading mid-flight
-    // never reaches back and makes a shot already in the air hit harder.
-    bullets.push({ x: player.x, y: nose, dmg: ship.damage * gunPower(),
-                   bomb: ship.fire === "bomb", seek: !!ship.seek });
+    // A shell and a missile each carry their own numbers, taken at the
+    // moment they were fired, so upgrading mid-flight cannot reach back and
+    // change something already in the air.
+    bullets.push({ x: player.x, y: nose, dmg: ship.damage,
+                   bomb: ship.fire === "bomb", seek: !!ship.seek,
+                   boom: ship.radius || BOMB_RADIUS,
+                   dash: ship.dash || SEEK_SPEED });
   }
   gunTimer = ship.reload;                 // this gun's own reload time
   playShootSound(!!ship.auto);            // a held stream gets a lighter, quicker pew
@@ -2611,7 +2659,10 @@ function update() {
   // goes at whatever it has locked onto, however far round that is, at a
   // speed the herd cannot beat. See SEEK_EDGE.
   const seeking = bullets.some((b) => b.seek);
-  const seekRun = seeking ? Math.max(SEEK_SPEED, herdStep() * SEEK_EDGE) : 0;
+  // The floor the herd puts under every missile. Each missile's OWN speed
+  // rides on the missile, taken when it was fired, so an upgrade cannot
+  // reach back and hurry along one already in the air.
+  const herdFloor = seeking ? herdStep() * SEEK_EDGE : 0;
   for (const b of bullets) {
     if (!b.seek) { b.y -= PLAYER_BULLET_SPEED; continue; }
     // Hold the lock while that animal lives; take the nearest when it dies.
@@ -2662,7 +2713,7 @@ function update() {
     // Never step PAST what it is going for: the last run of all lands on the
     // animal, and the hit is then found by the same hit() every other bullet
     // goes through.
-    const run = Math.min(seekRun, away);
+    const run = Math.min(Math.max(b.dash || SEEK_SPEED, herdFloor), away);
     b.x += b.fx * run;
     b.y += b.fy * run;
   }
@@ -2922,17 +2973,16 @@ function update() {
         if (licked > 0 && flameGun.ice) {
           // The FROST THROWER takes the same small bite and lights nothing.
           // Its work is the cold, which is counted in its own loop below.
-          inv.hp -= ICE_BITE * bite * gunPower();
+          inv.hp -= ICE_BITE * bite;
         } else if (licked > 0) {
           // The flame takes its small bite AND sets the animal alight, both
           // at once. Something already alight is simply re-lit, so its fire
           // never runs down while you are still pointing at it.
           if (inv.fire <= 0) inv.fireTick = FIRE_TICK; // a new fire waits one tick
-          inv.fire = FIRE_TIME;
-          inv.hp -= FLAME_BITE * bite * gunPower();
+          inv.fire = flameGun.fireTime || FIRE_TIME;
+          inv.hp -= FLAME_BITE * bite;
         } else {
-          // A beam takes a whole animal where the flame takes an eighth.
-          inv.hp -= 1 * bite * gunPower();
+          inv.hp -= 1 * bite; // a beam takes a whole animal where the flame takes an eighth
         }
         if (inv.hp <= 0) {
           inv.alive = false;
@@ -2962,7 +3012,7 @@ function update() {
     if (cold > 0) {
       inv.chill = ICE_SLOW_TIME;
       if (inv.frost < ICE_FREEZE_AT) inv.frost++;
-      if (inv.frost >= ICE_FREEZE_AT) inv.froze = ICE_HOLD;
+      if (inv.frost >= ICE_FREEZE_AT) inv.froze = flameGun.hold || ICE_HOLD;
     } else {
       if (inv.chill > 0) inv.chill--;
       if (inv.frost > 0) inv.frost--;
@@ -3032,7 +3082,7 @@ function update() {
         // A BLAST CANNON shell doesn't poke one animal — it goes off, and
         // the bang does all the damage to everything standing near it.
         if (b.bomb) {
-          bombBlast(b.x, b.y);
+          bombBlast(b.x, b.y, b.boom);
           b.y = -999;
           break;                    // one bang per shell
         }
@@ -3175,7 +3225,7 @@ function update() {
     // gun's bonus almost nothing. It burns on after you have swung away, and
     // after you have swapped ships, so it asks the ANIMAL whether it is a
     // chicken rather than asking a gun that may not be lit any more.
-    inv.hp -= (inv.boss ? FIRE_BITE * BOSS_FLAME_BITE : FIRE_BITE) * gunPower();
+    inv.hp -= inv.boss ? FIRE_BITE * BOSS_FLAME_BITE : FIRE_BITE;
     if (inv.hp <= 0) {
       inv.alive = false;
       inv.fire = 0;
@@ -3526,11 +3576,15 @@ function hurtPlayer(boom, cost = 1) {
 // second one finishes the cluster off.
 // Your bases are left alone; the shell only goes off on an animal.
 // ---------------------------------------------------------------------
-function bombBlast(x, y) {
+function bombBlast(x, y, reach) {
+  // How far this shell throws. It is handed in rather than read from
+  // BOMB_RADIUS, because an upgraded BLAST CANNON throws a wider one and a
+  // shell already in the air must go off the size it was fired at.
+  reach = reach || BOMB_RADIUS;
   spawnExplosion(x, y, BOMB_BOOM); // a big one, so you can see the blast
-  // A ring that races out to exactly BOMB_RADIUS, so you can SEE how far
-  // the blast reached and learn where to aim the next shell.
-  shockwaves.push({ x: x, y: y, life: 0 });
+  // A ring that races out to exactly that far, so you can SEE how far the
+  // blast reached and learn where to aim the next shell.
+  shockwaves.push({ x: x, y: y, life: 0, radius: reach });
   playExplosionSound(true);
   for (const inv of invaders) {
     if (!inv.alive) continue;
@@ -3541,8 +3595,8 @@ function bombBlast(x, y) {
     const spare = (sizeOf(inv) - CELL) / 2;
     const dist = Math.hypot(Math.max(0, Math.abs(inv.x - x) - spare),
                             Math.max(0, Math.abs(inv.y - y) - spare));
-    if (dist > BOMB_RADIUS) continue;
-    inv.hp -= (dist <= BOMB_CORE ? BOMB_DAMAGE : BOMB_DAMAGE / 2) * gunPower();
+    if (dist > reach) continue;
+    inv.hp -= dist <= BOMB_CORE ? BOMB_DAMAGE : BOMB_DAMAGE / 2;
     // Nothing walks away from a shell half-standing: anything knocked to
     // half health or below is finished off by the shock. So the blast
     // clears its whole radius, rather than leaving wounded animals behind.
@@ -3617,14 +3671,12 @@ try { bank = Math.max(0, Number(localStorage.getItem(BANK_KEY)) || 0); } catch (
 const UP_KEY    = "ai-ups";   // how many upgrades each ship has had
 const SPEND_KEY = "ai-spent"; // ...and the bank committed to them
 const UP_PRICE  = 100000;     // one upgrade
-const UP_MAX    = 3;          // the most any one ship can take
-// What an upgrade DOES: your gun hits half again as hard, every time. One
-// number for every ship in the shop, bullets, beams and sprays alike —
-// three upgrades and a gun bites two and a half times as hard as it did.
-//   A half keeps every size an exact binary fraction, which is the rule all
-// the damage in this game is held to: the flame's eighth becomes three
-// sixteenths, not 0.1874999999.
-const UP_STEP   = 0.5;
+const UP_MAX    = 1;          // ...and a ship can only ever take the one
+// WHAT an upgrade does is different for every ship — see UPGRADES, down
+// with the ships themselves. There is no blanket "hits harder" knob,
+// because the interesting thing about a gun is rarely how hard it hits: a
+// FROST THROWER that holds its freeze longer is worth more than one that
+// bites deeper.
 // readUps(): make sense of whatever is in the save file. A ship that no
 // longer exists is dropped, a count is rounded down and never allowed past
 // UP_MAX, and anything that is not a number at all is ignored — a bad save
@@ -3653,8 +3705,6 @@ function saveUps() {
 // How many upgrades a ship has had, and what is left of the bank to spend.
 function upsOn(ship) { return ups[ship.id] || 0; }
 function purse() { return Math.max(0, bank - spent); }
-// What your gun is worth right now: 1 with no upgrades, 2.5 with all three.
-function gunPower() { return 1 + UP_STEP * upsOn(currentShip()); }
 // You can only upgrade a ship you have earned, only three times, and only
 // with money you have not already laid out.
 function canUpgrade(ship) {
@@ -3733,7 +3783,28 @@ function saveShop() {
 
 // The ship you're currently flying.
 function currentShip() {
-  return SHIPS.find((s) => s.id === shipId) || SHIPS[0];
+  const base = SHIPS.find((s) => s.id === shipId) || SHIPS[0];
+  if (!upsOn(base)) return base;
+  // The patched copy is KEPT rather than built again. currentShip() is asked
+  // dozens of times a frame, and making a fresh object each time would leave
+  // the collector a pile to sweep up in the middle of a wave.
+  // Keyed on how many upgrades the ship has as well as which ship it is, so
+  // buying one throws the old copy away by itself. Nothing has to remember
+  // to clear it.
+  if (upBuilt.id !== base.id || upBuilt.ups !== upsOn(base)) {
+    upBuilt = { id: base.id, ups: upsOn(base), ship: upgradedShip(base) };
+  }
+  return upBuilt.ship;
+}
+let upBuilt = { id: null, ups: 0, ship: null };
+// upgradedShip(): the ship as its upgrade leaves it. See UPGRADES.
+function upgradedShip(ship) {
+  const up = UPGRADES[ship.id];
+  if (!up) return ship;
+  const out = Object.assign({}, ship, up.gives);
+  if (up.gives.beam)  out.beam  = Object.assign({}, ship.beam,  up.gives.beam);
+  if (up.gives.flame) out.flame = Object.assign({}, ship.flame, up.gives.flame);
+  return out;
 }
 
 // Fly a ship you've earned. Locked ones simply don't budge, and the choice
@@ -4424,16 +4495,20 @@ const CARD_TEXT_PT = Math.max(9, Math.min(CARD_TIGHT ? 14 : 15,
 // One card's box. Down the left column first, then the right.
 // Which keys pick a ship. There is no key for ten, so 0 means the tenth —
 // saying "1-10" would send you hunting for a key that is not there.
-// "★★☆" for a ship with two of its three upgrades. Drawn on its card and
-// on the start screen, so what your gun is worth is never a secret.
-function upStars(ship) {
-  const got = upsOn(ship);
-  return "★".repeat(got) + "☆".repeat(UP_MAX - got);
+// A star beside the name of a ship that has had its upgrade, so you can see
+// at a glance which of them are done without reading every box.
+function upStars(ship) { return upsOn(ship) >= UP_MAX ? "★" : ""; }
+// What this ship's upgrade is called. See UPGRADES.
+function upTells(ship) {
+  const up = UPGRADES[ship.id];
+  return up ? up.tells : "";
 }
-// What the box on a card says, and whether tapping it does anything.
+// What the box on a card says. It names the thing you are buying rather
+// than just saying UPGRADE, because eleven ships have eleven different
+// upgrades and "upgrade" on its own tells you nothing about which.
 function upLabel(ship) {
-  if (upsOn(ship) >= UP_MAX) return "FULLY UPGRADED";
-  if (purse() >= UP_PRICE) return "UPGRADE " + UP_PRICE;
+  if (upsOn(ship) >= UP_MAX) return "★ " + upTells(ship);
+  if (purse() >= UP_PRICE) return "UPGRADE: " + upTells(ship);
   return "NEED " + (UP_PRICE - purse()) + " MORE";
 }
 
@@ -4526,7 +4601,7 @@ function drawShop() {
       // worth more. This is the same corner of the card a ship you do NOT
       // own gives to its progress bar, so the two never meet.
       const got = upsOn(ship);
-      ctx.fillStyle = got >= UP_MAX ? "#ffd34d" : got > 0 ? "#6fe08a" : "#555";
+      ctx.fillStyle = "#ffd34d";
       ctx.font = CARD_STAR_PT + "px 'Courier New', monospace";
       ctx.fillText(upStars(ship), card.x + CARD_STAR_X, y + CARD_NAME_Y);
 

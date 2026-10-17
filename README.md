@@ -935,6 +935,56 @@ The shop shows a bar creeping toward each ship, so you can see how close you
 are. For most ships the bar measures your best single run. For the Flamethrower
 it measures the bank.
 
+### Upgrades ⬆️
+
+**Every ship can be upgraded once, for 100,000.** Not three times, not a little
+at a time — one upgrade each, and that ship is done.
+
+Each upgrade buys that ship out of whatever it is worst at, rather than simply
+making it hit harder:
+
+| Ship | One upgrade buys |
+|------|------------------|
+| **Scout** | **one more heart** — four instead of three |
+| **Rapid Fire** | **13 shots a second** instead of 10 |
+| **Twin Blaster** | the two barrels move **a whole animal apart**, so the pair takes two columns at once instead of both landing on the same animal |
+| **Blast Cannon** | a **wider bang** — 95 pixels of blast becomes 130. One shell cleared 6 animals out of a full herd, and 9 upgraded |
+| **Guided Missile** | **full speed** — it stops being the slow one and flies at a plain bullet's 5 pixels a step |
+| **Triple Blaster** | **five barrels** instead of three, still with the middle one standing forward |
+| **Double Rapid** | **13 pairs a second** instead of 10 |
+| **Red Laser** | **burns 3 seconds** instead of 2 |
+| **Electric Arc** | the current **walks five animals out** from the beam instead of three |
+| **Flamethrower** | the fire it leaves behind **burns twice as long** — 4 seconds becomes 8 |
+| **Frost Thrower** | the freeze **holds 3 seconds** after you let go, instead of 1 |
+
+They all live in one table, `UPGRADES`, near the ships at the top of
+`index.html`. Changing what an upgrade does is changing one line of it.
+
+#### What you spend
+
+**The bank is not emptied.** Two ships are yours because the bank has *reached*
+250,000 and 500,000 — so if upgrading took money out of it, buying one would
+quietly take the Flamethrower off you again. What goes down instead is a second
+number: how much of the bank you have **committed**. `bank` is what you have
+earned and never moves; `spent` is what you have laid out; what is left to spend
+is the difference, and that is the figure the shop shows.
+
+So you can never lose a ship by upgrading, and the shop will not let you spend
+money you have not got, upgrade a ship you have not earned, or upgrade the same
+ship twice.
+
+#### In the shop
+
+Every ship you own carries a box in the corner of its card saying what its
+upgrade would do — `UPGRADE: WIDE PAIR` — rather than just `UPGRADE`, because
+eleven ships have eleven different upgrades. Tap it to buy, or press **U** for
+the ship you are flying. Once bought the box turns gold and reads `★ WIDE PAIR`,
+and the ship wears a star beside its name.
+
+A shot already in the air keeps the numbers it was **fired** with. Buying the
+Blast Cannon's wider bang while a shell is climbing does not reach back and
+widen that shell, and the same goes for a missile's speed.
+
 ### The Guided Missile 🎯
 
 The Scout's gun with a lock on it. Same one bullet at a time, same no reload.
@@ -1081,8 +1131,12 @@ yours. The running total stays on screen until you own both of them.
 
 Three things are worth knowing about it:
 
-- **The bank is never spent.** It is a record of everything you have done, not a
-  purse. Flying the ship does not empty it, and you can never lose the ship again.
+- **The bank itself is never spent, even when you buy an upgrade.** It is the
+  record of everything you have done. Upgrades are paid for out of it, but what
+  goes down is a second number — how much you have **committed** — and the bank
+  stays where it is. That matters: the two bank ships are yours because the bank
+  has *reached* a figure, so a bank you could spend down would quietly take the
+  Flamethrower off you again. See [Upgrades](#upgrades-).
 - **Losing takes nothing out of it.** A bad game simply puts less in than a good
   one. There is no way to go backwards.
 - **Every point counts, in both games.** Levels and Endless both pay into the
