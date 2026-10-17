@@ -1234,6 +1234,72 @@ frame, with branches forking off it and dying away, and every jump crackles at
 its own brightness — so it gutters and flickers like a live wire instead of
 sitting there like a painted line.
 
+### Upgrades ⭐
+
+**Every ship can be upgraded three times, and each go costs 100,000 out of the
+bank.** An upgrade makes that ship's gun hit **half again as hard** — so three
+of them and it bites **two and a half times** as hard as it started.
+
+| Upgrades | What your gun is worth |
+|---|---|
+| none | 1x |
+| ★☆☆ | 1.5x |
+| ★★☆ | 2x |
+| ★★★ | **2.5x** |
+
+It is one number and it reaches **every** gun in the shop — bullets, beams and
+sprays alike, which take three quite different roads through the code. Measured
+over 600 steps with the trigger held, all eleven ships land on exactly 2.50x.
+
+Upgrades are **per ship**. Pouring 300,000 into the Scout does nothing for the
+Red Laser. Eleven ships, three each, is **33 upgrades and 3,300,000** to buy the
+lot — the bank is a long game.
+
+A half is not an accident. Every size of damage in this game has to be a
+fraction the computer holds exactly, or an animal is left standing on a sliver
+of health. A half keeps all of them exact: the Flamethrower's eighth becomes
+three sixteenths, not 0.1874999999.
+
+#### The bank is committed, not spent
+
+The bank is still **never spent**. It is the record of every point you have ever
+scored, and two ships are unlocked by asking whether it has *reached* a figure —
+so taking money out of it would quietly un-own the Flamethrower the moment you
+dropped below 250,000.
+
+So what is written down instead is how much of the bank has been **committed**.
+Two numbers answering two different questions:
+
+- **bank** — what you have earned. It only ever goes up, and the Flamethrower
+  and Frost Thrower still read it.
+- **spent** — what you have laid out on upgrades.
+
+What you have **left to spend** is the difference, and that is the figure the
+shop shows along the top. A test holds the important half of this: own the
+Flamethrower at exactly 250,000, spend 200,000 on upgrades, and it is still
+yours.
+
+#### Buying one
+
+Each ship you own carries an **UPGRADE** box in the bottom-right of its card —
+the same corner a ship you do *not* own gives to its progress bar, so the two
+can never collide. Tap it, or press **U** to upgrade whichever ship you are
+flying. The box tells you where you stand: `UPGRADE 100000` when you can afford
+it, `NEED 25000 MORE` when you cannot, and `FULLY UPGRADED` when the ship has
+had all three.
+
+The ★★☆ beside a ship's name is what its gun is worth, on its card and on the
+start screen.
+
+(The boxes sit *inside* the cards, and in two columns the whole card is itself a
+button for flying that ship. So the boxes are hit-tested **first** — the first
+thing a tap lands in wins, and a box buried under a card could never be pressed.
+A test holds that order.)
+
+`UP_PRICE` is what one costs, `UP_MAX` is how many a ship can take, and
+`UP_STEP` is what each one adds. All three are with the bank near the middle of
+`index.html`.
+
 ### A shop of eleven 🏪
 
 Past eight ships one column of cards is too short to hold a ship's name, what it

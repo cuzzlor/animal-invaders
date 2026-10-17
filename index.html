@@ -1257,7 +1257,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-10-17 direct";
+const BUILD = "2026-10-17 upgrades";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
@@ -1999,6 +1999,12 @@ document.addEventListener("keydown", (e) => {
   // back. (A phone has no F key, and on an iPad you add the game to the Home
   // Screen instead — see the meta tags at the top of the file.)
   if (e.key === "f" || e.key === "F") { toggleFullScreen(); return; }
+  // U upgrades the ship you are flying, from inside the shop. The box on
+  // its card does the same thing when tapped.
+  if ((e.key === "u" || e.key === "U") && state === "shop") {
+    buyUpgrade(currentShip());
+    return;
+  }
   // S opens the shop from the start or game-over screen (and shuts it again).
   if (e.key === "s" || e.key === "S") {
     if (state === "shop") closeShop(); else openShop();
@@ -2373,20 +2379,22 @@ function shootBullets() {
   const ship = currentShip();
   const nose = player.y - CELL / 2;
   if (ship.fire === "twin") {
-    bullets.push({ x: player.x - 11, y: nose, dmg: ship.damage });
-    bullets.push({ x: player.x + 11, y: nose, dmg: ship.damage });
+    bullets.push({ x: player.x - 11, y: nose, dmg: ship.damage * gunPower() });
+    bullets.push({ x: player.x + 11, y: nose, dmg: ship.damage * gunPower() });
   } else if (ship.fire === "triple") {
     // The middle barrel stands forward on the ship, so its bullet starts
     // TRIPLE_LEAD further up the screen than the other two. The three keep
     // that shape the whole way, because every bullet flies at the same
     // speed — an arrowhead going up, with the point in front.
-    bullets.push({ x: player.x - TRIPLE_SPREAD, y: nose, dmg: ship.damage });
-    bullets.push({ x: player.x, y: nose - TRIPLE_LEAD, dmg: ship.damage });
-    bullets.push({ x: player.x + TRIPLE_SPREAD, y: nose, dmg: ship.damage });
+    bullets.push({ x: player.x - TRIPLE_SPREAD, y: nose, dmg: ship.damage * gunPower() });
+    bullets.push({ x: player.x, y: nose - TRIPLE_LEAD, dmg: ship.damage * gunPower() });
+    bullets.push({ x: player.x + TRIPLE_SPREAD, y: nose, dmg: ship.damage * gunPower() });
   } else {
     // `bomb` marks a BLAST CANNON shell — it blows up where it lands
     // instead of just poking the one animal it touched.
-    bullets.push({ x: player.x, y: nose, dmg: ship.damage,
+    // A bullet carries the power it was fired WITH, so upgrading mid-flight
+    // never reaches back and makes a shot already in the air hit harder.
+    bullets.push({ x: player.x, y: nose, dmg: ship.damage * gunPower(),
                    bomb: ship.fire === "bomb", seek: !!ship.seek });
   }
   gunTimer = ship.reload;                 // this gun's own reload time
@@ -2914,16 +2922,17 @@ function update() {
         if (licked > 0 && flameGun.ice) {
           // The FROST THROWER takes the same small bite and lights nothing.
           // Its work is the cold, which is counted in its own loop below.
-          inv.hp -= ICE_BITE * bite;
+          inv.hp -= ICE_BITE * bite * gunPower();
         } else if (licked > 0) {
           // The flame takes its small bite AND sets the animal alight, both
           // at once. Something already alight is simply re-lit, so its fire
           // never runs down while you are still pointing at it.
           if (inv.fire <= 0) inv.fireTick = FIRE_TICK; // a new fire waits one tick
           inv.fire = FIRE_TIME;
-          inv.hp -= FLAME_BITE * bite;
+          inv.hp -= FLAME_BITE * bite * gunPower();
         } else {
-          inv.hp -= 1 * bite; // a beam takes a whole animal where the flame takes an eighth
+          // A beam takes a whole animal where the flame takes an eighth.
+          inv.hp -= 1 * bite * gunPower();
         }
         if (inv.hp <= 0) {
           inv.alive = false;
@@ -3166,7 +3175,7 @@ function update() {
     // gun's bonus almost nothing. It burns on after you have swung away, and
     // after you have swapped ships, so it asks the ANIMAL whether it is a
     // chicken rather than asking a gun that may not be lit any more.
-    inv.hp -= inv.boss ? FIRE_BITE * BOSS_FLAME_BITE : FIRE_BITE;
+    inv.hp -= (inv.boss ? FIRE_BITE * BOSS_FLAME_BITE : FIRE_BITE) * gunPower();
     if (inv.hp <= 0) {
       inv.alive = false;
       inv.fire = 0;
@@ -3533,7 +3542,7 @@ function bombBlast(x, y) {
     const dist = Math.hypot(Math.max(0, Math.abs(inv.x - x) - spare),
                             Math.max(0, Math.abs(inv.y - y) - spare));
     if (dist > BOMB_RADIUS) continue;
-    inv.hp -= dist <= BOMB_CORE ? BOMB_DAMAGE : BOMB_DAMAGE / 2;
+    inv.hp -= (dist <= BOMB_CORE ? BOMB_DAMAGE : BOMB_DAMAGE / 2) * gunPower();
     // Nothing walks away from a shell half-standing: anything knocked to
     // half health or below is finished off by the shock. So the blast
     // clears its whole radius, rather than leaving wounded animals behind.
@@ -3594,6 +3603,71 @@ try { bestRun = Math.max(0, Number(localStorage.getItem(BEST_KEY)) || 0); } catc
 // ---------------------------------------------------------------------
 let bank = 0;
 try { bank = Math.max(0, Number(localStorage.getItem(BANK_KEY)) || 0); } catch (e) {}
+
+// --- UPGRADES ---
+// Every ship can be made to hit harder, three times over, and each go costs
+// UP_PRICE out of the bank.
+//   The bank itself is NOT touched. It is the record of every point you have
+// ever scored, and two ships are unlocked by asking whether it has reached a
+// figure — spend it down and the FLAMETHROWER you own at 250,000 would
+// quietly stop being yours. So what is written down instead is how much of
+// it has been COMMITTED, and the two numbers answer different questions:
+// `bank` is what you have earned, `spent` is what you have laid out, and
+// what is left to spend is the difference.
+const UP_KEY    = "ai-ups";   // how many upgrades each ship has had
+const SPEND_KEY = "ai-spent"; // ...and the bank committed to them
+const UP_PRICE  = 100000;     // one upgrade
+const UP_MAX    = 3;          // the most any one ship can take
+// What an upgrade DOES: your gun hits half again as hard, every time. One
+// number for every ship in the shop, bullets, beams and sprays alike —
+// three upgrades and a gun bites two and a half times as hard as it did.
+//   A half keeps every size an exact binary fraction, which is the rule all
+// the damage in this game is held to: the flame's eighth becomes three
+// sixteenths, not 0.1874999999.
+const UP_STEP   = 0.5;
+// readUps(): make sense of whatever is in the save file. A ship that no
+// longer exists is dropped, a count is rounded down and never allowed past
+// UP_MAX, and anything that is not a number at all is ignored — a bad save
+// should cost you an upgrade, never wedge the game.
+function readUps(raw) {
+  const out = {};
+  if (!raw || typeof raw !== "object") return out;
+  for (const id in raw) {
+    const n = Math.floor(Number(raw[id]));
+    if (!SHIPS.some((s) => s.id === id)) continue;
+    if (!(n >= 1)) continue;
+    out[id] = Math.min(UP_MAX, n);
+  }
+  return out;
+}
+let ups = {};
+try { ups = readUps(JSON.parse(localStorage.getItem(UP_KEY))); } catch (e) {}
+let spent = 0;
+try { spent = Math.max(0, Number(localStorage.getItem(SPEND_KEY)) || 0); } catch (e) {}
+function saveUps() {
+  try {
+    localStorage.setItem(UP_KEY, JSON.stringify(ups));
+    localStorage.setItem(SPEND_KEY, String(spent));
+  } catch (e) {}
+}
+// How many upgrades a ship has had, and what is left of the bank to spend.
+function upsOn(ship) { return ups[ship.id] || 0; }
+function purse() { return Math.max(0, bank - spent); }
+// What your gun is worth right now: 1 with no upgrades, 2.5 with all three.
+function gunPower() { return 1 + UP_STEP * upsOn(currentShip()); }
+// You can only upgrade a ship you have earned, only three times, and only
+// with money you have not already laid out.
+function canUpgrade(ship) {
+  return unlocked(ship) && upsOn(ship) < UP_MAX && purse() >= UP_PRICE;
+}
+function buyUpgrade(ship) {
+  if (!canUpgrade(ship)) return false;
+  ups[ship.id] = upsOn(ship) + 1;
+  spent += UP_PRICE;
+  saveUps();
+  playExplosionSound(true);   // a bang, so a purchase is felt as well as seen
+  return true;
+}
 let banked = 0;            // how much of THIS run has gone in already
 let bankAtRunStart = bank; // what the bank held when this run began
 let gemsAtRunStart = gems(); // ...and how many gems, for the same reason
@@ -3920,14 +3994,26 @@ function screenButtons() {
       return button(card.x + card.w - 212, card.y + (SHOP_CARD_H - BTN_H) / 2,
                     198, label, action, style);
     });
+    // The UPGRADE box on each card you own. It sits INSIDE the card, and in
+    // two columns the whole card is itself a button — so these go in front
+    // of the cards in the list, because the first one the tap lands in wins
+    // and a box buried under a card could never be pressed.
+    const buys = [];
+    SHIPS.forEach((ship, i) => {
+      if (!unlocked(ship)) return;              // nothing to upgrade yet
+      const card = shopCard(i);
+      buys.push({ x: card.x + CARD_UP_X, y: card.y + CARD_UP_Y,
+                  w: CARD_UP_W, h: CARD_UP_H, label: upLabel(ship), style: "bare",
+                  action: canUpgrade(ship) ? () => buyUpgrade(ship) : null });
+    });
     // If you stepped in from a game in progress, the only way out is back
     // into it — a "PLAY" that quietly threw your run away would be cruel.
     if (shopCameFrom === "playing") {
-      return rows.concat(buttonRow(848, 260, [
+      return buys.concat(rows, buttonRow(848, 260, [
         { label: "BACK TO GAME", action: closeShop },
       ]));
     }
-    return rows.concat(buttonRow(848, 210, [
+    return buys.concat(rows, buttonRow(848, 210, [
       { label: "BACK", action: closeShop, style: "quiet" },
       { label: "PLAY", action: () => newGame("playing") },
     ]));
@@ -4315,6 +4401,21 @@ const CARD_BAR_W  = SHOP_COLS === 1 ? 250 : 176;
 // running it off the side. Courier is a typewriter face: every letter is
 // exactly 0.6 of the size across, which is what makes this a sum and not a
 // guess.
+// The UPGRADE box sits in the bottom-right of a card you own — exactly the
+// room a card you do NOT own gives to the bar creeping towards its price.
+// The two can never collide, because a ship is either earned or it is not.
+const CARD_UP_W = SHOP_COLS === 1 ? 200 : 152;
+const CARD_UP_H = CARD_TIGHT ? 24 : 26;
+const CARD_UP_X = SHOP_CARD_W - CARD_UP_W - 12;
+const CARD_UP_Y = SHOP_CARD_H - CARD_UP_H - 5;
+const CARD_UP_PT = CARD_TIGHT ? 11 : 12;
+// The ★★☆ go beside the ship's NAME, not beside "EARNED" on the line below:
+// that line already carries "★ FLYING THIS ONE" at its longest, and stars
+// landed on top of it. The longest name is fourteen letters, and Courier
+// sets every letter at 0.6 of its size, so this clears it with room over.
+const CARD_NAME_CH = SHIPS.reduce((m, sh) => Math.max(m, sh.name.length), 1);
+const CARD_STAR_PT = CARD_TIGHT ? 15 : 17;
+const CARD_STAR_X = CARD_TEXT_X + Math.ceil(CARD_NAME_CH * 0.6 * CARD_NAME_PT) + 14;
 const CARD_TEXT_ROOM = SHOP_CARD_W - CARD_TEXT_X - 12;
 const CARD_LONGEST = SHIPS.reduce((most, sh) =>
   sh.blurb.reduce((m, line) => Math.max(m, line.length), most), 1);
@@ -4323,6 +4424,19 @@ const CARD_TEXT_PT = Math.max(9, Math.min(CARD_TIGHT ? 14 : 15,
 // One card's box. Down the left column first, then the right.
 // Which keys pick a ship. There is no key for ten, so 0 means the tenth —
 // saying "1-10" would send you hunting for a key that is not there.
+// "★★☆" for a ship with two of its three upgrades. Drawn on its card and
+// on the start screen, so what your gun is worth is never a secret.
+function upStars(ship) {
+  const got = upsOn(ship);
+  return "★".repeat(got) + "☆".repeat(UP_MAX - got);
+}
+// What the box on a card says, and whether tapping it does anything.
+function upLabel(ship) {
+  if (upsOn(ship) >= UP_MAX) return "FULLY UPGRADED";
+  if (purse() >= UP_PRICE) return "UPGRADE " + UP_PRICE;
+  return "NEED " + (UP_PRICE - purse()) + " MORE";
+}
+
 function shipKeys() {
   if (SHIPS.length < 10) return "1–" + SHIPS.length;
   return SHIPS.length < 11 ? "1–9 and 0" : "1–9, 0 and -";
@@ -4358,8 +4472,8 @@ function drawShop() {
   ctx.fillText(tally, W / 2, 94);
   ctx.fillStyle = "#888";
   ctx.font = "17px 'Courier New', monospace";
-  ctx.fillText("Most ships are earned in ONE big game.   •   Two fill the bank" +
-               "   •   One costs GEMS", W / 2, 116);
+  ctx.fillText("Earn ships by playing   •   UPGRADE one for " + UP_PRICE +
+               "   •   " + purse() + " left to spend", W / 2, 116);
 
   for (let i = 0; i < SHIPS.length; i++) {
     const ship = SHIPS[i];
@@ -4407,7 +4521,30 @@ function drawShop() {
                  : ship.bank ? "LOCKED — the bank must reach " + ship.bank
                  : "LOCKED — score " + ship.need + " in one game",
                  tx, y + CARD_FOOT_Y);
-    if (!mine) {
+    if (mine) {
+      // A ship you own shows what its gun is worth, and a box to make it
+      // worth more. This is the same corner of the card a ship you do NOT
+      // own gives to its progress bar, so the two never meet.
+      const got = upsOn(ship);
+      ctx.fillStyle = got >= UP_MAX ? "#ffd34d" : got > 0 ? "#6fe08a" : "#555";
+      ctx.font = CARD_STAR_PT + "px 'Courier New', monospace";
+      ctx.fillText(upStars(ship), card.x + CARD_STAR_X, y + CARD_NAME_Y);
+
+      const bx = card.x + CARD_UP_X, by = y + CARD_UP_Y;
+      const open = canUpgrade(ship);
+      const full = got >= UP_MAX;
+      roundRectPath(bx, by, CARD_UP_W, CARD_UP_H, 7);
+      ctx.fillStyle = open ? "rgba(111,224,138,0.16)" : "rgba(255,255,255,0.04)";
+      ctx.fill();
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = open ? "#6fe08a" : full ? "#6a5a20" : "#3a3a3a";
+      ctx.stroke();
+      ctx.textAlign = "center";
+      ctx.fillStyle = open ? "#6fe08a" : full ? "#8a7430" : "#666";
+      ctx.font = CARD_UP_PT + "px 'Courier New', monospace";
+      ctx.fillText(upLabel(ship), bx + CARD_UP_W / 2, by + CARD_UP_H / 2);
+      ctx.textAlign = "left";
+    } else {
       // A bar creeping toward what you need, so you can see how far off you
       // are rather than just being told "no". For most ships that is your
       // best single run against the price; for the one that fills up it is
@@ -4436,7 +4573,7 @@ function drawShop() {
   ctx.textAlign = "center";
   ctx.fillStyle = "#888";
   ctx.font = "17px 'Courier New', monospace";
-  ctx.fillText("Tap a ship you've earned to fly it (or press " + shipKeys() + ")" +
+  ctx.fillText("Tap a ship to fly it (" + shipKeys() + ")   •   tap UPGRADE, or U" +
                "   •   Esc goes back", W / 2, 922);
 }
 
@@ -5130,8 +5267,8 @@ function draw() {
     ctx.fillStyle = "#888";
     ctx.font = "18px 'Courier New', monospace";
     ctx.fillText("Move with ← →   •   Shoot with Space", W / 2, 330);
-    ctx.fillText("Flying: " + currentShip().name + "   •   best run: " + bestRun +
-                 bankLine() + gemLine(), W / 2, 360);
+    ctx.fillText("Flying: " + currentShip().name + " " + upStars(currentShip()) +
+                 "   •   best run: " + bestRun + bankLine() + gemLine(), W / 2, 360);
     // Which copy of the game this is — see BUILD, up at the top. Small and
     // grey, because it is only there for the day a phone will not update.
     // The build, and the frames a second this device is really managing. Both
