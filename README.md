@@ -607,6 +607,40 @@ comes down on its own, still wearing the top of its egg as a hat — and it take
 **45 hits** to see off, where an ordinary animal takes one. A bar across the top
 shows how much of it is left. It's back again on stage 30, 45, and so on.
 
+### It lands on you 🐣💥
+
+A chicken comes **down** five pixels every time it turns around, and for a long
+time nothing happened when it got to you: it could sit square on top of your
+ship all day and cost you nothing. Now it squashes you — **2 hearts of your 3**,
+then the usual flashing, and 2 more if you are still under it when the flashing
+stops. That is about **0.8 seconds to get out from under it**.
+
+It is not the same rule as the herd's. The herd reaching your line **ends the
+run** outright, and that is checked as they drop. A chicken is one animal coming
+down a few pixels at a time, so ending the run without a word would be a mean
+way to lose a game — it takes hearts and leaves you a way out instead. An
+ordinary animal standing on you between drops still costs you nothing; its rule
+is the drop.
+
+What has to touch you is the **chicken**, not the square it is drawn in. The
+chick is painted 240 pixels across inside a 260-pixel box, and the corners of
+that box are empty sky — so the game measures the drawing. `inkSpan()` works
+that out from the art itself, with the same sums `drawThing()` uses to paint it,
+so the two can never disagree about where the chicken is.
+
+How long before this matters? The chick has to turn around **114 times** to come
+down that far, and it turns faster the more you have hurt it:
+
+| | Before it is down on you |
+|---|---|
+| The Big Chick (level 5) | about **11 minutes** |
+| The Rainbow Chick (level 14) | about **7.5 minutes** |
+| The Rainbow Chick, nearly beaten and raging | about **3 minutes** |
+
+So it is a rule for a fight that has dragged on, which is exactly when you want
+it. `BOSS_TOUCH` is what a squashing costs and `BOSS_DROP` is how fast the chick
+comes down — raise that one and the chicken becomes a clock you are racing.
+
 ### The Rainbow Chick 🌈🐣
 
 From **stage 30** the chick comes back grown up. It has thrown the eggshell away

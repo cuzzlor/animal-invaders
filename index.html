@@ -1059,6 +1059,14 @@ const BOSS_TOP     = 190; // how far down the screen it starts
 const BOSS_SPEED   = 0.9; // how fast it sweeps to begin with
 const BOSS_RAGE    = 1.6; // how much FASTER it sweeps once nearly beaten
 const BOSS_DROP    = 5;   // how far it comes down each time it turns around
+// Hearts it costs you to be LANDED ON by a chicken. The herd ends the run
+// the moment it reaches your line; a chicken does not, because there is only
+// one of it and it comes down five pixels at a time. Being sat on by it
+// should cost you dearly and leave you a way out, not end the game without a
+// word — so the drop leaves the boss alone and this takes over. Two of your
+// three hearts, and SAFE_TIME of flashing before it can take two more: stay
+// under it and you have about a second and a half to think again.
+const BOSS_TOUCH   = 2;
 const BOSS_POINTS  = 500; // what beating it is worth
 // From stage 30 the chick comes back CROWNED: a rainbow crown where the
 // eggshell used to be, and twice the health. Every boss stage from there on
@@ -1249,7 +1257,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-10-17 seekbite";
+const BUILD = "2026-10-17 squash";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
@@ -1553,6 +1561,38 @@ function tankOf() {
 
 // How wide across a thing is. Everything is one CELL except the boss.
 function sizeOf(inv) { return inv.size || CELL; }
+
+// ---------------------------------------------------------------------
+// inkSpan(): how big a sprite's DRAWING is, in pixels — which is not the
+// same as the box it is drawn in. A BIG CHICK is drawn in a 260px box, but
+// its letters only reach across 20 of the grid's 22 columns, so the chick
+// itself is 240 across and the rest is empty sky. Touching it ought to mean
+// touching the chicken.
+//   The sums here are drawThing()'s own, so the two cannot disagree about
+// where the picture is. Worked out once and kept on the sprite.
+// ---------------------------------------------------------------------
+function inkSpan(thing, size) {
+  if (!thing || !thing.isPixel) return { w: size, h: size };
+  if (!thing.ink) {
+    const rows = thing.rows, across = rows[0].length, down = rows.length;
+    let lo = across, hi = -1, top = down, bot = -1;
+    for (let r = 0; r < down; r++) {
+      for (let c = 0; c < across; c++) {
+        if (rows[r][c] === ".") continue;
+        if (c < lo) lo = c;
+        if (c > hi) hi = c;
+        if (r < top) top = r;
+        if (r > bot) bot = r;
+      }
+    }
+    thing.ink = hi < lo ? { cols: 0, rows: 0, span: Math.max(across, down) }
+                        : { cols: hi - lo + 1, rows: bot - top + 1,
+                            span: Math.max(across, down) };
+  }
+  const ink = thing.ink;
+  const ps = Math.max(1, Math.round(size / ink.span));
+  return { w: ink.cols * ps, h: ink.rows * ps };
+}
 
 function buildLevel() {
   plan = levelPlan(); // settle this wave's numbers before anything reads them
@@ -2672,8 +2712,10 @@ function update() {
       // A row's drop for the herd; the boss only sags a little, or it would
       // be on top of you before you'd got through its health.
       inv.y += inv.boss ? BOSS_DROP : 20;
-      // If the animals reach the bottom, it's game over.
-      if (inv.y + sizeOf(inv) / 2 > player.y - CELL / 2) state = "lost";
+      // If the animals reach the bottom, it's game over — but NOT a chicken.
+      // One animal arriving on its own costs you hearts and leaves you a way
+      // out; see BOSS_TOUCH, down where the other hits are dealt with.
+      if (!inv.boss && inv.y + sizeOf(inv) / 2 > player.y - CELL / 2) state = "lost";
     }
   }
 
@@ -3051,6 +3093,23 @@ function update() {
     }
   }
   shots = shots.filter((m) => m.y < H + 20);
+
+  // --- The BIG CHICK landing on you ---
+  // It lays eggs and it throws ice, but it is also a very large animal, and
+  // for a long time you could stand underneath it all day. Now it squashes
+  // you: BOSS_TOUCH hearts, then SAFE_TIME of flashing, and if you are still
+  // there when that runs out it takes BOSS_TOUCH more.
+  //   What has to overlap is the CHICKEN, not the square it is drawn in.
+  if (invuln === 0) {
+    for (const inv of invaders) {
+      if (!inv.alive || !inv.boss) continue;
+      const box = inkSpan(inv.animal, sizeOf(inv));
+      if (Math.abs(player.x - inv.x) >= (box.w + CELL) / 2) continue;
+      if (Math.abs(player.y - inv.y) >= (box.h + CELL) / 2) continue;
+      hurtPlayer(true, BOSS_TOUCH);
+      break;                  // one chicken, one squashing
+    }
+  }
 
   // --- Move the explosion bits and let them fade out ---
   for (const p of particles) {
