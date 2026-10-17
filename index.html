@@ -651,8 +651,6 @@ const BULLET_LENGTH = 22;  // how long your shots look (bigger = longer streaks)
 // on the ship, so its bullet does too — the three fly as an arrowhead and
 // the middle one lands first.
 const TWIN_SPREAD   = 11; // how far out the TWIN BLASTER's two barrels sit
-const TWIN_WIDE     = 35; // ...and where an upgrade puts them: 70 apart, one
-                          // animal's spacing, so the pair takes two columns
 const TRIPLE_SPREAD = 15; // how far out the two side bullets start, in pixels
 const TRIPLE_LEAD   = 16; // how far ahead of them the middle one starts
 const RAPID_EVERY = 12;  // between RAPID FIRE shots (12 = five a second at GAME_SPEED 1)
@@ -660,7 +658,12 @@ const RAPID_FAST  = 9;   // ...and upgraded: 120/9 rounds to THIRTEEN a second
 const BOMB_RELOAD = 30;  // between BLAST CANNON shells (30 = half a second at GAME_SPEED 1)
 const BOMB_RADIUS = 95;  // how far the blast reaches, in pixels
 const BOMB_CORE   = 44;  // inside this it's full strength; past it, half
-const BOMB_WIDE   = 130; // ...and how far an UPGRADED cannon throws it
+// An UPGRADED cannon throws the whole blast half again as far. The CORE
+// goes with it, so the full-strength middle keeps its share of the bang
+// instead of a wider blast being mostly half-strength fringe.
+const BOMB_GROW   = 1.5;
+const BOMB_WIDE   = BOMB_RADIUS * BOMB_GROW;
+const BOMB_WCORE  = BOMB_CORE * BOMB_GROW;
 const BOMB_BOOM   = 3.4; // how big the bang LOOKS (bigger = more flying bits)
 // What one shell takes off. An ordinary animal has 1 health, so anything from
 // 1 up downs it outright and this number never showed — it only starts to
@@ -785,6 +788,12 @@ const FLAME_SPREAD = FLAME_MOUTH + FLAME_TAPER * FLAME_REACH; // width at the ti
 const FLAME_CATCH  = 80;   // heat before the flame bites and lights (40 steps at the nose)
 const FLAME_BITE   = 0.125; // health the flame itself takes at each bite
 const FIRE_TIME    = stepsFor(4); // how long a thing stays alight once lit
+// An UPGRADED FLAMETHROWER runs hotter: it needs this much LESS heat before
+// it bites, so it sets a thing alight 35% sooner. The bite and the lighting
+// are the same moment in the code, so it also bites 35% more often — the
+// flame does not light faster without burning faster, and saying otherwise
+// would mean a second counter for no good reason.
+const FLAME_HOT    = 1.35;
 // Steps between one bite of the fire and the next. The fire eats at HALF the
 // speed it used to (40 steps instead of 20), and stays alight twice as long
 // to make up for it — so it still does its three animals' worth of damage in
@@ -814,6 +823,7 @@ const FLAME_PRICE  = 250000; // what it costs — paid into the bank, not in one
 // two and a half seconds of holding it there, then two seconds of waiting
 // while the tank fills. You cannot lean on the button; you pick your moment.
 const ICE_TANK      = stepsFor(3);    // under the flame's 3.5
+const ICE_BIG       = Math.round(ICE_TANK * 1.3); // ...and 30% more, upgraded
 const ICE_SLOW      = 0.4;            // how much of its speed a chilled animal keeps
 const ICE_SLOW_TIME = stepsFor(0.5);  // how long the chill lasts once you swing away
 // Steps in the spray before it freezes solid. It has to stay UNDER the time
@@ -1170,15 +1180,15 @@ const WAVE_SPEEDUP = 0.10; // each wave of a level is this much faster
 const UPGRADES = {
   scout:  { tells: "+1 HEART",   gives: { hearts: 1 } },
   rapid:  { tells: "13 A SEC",   gives: { reload: RAPID_FAST } },
-  twin:   { tells: "WIDE PAIR",  gives: { spread: TWIN_WIDE } },
-  bomb:   { tells: "BIG BANG",   gives: { radius: BOMB_WIDE } },
-  seek:   { tells: "FULL SPEED", gives: { dash: PLAYER_BULLET_SPEED } },
-  triple: { tells: "5 BARRELS",  gives: { barrels: 5 } },
+  twin:   { tells: "+1 HEART",   gives: { hearts: 1 } },
+  bomb:   { tells: "BANG x1.5",  gives: { radius: BOMB_WIDE, core: BOMB_WCORE } },
+  seek:   { tells: "+1 HEART",   gives: { hearts: 1 } },
+  triple: { tells: "+1 HEART",   gives: { hearts: 1 } },
   drapid: { tells: "13 PAIRS",   gives: { reload: RAPID_FAST } },
-  laser:  { tells: "BURNS 3s",   gives: { beam:  { time: stepsFor(3) } } },
-  volt:   { tells: "5 DEEP",     gives: { beam:  { hops: 5 } } },
-  flame:  { tells: "FIRE 2x",    gives: { flame: { fireTime: FIRE_TIME * 2 } } },
-  frost:  { tells: "HOLDS 3s",   gives: { flame: { hold: stepsFor(3) } } },
+  laser:  { tells: "BURNS 2.5s", gives: { beam:  { time: stepsFor(2.5) } } },
+  volt:   { tells: "BURNS 3s",   gives: { beam:  { time: stepsFor(3) } } },
+  flame:  { tells: "LIGHTS 35%", gives: { flame: { catchAt: FLAME_CATCH / FLAME_HOT } } },
+  frost:  { tells: "+30% TANK",  gives: { flame: { tank: ICE_BIG } } },
 };
 
 const LEVELS = [
@@ -1290,7 +1300,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-10-17 upgrade1";
+const BUILD = "2026-10-17 upgrades";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
@@ -2414,18 +2424,15 @@ function shootBullets() {
   const ship = currentShip();
   const nose = player.y - CELL / 2;
   if (ship.fire === "twin") {
-    // Two barrels, `spread` out either side of the nose. Upgraded they move
-    // apart to a whole animal's width, so the pair takes two columns at once
-    // instead of both landing on the same animal.
-    const wide = ship.spread || TWIN_SPREAD;
-    bullets.push({ x: player.x - wide, y: nose, dmg: ship.damage });
-    bullets.push({ x: player.x + wide, y: nose, dmg: ship.damage });
+    // Two barrels, TWIN_SPREAD out either side of the nose.
+    bullets.push({ x: player.x - TWIN_SPREAD, y: nose, dmg: ship.damage });
+    bullets.push({ x: player.x + TWIN_SPREAD, y: nose, dmg: ship.damage });
   } else if (ship.fire === "triple") {
     // The middle barrel stands forward on the ship, so its bullet starts
     // TRIPLE_LEAD further up the screen than the other two. The three keep
     // that shape the whole way, because every bullet flies at the same
     // speed — an arrowhead going up, with the point in front.
-    const barrels = ship.barrels || 3;    // five of them, upgraded
+    const barrels = 3;
     const mid = (barrels - 1) / 2;
     for (let i = 0; i < barrels; i++) {
       // The MIDDLE barrel stands forward on the ship, so its bullet starts
@@ -2437,13 +2444,14 @@ function shootBullets() {
   } else {
     // `bomb` marks a BLAST CANNON shell — it blows up where it lands
     // instead of just poking the one animal it touched.
-    // A shell and a missile each carry their own numbers, taken at the
-    // moment they were fired, so upgrading mid-flight cannot reach back and
-    // change something already in the air.
+    // A SHELL carries its own blast, taken at the moment it was fired, so
+    // buying the BLAST CANNON's bigger bang while one is still climbing
+    // cannot reach back and widen it. A missile has nothing of the sort to
+    // carry: every missile flies at SEEK_SPEED, and no upgrade changes it.
     bullets.push({ x: player.x, y: nose, dmg: ship.damage,
                    bomb: ship.fire === "bomb", seek: !!ship.seek,
                    boom: ship.radius || BOMB_RADIUS,
-                   dash: ship.dash || SEEK_SPEED });
+                   core: ship.core || BOMB_CORE });
   }
   gunTimer = ship.reload;                 // this gun's own reload time
   playShootSound(!!ship.auto);            // a held stream gets a lighter, quicker pew
@@ -2713,7 +2721,7 @@ function update() {
     // Never step PAST what it is going for: the last run of all lands on the
     // animal, and the hit is then found by the same hit() every other bullet
     // goes through.
-    const run = Math.min(Math.max(b.dash || SEEK_SPEED, herdFloor), away);
+    const run = Math.min(Math.max(SEEK_SPEED, herdFloor), away);
     b.x += b.fx * run;
     b.y += b.fy * run;
   }
@@ -2979,7 +2987,7 @@ function update() {
           // at once. Something already alight is simply re-lit, so its fire
           // never runs down while you are still pointing at it.
           if (inv.fire <= 0) inv.fireTick = FIRE_TICK; // a new fire waits one tick
-          inv.fire = flameGun.fireTime || FIRE_TIME;
+          inv.fire = FIRE_TIME;
           inv.hp -= FLAME_BITE * bite;
         } else {
           inv.hp -= 1 * bite; // a beam takes a whole animal where the flame takes an eighth
@@ -3012,7 +3020,7 @@ function update() {
     if (cold > 0) {
       inv.chill = ICE_SLOW_TIME;
       if (inv.frost < ICE_FREEZE_AT) inv.frost++;
-      if (inv.frost >= ICE_FREEZE_AT) inv.froze = flameGun.hold || ICE_HOLD;
+      if (inv.frost >= ICE_FREEZE_AT) inv.froze = ICE_HOLD;
     } else {
       if (inv.chill > 0) inv.chill--;
       if (inv.frost > 0) inv.frost--;
@@ -3082,7 +3090,7 @@ function update() {
         // A BLAST CANNON shell doesn't poke one animal — it goes off, and
         // the bang does all the damage to everything standing near it.
         if (b.bomb) {
-          bombBlast(b.x, b.y, b.boom);
+          bombBlast(b.x, b.y, b.boom, b.core);
           b.y = -999;
           break;                    // one bang per shell
         }
@@ -3576,11 +3584,13 @@ function hurtPlayer(boom, cost = 1) {
 // second one finishes the cluster off.
 // Your bases are left alone; the shell only goes off on an animal.
 // ---------------------------------------------------------------------
-function bombBlast(x, y, reach) {
-  // How far this shell throws. It is handed in rather than read from
-  // BOMB_RADIUS, because an upgraded BLAST CANNON throws a wider one and a
-  // shell already in the air must go off the size it was fired at.
+function bombBlast(x, y, reach, core) {
+  // How far this shell throws, and how much of that is full strength. Both
+  // are handed in rather than read from BOMB_RADIUS and BOMB_CORE, because
+  // an upgraded BLAST CANNON throws a wider one and a shell already in the
+  // air must go off the size it was fired at.
   reach = reach || BOMB_RADIUS;
+  core = core || BOMB_CORE;
   spawnExplosion(x, y, BOMB_BOOM); // a big one, so you can see the blast
   // A ring that races out to exactly that far, so you can SEE how far the
   // blast reached and learn where to aim the next shell.
@@ -3596,7 +3606,7 @@ function bombBlast(x, y, reach) {
     const dist = Math.hypot(Math.max(0, Math.abs(inv.x - x) - spare),
                             Math.max(0, Math.abs(inv.y - y) - spare));
     if (dist > reach) continue;
-    inv.hp -= dist <= BOMB_CORE ? BOMB_DAMAGE : BOMB_DAMAGE / 2;
+    inv.hp -= dist <= core ? BOMB_DAMAGE : BOMB_DAMAGE / 2;
     // Nothing walks away from a shell half-standing: anything knocked to
     // half health or below is finished off by the shock. So the blast
     // clears its whole radius, rather than leaving wounded animals behind.
@@ -3659,8 +3669,8 @@ let bank = 0;
 try { bank = Math.max(0, Number(localStorage.getItem(BANK_KEY)) || 0); } catch (e) {}
 
 // --- UPGRADES ---
-// Every ship can be made to hit harder, three times over, and each go costs
-// UP_PRICE out of the bank.
+// Every ship can be made better at the thing it is for, ONCE, and that one
+// go costs UP_PRICE out of the bank.
 //   The bank itself is NOT touched. It is the record of every point you have
 // ever scored, and two ships are unlocked by asking whether it has reached a
 // figure — spend it down and the FLAMETHROWER you own at 250,000 would
