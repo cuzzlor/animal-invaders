@@ -848,7 +848,7 @@ back to exactly where you were — the new ship is in your hands immediately.
 | **Rapid Fire** | score 2,500 in one game | **Hold** the button and it pours out ten shots a second — but each one only hits half as hard, so most animals take two. |
 | **Twin Blaster** | score 5,000 in one game | Two cannons — two bullets every shot, so you clear the herd twice as fast. |
 | **Blast Cannon** | score 6,000 in one game | Lobs a shell that **blows up** where it lands, clearing whatever it hits and the whole ring of animals around it — **six** at a time in the thick of the herd, four along its bottom edge. A shell does **5** damage, so a tough herd costs it nothing. A quarter of a second to reload. |
-| **Guided Missile** | **20 gems** — beat every level once | The Scout's gun with a **lock** on it. One bullet at a time, full strength, no reload — the Scout's numbers exactly. The bullet does not fly straight up: it takes the animal **nearest to it** and steers all the way in, and if that animal goes down first it locks onto the next nearest. **It cannot miss.** It flies *at* the animal rather than upwards, so there is no angle it cannot make; it is never slower than the herd it is chasing; and it goes **around** your own cover rather than through it. It is **slower** than every other bullet in the game — you watch it go. |
+| **Guided Missile** | **20 gems** — beat every level once | The Scout's gun with a **lock** on it. One bullet at a time, no reload, and it bites **twice as hard as any other bullet** — one missile downs a **tough** animal, the kind with 2 health. The bullet does not fly straight up: it takes the animal **nearest to it** and steers all the way in, and if that animal goes down first it locks onto the next nearest. **It cannot miss.** It flies *at* the animal rather than upwards, so there is no angle it cannot make; it is never slower than the herd it is chasing; and it goes **around** your own cover rather than through it. It is **slower** than every other bullet in the game — you watch it go. |
 | **Triple Blaster** | score 8,500 in one game | Three cannons instead of two. The middle barrel stands **forward** on the ship, so its bullet leaves from further up the screen — the three fly as an arrowhead with the point in front, and the middle one lands first. |
 | **Double Rapid** | score 9,000 in one game | Rapid Fire with two barrels. **Hold** the button and it pours out ten **pairs** a second. Each bullet is half strength, like Rapid Fire's, so a pair downs an ordinary animal where a single bullet leaves it standing. |
 | **Red Laser** | score 10,000 in one game | A red beam that smashes clean through every animal it touches (and melts their shots). Burns for **2 seconds**, then reloads in under half of one — so it is lit five sixths of the time, and one burn carries you nearly the whole width of a wave. |
@@ -871,8 +871,23 @@ it measures the bank.
 
 ### The Guided Missile 🎯
 
-The Scout's gun with a lock on it. Same one bullet at a time, same full
-strength, same no reload. You stop lining the ship up and just press fire.
+The Scout's gun with a lock on it. Same one bullet at a time, same no reload.
+You stop lining the ship up and just press fire.
+
+It hits **twice as hard** as anything else that fires a bullet. Every other
+bullet in the game takes **1** off an animal; a missile takes **2**, which is
+exactly what a **tough** animal has — so one missile puts one down. That is
+8 of the 16 levels with a herd, and the whole of Endless past stage 15.
+
+| The herd | Health | Missiles to down one |
+|---|---|---|
+| Levels 1–3 | 1 | **one** |
+| The tough herd — 8 levels, and all of Endless past stage 15 | 2 | **one** |
+| The hardest herd — levels 16–20 | 3 | two |
+
+The five hardest levels still take two, because their animals have 3 health
+and a missile takes 2. `SEEK_BITE` is the number if you want those in one as
+well.
 
 It is the one ship that is not bought with points at all. It costs **20 gems**,
 and gems come from beating levels — see [Gems](#gems-) below.
@@ -888,6 +903,13 @@ true:
 
 It also never steps **past** what it is chasing: the last run of all lands on the
 animal.
+
+The bigger bite shows up on the chickens too, because a missile is a plain
+bullet as far as a boss is concerned and 2 is 2. At a steady eight taps a
+second, **The Big Chick** goes from 6.0 seconds to **3.8**, and **The Last
+Chick** from 13.5 to **7.7**. A tough level goes from 10.8 seconds to **6.4**.
+It is not the hardest-hitting thing in the shop even so — the Blast Cannon's
+shell has always done **5**, to a boss as much as to anything else.
 
 #### How it gets round a base
 
@@ -941,8 +963,8 @@ you cannot pick off a column, save the top row for last, or leave one alive on
 purpose. It is one bullet at a time, where the Twin Blaster costs less and fires
 two.
 
-The knobs are `SEEK_SPEED`, `SEEK_EDGE`, `SEEK_CLEAR`, `GEM_PRICE`, `SEEK_COLOR`
-and `SEEK_TAIL`, near the ships at the top of `index.html`. `SEEK_CLEAR` is the
+The knobs are `SEEK_BITE`, `SEEK_SPEED`, `SEEK_EDGE`, `SEEK_CLEAR`, `GEM_PRICE`,
+`SEEK_COLOR` and `SEEK_TAIL`, near the ships at the top of `index.html`. `SEEK_CLEAR` is the
 berth it gives a base block — make it bigger and it swings wider.
 
 ### Gems 💎

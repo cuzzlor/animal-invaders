@@ -928,6 +928,14 @@ const GEM_PRICE  = 20;        // gems for the missile — every level, as it sta
 const GEM_COLOR  = "#6fe08a"; // the gem's own green, for its bar and its count
 const SEEK_COLOR = "#ff5fd0"; // the streak it draws, in the ship's own magenta
 const SEEK_TAIL  = 16;        // how long that streak is — it trails the TURN
+// What one missile takes off an animal. TWO, where every other bullet in
+// the game takes one, so that a TOUGH animal — the ones with 2 health, which
+// is eight of the sixteen ordinary levels and all of ENDLESS past stage
+// TOUGH_AFTER — goes down to a single missile. It cannot be written as
+// TOUGH_HP here, much as it would like to be: that constant is declared
+// further down the file than this one is used. A test holds the two
+// together instead, so neither can be moved without the other.
+const SEEK_BITE  = 2;
 const SEEK_CLEAR = 7;         // the berth it gives a base block, in pixels
 const SEEK_LOOK  = 6;         // ...and how finely it hunts sideways for a way through
 
@@ -960,9 +968,9 @@ const SHIPS = [
   // and update() does the steering.
   {
     id: "seek", name: "GUIDED MISSILE", art: SEEK_ROCKET_ART, gems: GEM_PRICE,
-    fire: "single", damage: 1, reload: 0, seek: true,
-    blurb: ["The SCOUT's gun with a LOCK on it. Slower,",
-            "steers ROUND cover, and it CANNOT miss."],
+    fire: "single", damage: SEEK_BITE, reload: 0, seek: true,
+    blurb: ["Slower, steers ROUND cover, CANNOT miss,",
+            "and it downs a TOUGH animal in one."],
   },
   {
     id: "triple", name: "TRIPLE BLASTER", art: TRIPLE_ROCKET_ART, need: 8500,
@@ -1241,7 +1249,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-09-28 roundcover";
+const BUILD = "2026-10-17 seekbite";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
