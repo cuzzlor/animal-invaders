@@ -607,6 +607,34 @@ comes down on its own, still wearing the top of its egg as a hat — and it take
 **45 hits** to see off, where an ordinary animal takes one. A bar across the top
 shows how much of it is left. It's back again on stage 30, 45, and so on.
 
+### Hit square was the SAFE way to be hit 🥚
+
+The chick's egg and its ice both go off **at a place**, and both decide who is
+caught by how near that place is. The shot was being sent off the screen to be
+swept up **before** the blast was told where it had happened — so a hit dead on
+your ship went off at y 1959, a thousand pixels below the floor, where nobody
+was standing.
+
+What that meant in play:
+
+| Where the chick's egg landed | Before | Now |
+|---|---|---|
+| **Square on your ship** | **nothing at all** | a heart |
+| 40 pixels to one side | a heart | a heart |
+| Well away from you | nothing | nothing |
+
+Walking an egg across the ship two pixels at a time, **19 of 21 spots were
+safe** — a 38-pixel dead patch centred exactly on you. Being hit square was the
+safe way to be hit, and the nearer the chick's aim, the less it hurt.
+
+The ice still took its three hearts, because a direct shard does not ask who is
+standing near — but it threw its burst, its ring and the hole it punches in your
+cover a long way below the screen, so you never saw it land.
+
+Only the Big Chick lays exploding eggs and only the Big Chick throws ice, so
+this was the boss's bug alone. An ordinary animal's shot has no blast and never
+used the place it struck.
+
 ### It lands on you 🐣💥
 
 A chicken comes **down** five pixels every time it turns around, and for a long
@@ -637,8 +665,12 @@ down that far, and it turns faster the more you have hurt it:
 | The Rainbow Chick (level 14) | about **7.5 minutes** |
 | The Rainbow Chick, nearly beaten and raging | about **3 minutes** |
 
-So it is a rule for a fight that has dragged on, which is exactly when you want
-it. `BOSS_TOUCH` is what a squashing costs and `BOSS_DROP` is how fast the chick
+So it is a rule for a fight that has dragged on — and in practice you will
+almost never meet it, because the chick's **eggs** see you off in about half a
+minute if you stand under it and do nothing. It is there so that standing under
+a chicken is never free, not because you will often get the chance.
+
+`BOSS_TOUCH` is what a squashing costs and `BOSS_DROP` is how fast the chick
 comes down — raise that one and the chicken becomes a clock you are racing.
 
 ### The Rainbow Chick 🌈🐣

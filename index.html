@@ -1257,7 +1257,7 @@ const H = canvas.height;
 //
 // Bump it whenever you change something you need to see on another device.
 // ---------------------------------------------------------------------
-const BUILD = "2026-10-17 squash";
+const BUILD = "2026-10-17 direct";
 
 // How big things are drawn, in pixels.
 const CELL = 40;          // the size of one animal / the player
@@ -3084,11 +3084,22 @@ function update() {
   for (const m of shots) {
     if (m.y > H + 20) continue;
     if (invuln === 0 && hit(m.x, m.y, player.x, player.y, CELL)) {
+      // WHERE IT STRUCK, written down before the shot is sent off-screen to
+      // be swept up. The two blasts below go off at a place, and they decide
+      // who is caught by how near that place is: an egg told it went off a
+      // thousand pixels under the floor finds nobody standing anywhere near
+      // it. Reading m.y after it had been set to H + 999 meant a boss egg
+      // landing DEAD ON the ship did nothing at all, while one landing
+      // beside you cost you a heart — being hit square was the safe way to
+      // be hit. The ice still took its hearts, because a direct shard does
+      // not ask who is near, but it threw its burst, its ring and the hole
+      // it blows in your cover a long way below the screen.
+      const bx = m.x, by = m.y;
       m.y = H + 999;       // remove this shot
       // The chick's ice, head-on: SHARD_COST hearts, not one. It is the
       // hardest hit in the game, and it is the only one you are warned about.
-      if (m.shard) { shardBlast(m.x, m.y, true); continue; }
-      if (m.explodes) { eggBlast(m.x, m.y); continue; }
+      if (m.shard) { shardBlast(bx, by, true); continue; }
+      if (m.explodes) { eggBlast(bx, by); continue; }
       hurtPlayer(true);    // a life, a bang, and the ice if this level has it
     }
   }
