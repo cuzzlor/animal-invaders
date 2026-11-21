@@ -1033,6 +1033,89 @@ const SHIPS = [
   },
 ];
 
+// ---------------------------------------------------------------------
+// MINIONS — a little ship that flies beside yours and fires by itself.
+//   A minion is a fifth the size of your ship. It is bought with DARK
+// MATTER, not with points: you win one dark matter for every stage you
+// clear in the endless game and every level you beat in the level game.
+// Dark matter is SPENT, unlike the bank, so a minion costs you what you
+// pay for it. Once bought it is yours for good, and you can take up to
+// THREE along at a time (MINION_MAX), with any ship.
+//   It aims itself: it fires whenever an animal is above it and its gun is
+// ready. Its shots are weaker than a SCOUT's, and they pass your own
+// cover without chipping it — you are not steering it, so it should not be
+// able to knock down the roof over your head.
+//   `reload` is the time between shots, `dmg` what each shot takes off an
+// animal (a SCOUT bullet takes 1), and `guns` how many it fires at once.
+// ---------------------------------------------------------------------
+const MINION_SIZE  = 8;               // a fifth of your ship, which is CELL (40) across
+const MINION_GAP   = 32;              // how far from your ship's middle it flies
+const MINION_STEP  = 18;              // ...and how far apart two minions on one side fly
+const MINION_REACH = 24;              // how far to the side an animal can be and still be shot at
+const MINION_SHOT_SPEED = 6;          // its shots fly a little quicker than yours
+const MINION_COLOR = "#c99bff";       // the colour of its shots, and of dark matter
+const MINI_SCOUT_ART = spr([
+  "...v...", "..vvv..", "..WCW..", "..WsW..",
+  ".vWsWv.", "vvsssvv", "v.GGG.v", "...O...",
+]);
+const MINI_RAPID_ART = spr([
+  "...e...", "..eee..", ".eWCWe.", ".eWsWe.",
+  "eeWsWee", "e.sss.e", "..GGG..", "..OYO..",
+]);
+const MINI_TWIN_ART = spr([
+  ".Y...Y.", ".Y.Y.Y.", ".YYYYY.", ".YWCWY.",
+  "YYWsWYY", "Y.sss.Y", "..GGG..", "..OYO..",
+]);
+const MINI_FROST_ART = spr([
+  "...W...", "..WCW..", ".CWCWC.", ".CWsWC.",
+  "CCWsWCC", "C.sss.C", "..GGG..", "..CWC..",
+]);
+const MINI_FLAME_ART = spr([
+  "...Y...", "..YOY..", ".OWCWO.", ".OWsWO.",
+  "ROWsWOR", "R.sss.R", "..GGG..", "..OYO..",
+]);
+const MINI_VENOM_ART = spr([
+  "...g...", "..ggg..", ".jWCWj.", ".jWsWj.",
+  "jgWsWgj", "j.sss.j", "..GGG..", "..gjg..",
+]);
+// MINI FROST: how long a hit holds an animal frozen. It is the FROST
+// THROWER's freeze, so everything that gun's freeze does, this does — a
+// BIG CHICK held frozen for BOSS_BREAK still breaks out and throws the ice.
+const MINI_FREEZE = stepsFor(2);
+// MINI VENOM: poison eats like the FLAMETHROWER's fire, at half the speed —
+// a bite every two of the fire's ticks — and lasts twice as long, so it
+// does the same damage in the end and takes twice as long to do it.
+const POISON_TICK = FIRE_TICK * 2;
+const POISON_TIME = FIRE_TIME * 2;
+const MINIONS = [
+  { id: "mscout", name: "MINI SCOUT", art: MINI_SCOUT_ART, price: 100,
+    reload: stepsFor(3 / 8), dmg: 0.5, guns: 1,
+    blurb: ["Eight shots every three seconds, by itself.",
+            "Two of its shots down one animal."] },
+  { id: "mrapid", name: "MINI RAPID", art: MINI_RAPID_ART, price: 250,
+    reload: stepsFor(3 / 16), dmg: 0.5, guns: 1,
+    blurb: ["About five little shots a second —",
+            "twice as busy as the MINI SCOUT."] },
+  { id: "mtwin", name: "MINI TWIN", art: MINI_TWIN_ART, price: 500,
+    reload: stepsFor(3 / 16), dmg: 0.68, guns: 2,
+    blurb: ["Two barrels, about five shots a second,",
+            "and each bites harder. Two down one."] },
+  // The last three do no damage with the shot itself. What a shot does is
+  // in `hits`: it leaves something on the animal that does the work.
+  { id: "mfrost", name: "MINI FROST", art: MINI_FROST_ART, price: 750,
+    reload: stepsFor(1), dmg: 0, guns: 1, hits: "freeze", color: "#bff4ff",
+    blurb: ["One shot a second. FREEZES what it hits",
+            "for " + secs(MINI_FREEZE) + ": no damage, but it can't move."] },
+  { id: "mflame", name: "MINI FLAME", art: MINI_FLAME_ART, price: 1000,
+    reload: stepsFor(1), dmg: 0, guns: 1, hits: "fire", color: "#ff8c1a",
+    blurb: ["One shot a second. Sets what it hits",
+            "ALIGHT with the FLAMETHROWER's fire."] },
+  { id: "mvenom", name: "MINI VENOM", art: MINI_VENOM_ART, price: 1250,
+    reload: stepsFor(0.5), dmg: 0, guns: 1, hits: "poison", color: "#8dff5a",
+    blurb: ["Two shots a second. POISON: kills half",
+            "as fast as fire, but lasts twice as long."] },
+];
+
 // --- The numbers you'll reach for first ---
 const ROWS        = 4;     // how many rows of animals
 const COLS        = 8;     // how many animals in each row
@@ -1095,12 +1178,13 @@ const EGG_BOOM     = 2.6; // how big the bang LOOKS
 // --- IT BREAKS OUT OF THE ICE ---
 // Everything else the FROST THROWER catches stays frozen for as long as you
 // hold the spray on it. The BIG CHICK does not. It is far too big to hold:
-// BOSS_BREAK after it goes solid it SHATTERS the block, and throws the
-// biggest piece straight at you. That piece costs you SHARD_COST of your
-// three hearts, so freezing a boss is no longer free — it buys you three
-// seconds of no eggs, and you pay for them by getting out of the way.
-//   The block cracks visibly for the last SHARD_CRACK, so the shard is
-// never a surprise: you are told, and then you move.
+// BOSS_BREAK after it goes solid it SHATTERS the block, and it has to be
+// frozen all over again. It used to throw the biggest piece straight at you,
+// for SHARD_COST of your three hearts — a whole run gone in one hit. It
+// throws nothing now (SHARD_CLUTCH is 0), but the machinery for the shard is
+// all still here, so putting SHARD_CLUTCH back to 1 brings it back.
+//   The block cracks visibly for the last SHARD_CRACK, so you can see it is
+// about to go.
 //   SHARD_CRACK MUST BE SHORTER THAN ICE_HOLD. Once the crack shows, the
 // chick still needs SHARD_CRACK more steps of being frozen — and a block you
 // have taken the spray off has only ICE_HOLD left in it. Make the two equal
@@ -1109,18 +1193,21 @@ const EGG_BOOM     = 2.6; // how big the bang LOOKS
 // go, you can only get out of the way. A test holds the gap.
 const BOSS_BREAK   = stepsFor(3);    // frozen this long, and it bursts out
 const SHARD_CRACK  = stepsFor(0.75); // ...cracking for the last of it
-// How many pieces the block breaks into, all thrown at once. ONE is what it
-// throws. Put it up and they are laid out and aimed the way the chick lays a
-// clutch of eggs — spread across its width, the middle one aimed at you, the
-// rest leaning wide by SHARD_LEAN — so the machinery for a fan is still here
-// and costs one number. At 1 the shard comes from the middle and is aimed,
-// and SHARD_LEAN does nothing.
-const SHARD_CLUTCH = 1;
+// Once it has broken out, the chick cannot be frozen again for this long —
+// not by the FROST THROWER, not by a MINI FROST. Without it a MINI FROST,
+// firing every second, would have it back in the ice the moment it got out.
+const BOSS_THAW    = stepsFor(3);
+// How many pieces the block throws at you when it breaks, all at once. NONE:
+// the chick breaks out and throws nothing. At 1 the shard comes from the
+// middle and is aimed at you. Higher, and they are laid out the way the chick
+// lays a clutch of eggs — spread across its width, the middle one aimed at
+// you, the rest leaning wide by SHARD_LEAN.
+const SHARD_CLUTCH = 0;
 const SHARD_COST   = 3;   // hearts a chunk of that ice takes off you
 const SHARD_SPLASH = 1;   // ...or off you standing in its blast behind cover
 const SHARD_SPEED  = 2;   // how many times an egg's speed it comes down at
 const SHARD_LEAN   = SHOT_ANGLE * 1.6; // how far the outside pieces fly wide
-                                       // (nothing, while SHARD_CLUTCH is 1)
+                                       // (nothing, unless SHARD_CLUTCH is 2 or more)
 const SHARD_SIZE   = 56;  // how big it is drawn, in pixels
 const SHARD_RADIUS = 70;  // how far the blast reaches when it lands
 const SHARD_BOOM   = 3;   // how big that bang LOOKS
@@ -1500,7 +1587,9 @@ function seedGemsFromProgress() {
 }
 seedGemsFromProgress();
 
-function inLevels() { return mode === "levels"; }
+// A TEST DRIVE is always the endless game's first few stages, whichever
+// game you were set to — see startTestDrive().
+function inLevels() { return mode === "levels" && !testDrive; }
 function saveMode() { try { localStorage.setItem(MODE_KEY, mode); } catch (e) {} }
 function saveRung() { try { localStorage.setItem(RUNG_KEY, String(bestLevel)); } catch (e) {} }
 function saveDone() { try { localStorage.setItem(DONE_KEY, finished ? "1" : "0"); } catch (e) {} }
@@ -1525,6 +1614,16 @@ let enteringName;  // true while the "new high score!" name box is open
 let lastEntry;     // the run you just saved, so we can highlight it gold
 let justUnlocked = []; // ships the run you just finished earned, to shout about
 let gemJustWon = false; // did the level you have just beaten pay a gem?
+
+// --- TEST DRIVE ---
+// Fly a ship you have NOT earned yet, to see whether it is worth earning.
+// A drive is the first TEST_STAGES stages of the endless game and then it
+// is over, and it counts for nothing: no bank, no best run, no high score.
+// Without that rule you could earn a ship by flying one you do not own.
+//   `testDrive` is the id of the ship on loan, or null in an ordinary game.
+// newGame() sets it, so every way into an ordinary game ends a drive.
+const TEST_STAGES = 5;
+let testDrive = null;
 
 // Remember which keys are currently held down.
 const keys = {};
@@ -1655,10 +1754,13 @@ function buildLevel() {
       maxHp: plan.bossHp,
       fire: 0,             // steps of burning left, once something sets it alight
       fireTick: 0,         // steps until the fire takes its next bite
+      poison: 0,           // steps of POISON left, from the MINI VENOM
+      poisonTick: 0,       // steps until the poison takes its next bite
       chill: 0,            // steps of SLOW left, from the FROST THROWER
       frost: 0,            // steps it has been held in the frost so far
       froze: 0,            // steps of FROZEN left — it cannot walk, drop or shoot
       held: 0,             // steps it has been frozen SO FAR, for BOSS_BREAK
+      thawed: 0,           // steps left before it can be frozen again, after breaking out
       size: BOSS_SIZE,     // everything else is CELL (40) across
       boss: true,
     });
@@ -1686,6 +1788,8 @@ function buildLevel() {
           maxHp: herdHp(),     // what it started with, so we can show it fading
           fire: 0,             // steps of burning left, once the FLAMETHROWER lights it
           fireTick: 0,         // steps until the fire takes its next bite
+          poison: 0,           // steps of POISON left, from the MINI VENOM
+          poisonTick: 0,       // steps until the poison takes its next bite
           chill: 0,            // steps of SLOW left, from the FROST THROWER
           frost: 0,            // steps it has been held in the frost so far
           froze: 0,            // steps of FROZEN left — it cannot walk, drop or shoot
@@ -1724,6 +1828,7 @@ function buildLevel() {
   // Re-centre the player and clear the air.
   player.x = W / 2;
   bullets = [];
+  minionTimers = []; // the minions start each wave ready to fire
   shots = [];
   particles = [];
   shockwaves = [];
@@ -1745,7 +1850,8 @@ function buildLevel() {
 // newGame(): reset the score/lives/stage and lay out a fresh board.
 // startState is "start" (wait on the start screen) or "playing" (go now).
 // ---------------------------------------------------------------------
-function newGame(startState) {
+function newGame(startState, drive) {
+  testDrive = drive || null; // first, so the lives below are the loaned ship's
   player = { x: W / 2, y: H - CELL - 20 };
   score = 0;
   wave = 1;              // the first wave of whatever level you are on
@@ -1799,7 +1905,17 @@ function startOrRestart() {
   // On WELL DONE, a tap carries you straight into the level it just named.
   // Waiting instead takes you to the list — see tickCleared().
   else if (state === "cleared") nextLevelNow();
+  // After a TEST DRIVE, going again means driving the same ship again.
+  else if ((state === "lost" || state === "won") && testDrive) newGame("playing", testDrive);
   else if (state === "lost" || state === "won" || state === "shop") newGame("playing");
+}
+
+// startTestDrive(): take a ship you have not earned out for TEST_STAGES
+// stages. A ship you own needs no test drive — you just fly it.
+function startTestDrive(ship) {
+  if (unlocked(ship)) return;
+  newGame("playing", ship.id);
+  stageBanner = BANNER_TIME;
 }
 
 // ---------------------------------------------------------------------
@@ -1842,17 +1958,29 @@ function startLevel(n) {
 // straight into the middle of a wave.
 // ---------------------------------------------------------------------
 let shopCameFrom = "start";
+// The shop has two pages: "ships", and "minions" (see drawMinions()).
+let shopView = "ships";
+function toggleMinions() {
+  if (state !== "shop") return;
+  shopView = shopView === "minions" ? "ships" : "minions";
+}
 function openShop() {
   if (state !== "start" && state !== "lost" && state !== "won" &&
       state !== "playing") return;
   if (enteringName) return; // deal with the high-score box first
+  // Not in the middle of a test drive: the shop is for choosing YOUR ship,
+  // and swapping in the middle of a drive would end it without saying so.
+  if (state === "playing" && testDrive) return;
   if (state === "playing") paused = true;
   shopCameFrom = state;
   state = "shop";
+  shopView = "ships";   // the shop always opens on the ships
   updateSpace(); // browsing ships is quiet if you came in from a live game
 }
 function closeShop() {
   if (state !== "shop") return;
+  // Backing out of the minions goes back to the ships, not out of the shop.
+  if (shopView === "minions") { shopView = "ships"; return; }
   state = shopCameFrom;
   updateSpace();
 }
@@ -1873,6 +2001,7 @@ function closeShop() {
 // ---------------------------------------------------------------------
 function restartGame() {
   if (state !== "playing") return;
+  if (testDrive) { newGame("playing", testDrive); return; } // nothing to keep
   bankPoints();
   if (score > bestRun) bestRun = score;
   saveShop(); // and the bank keeps the points this run made, however it ended
@@ -1935,8 +2064,14 @@ function nextStage() {
   // matters most after the boss: being blown up by the last egg of a chicken
   // you've already beaten would be a rotten way to lose a life.
   shots = [];
+  // A TEST DRIVE stops after its last stage.
+  if (testDrive && stage >= TEST_STAGES) {
+    state = "won";
+    return;
+  }
   // ENDLESS rolls straight on into the next, faster wave, and never stops.
   if (!inLevels()) {
+    winDarkMatter();   // a stage cleared is worth one dark matter
     stage++;
     buildLevel();
     return;
@@ -1950,6 +2085,9 @@ function nextStage() {
     buildLevel();
     return;
   }
+  // A level beaten is worth one dark matter — every time, not just the
+  // first, the same as an endless stage is every time.
+  winDarkMatter();
   // A GEM for the level — the first time you beat it, and only then. This
   // sits above the split below so that the last level pays exactly like
   // every other one: the YOU WIN screen is still a level being beaten.
@@ -2062,8 +2200,20 @@ document.addEventListener("keydown", (e) => {
   // "2" comes after "1". That is fine while there are fewer than ten of a
   // thing and silently breaks every key but 1 the moment there are ten. And
   // 0 means ten, because there is no key for it.
+  // N flips the shop between the ships and the MINIONS.
+  if ((e.key === "n" || e.key === "N") && state === "shop") {
+    toggleMinions();
+    return;
+  }
   const picked = numberKey(e.key);
-  if (state === "shop" && picked >= 1 && picked <= SHIPS.length) {
+  // On the minions page, 1 / 2 / 3 do whatever that minion's button says.
+  if (state === "shop" && shopView === "minions") {
+    if (picked >= 1 && picked <= MINIONS.length) {
+      const b = minionButton(picked - 1);
+      if (b.action) b.action();
+      return;
+    }
+  } else if (state === "shop" && picked >= 1 && picked <= SHIPS.length) {
     equipShip(SHIPS[picked - 1]);
     return;
   }
@@ -2662,6 +2812,28 @@ function update() {
   if (gunTimer > 0) gunTimer--;
   if (currentShip().auto && keys[" "] && gunTimer === 0 && iced === 0) shootBullets();
 
+  // --- The MINIONS fire by themselves ---
+  // Each one whenever its own gun is ready and an animal is above it. They
+  // do not wait for the button and they are not held by the ice: each is
+  // its own little ship.
+  const minis = currentMinions();
+  const mxs = minionXs(minis.length);
+  minis.forEach((mini, k) => {
+    if ((minionTimers[k] || 0) > 0) minionTimers[k]--;
+    const mx = mxs[k];
+    const above = invaders.some((inv) => inv.alive && inv.y < player.y &&
+      Math.abs(inv.x - mx) < MINION_REACH + sizeOf(inv) / 2);
+    if (!(minionTimers[k] > 0) && above) {
+      const nose = player.y - MINION_SIZE / 2;
+      for (let g = 0; g < mini.guns; g++) {
+        const off = mini.guns === 1 ? 0 : (g === 0 ? -2 : 2);
+        bullets.push({ x: mx + off, y: nose, dmg: mini.dmg, mini: true,
+                       hits: mini.hits, color: mini.color });
+      }
+      minionTimers[k] = mini.reload;
+    }
+  });
+
   // --- Move YOUR bullets; drop ones that fly off the top ---
   //   An ordinary bullet goes straight up, and always has. A GUIDED MISSILE
   // goes at whatever it has locked onto, however far round that is, at a
@@ -2672,7 +2844,7 @@ function update() {
   // reach back and hurry along one already in the air.
   const herdFloor = seeking ? herdStep() * SEEK_EDGE : 0;
   for (const b of bullets) {
-    if (!b.seek) { b.y -= PLAYER_BULLET_SPEED; continue; }
+    if (!b.seek) { b.y -= b.mini ? MINION_SHOT_SPEED : PLAYER_BULLET_SPEED; continue; }
     // Hold the lock while that animal lives; take the nearest when it dies.
     if (!b.lock || !b.lock.alive) b.lock = nearestAnimal(b.x, b.y);
     // Nothing left to chase — the wave is down. Fly on out of the top.
@@ -3016,7 +3188,11 @@ function update() {
   const icy = flameLit && flameGun && flameGun.ice;
   for (const inv of invaders) {
     if (!inv.alive) continue;
-    const cold = icy ? flameHeat(inv.x, inv.y, sizeOf(inv)) : 0;
+    // Just broken out of the ice? Then for BOSS_THAW the cold cannot take
+    // hold of it at all — see breakIce().
+    const proof = inv.thawed > 0;
+    if (proof) inv.thawed--;
+    const cold = icy && !proof ? flameHeat(inv.x, inv.y, sizeOf(inv)) : 0;
     if (cold > 0) {
       inv.chill = ICE_SLOW_TIME;
       if (inv.frost < ICE_FREEZE_AT) inv.frost++;
@@ -3094,6 +3270,7 @@ function update() {
           b.y = -999;
           break;                    // one bang per shell
         }
+        if (b.hits) minionHit(inv, b.hits); // frost, fire or poison, from a minion
         inv.hp -= b.dmg;
         b.y = -999;                 // send bullet off-screen so it's cleaned up
         if (inv.hp <= 0) {
@@ -3113,7 +3290,8 @@ function update() {
     // that it is never inside a block. This line is belt and braces: if the
     // steering ever did let one touch a base, the missile would be swallowed
     // by your own roof rather than quietly knocking it down.
-    if (!b.seek && b.y > -20 && hitBase(b.x, b.y)) b.y = -999;
+    // A MINION's shot flies straight through your cover without chipping it.
+    if (!b.seek && !b.mini && b.y > -20 && hitBase(b.x, b.y)) b.y = -999;
   }
   bullets = bullets.filter((b) => b.y > -20);
 
@@ -3243,6 +3421,28 @@ function update() {
     }
   }
   if (burnedUp > 0) playExplosionSound();
+
+  // --- Animals that are POISONED ---
+  // The MINI VENOM's poison works exactly like the fire above, at half the
+  // pace: a bite every POISON_TICK, for POISON_TIME, so it takes the same
+  // health in the end and twice as long to do it.
+  let poisoned = 0;
+  for (const inv of invaders) {
+    if (!inv.alive || inv.poison <= 0) continue;
+    inv.poison--;
+    if (--inv.poisonTick > 0) continue;
+    inv.poisonTick = POISON_TICK;
+    inv.hp -= inv.boss ? FIRE_BITE * BOSS_FLAME_BITE : FIRE_BITE;
+    if (inv.hp <= 0) {
+      inv.alive = false;
+      inv.fire = 0;
+      inv.poison = 0;
+      spawnExplosion(inv.x, inv.y, inv.boss ? 5 : 1);
+      score += inv.boss ? BOSS_POINTS : 10;
+      poisoned++;
+    }
+  }
+  if (poisoned > 0) playExplosionSound();
 
   // --- Cleared the herd? On to the next (faster) stage! ---
   // Only if you're still alive, of course.
@@ -3462,8 +3662,8 @@ function hitBase(x, y, peek) {
 
 // ---------------------------------------------------------------------
 // breakIce(): the BIG CHICK has been frozen for BOSS_BREAK and bursts out.
-// The block goes off in a shower of cold, and the biggest piece is aimed at
-// wherever you are standing at that moment.
+// The block goes off in a shower of cold. It throws SHARD_CLUTCH pieces at
+// you as it goes — none, as that is set.
 //   Everything cold about the chick is wiped, not just the freeze: it has to
 // be held in the spray for the full ICE_FREEZE_AT again before it will go
 // solid a second time. With a tank of three seconds that is as fast as you
@@ -3474,12 +3674,13 @@ function breakIce(boss, speed) {
   boss.frost = 0;
   boss.chill = 0;
   boss.held  = 0;
+  boss.thawed = BOSS_THAW;   // and it cannot be frozen again for a while
   spawnExplosion(boss.x, boss.y, 4, ICE_BITS);
   shockwaves.push({ x: boss.x, y: boss.y, life: 0, radius: sizeOf(boss) * 0.75,
                     color: "#7ef9ff", flash: "#eafcff" });
   playExplosionSound(true);
-  // The block throws SHARD_CLUTCH pieces — one, as it is set. See the note
-  // on SHARD_CLUTCH for what happens when it is more than that.
+  // The block throws SHARD_CLUTCH pieces — none, as it is set. See the note
+  // on SHARD_CLUTCH for what happens when it is one or more.
   const startY = boss.y + sizeOf(boss) / 2;
   const fall = Math.max(1, (player.y - startY) / speed);
   for (let i = 0; i < SHARD_CLUTCH; i++) {
@@ -3728,6 +3929,113 @@ function buyUpgrade(ship) {
   playExplosionSound(true);   // a bang, so a purchase is felt as well as seen
   return true;
 }
+// --- DARK MATTER and MINIONS --- (see MINIONS, up with the ships)
+//   Three things are written down: how much dark matter you hold, which
+// minions you have bought, and which of them (up to MINION_MAX) fly with
+// you. A bad save loses you a minion, never wedges the game: unknown ids
+// are dropped.
+const DARK_KEY      = "ai-dark";     // dark matter you hold, to spend
+const MINIONS_KEY   = "ai-minions";  // the minions you have bought
+const MINION_KEY    = "ai-minion";   // the ones flying with you, "id,id,id", or ""
+const MINION_MAX    = 3;             // how many can fly with you at once
+let darkMatter = 0;
+try { darkMatter = Math.max(0, Math.floor(Number(localStorage.getItem(DARK_KEY)) || 0)); } catch (e) {}
+let ownMinions = [];
+try {
+  const raw = JSON.parse(localStorage.getItem(MINIONS_KEY));
+  if (Array.isArray(raw)) ownMinions = MINIONS.map((m) => m.id).filter((id) => raw.includes(id));
+} catch (e) {}
+// The ones flying with you, in the order you took them along. A save from
+// before you could take three holds a single id, which reads the same way.
+let minionIds = [];
+try {
+  const saved = (localStorage.getItem(MINION_KEY) || "").split(",");
+  minionIds = saved.filter((id, i) => ownMinions.includes(id) && saved.indexOf(id) === i)
+                   .slice(0, MINION_MAX);
+} catch (e) {}
+function saveMinions() {
+  try {
+    localStorage.setItem(DARK_KEY, String(darkMatter));
+    localStorage.setItem(MINIONS_KEY, JSON.stringify(ownMinions));
+    localStorage.setItem(MINION_KEY, minionIds.join(","));
+  } catch (e) {}
+}
+function ownsMinion(m) { return ownMinions.includes(m.id); }
+// The minions flying with you, in the order you took them along.
+function currentMinions() {
+  return minionIds.map((id) => MINIONS.find((m) => m.id === id)).filter(Boolean);
+}
+function minionAlong(m) { return minionIds.includes(m.id); }
+function minionsFull() { return minionIds.length >= MINION_MAX; }
+// Buy one, and take it along straight away if there is room — buying a
+// minion and then having to find the button that puts it on would be one
+// tap too many. With three already along it waits in the hangar.
+function buyMinion(m) {
+  if (ownsMinion(m) || darkMatter < m.price) return false;
+  darkMatter -= m.price;
+  ownMinions.push(m.id);
+  if (!minionsFull()) minionIds.push(m.id);
+  minionTimers = [];
+  saveMinions();
+  playExplosionSound(true);   // the same bang a ship upgrade makes
+  return true;
+}
+// Take this one along — or, if it is already along, leave it behind. With
+// MINION_MAX already along there is no room, and one has to come off first.
+function equipMinion(m) {
+  if (!ownsMinion(m)) return;
+  if (minionAlong(m)) minionIds = minionIds.filter((id) => id !== m.id);
+  else if (!minionsFull()) minionIds.push(m.id);
+  else return;
+  minionTimers = [];          // everyone starts ready to fire
+  saveMinions();
+  playShootSound(true);
+}
+// One dark matter, for a stage cleared or a level beaten. A TEST DRIVE
+// counts for nothing, the same as it does for the bank. `darkAt` is when it
+// was won, by the wall clock, so "+1 DARK MATTER" can show for a moment.
+let darkAt = -1e9;
+const DARK_SHOW_MS = 2500; // how long "+1 DARK MATTER" stays up
+function winDarkMatter() {
+  if (testDrive) return;
+  darkMatter++;
+  darkAt = nowMs();
+  saveMinions();
+}
+// minionHit(): what a MINI FROST, FLAME or VENOM shot leaves on the animal
+// it hits. Each one goes through the game's own rules for that thing, so a
+// minion's freeze is the FROST THROWER's freeze and its fire is the
+// FLAMETHROWER's fire. Hitting something already frozen, alight or
+// poisoned starts its clock again rather than stacking a second one.
+function minionHit(inv, hits) {
+  if (hits === "freeze") {
+    if (inv.thawed > 0) return;   // a chick just out of the ice will not go back in
+    inv.froze = Math.max(inv.froze, MINI_FREEZE);
+    inv.chill = ICE_SLOW_TIME;
+  } else if (hits === "fire") {
+    if (inv.fire <= 0) inv.fireTick = FIRE_TICK;   // a new fire waits one tick
+    inv.fire = FIRE_TIME;
+  } else if (hits === "poison") {
+    if (inv.poison <= 0) inv.poisonTick = POISON_TICK;
+    inv.poison = POISON_TIME;
+  }
+}
+let minionTimers = [];     // steps until each minion's gun is ready again
+// Where the minions fly, out from your ship's middle: the first on your
+// right, the second on your left, the third further out on the right. Up
+// against a wall there is no room on that side, so they all go to the other
+// side in a row instead, rather than off the screen or on top of each other.
+const MINION_SLOTS = [MINION_GAP, -MINION_GAP, MINION_GAP + MINION_STEP];
+function minionXs(count) {
+  let offs = MINION_SLOTS.slice(0, count);
+  const fits = (o) => player.x + o >= MINION_SIZE && player.x + o <= W - MINION_SIZE;
+  if (!offs.every(fits)) {
+    const right = player.x + MINION_GAP + MINION_STEP * (count - 1) <= W - MINION_SIZE;
+    offs = offs.map((_, k) => (right ? 1 : -1) * (MINION_GAP + MINION_STEP * k));
+  }
+  return offs.map((o) => player.x + o);
+}
+
 let banked = 0;            // how much of THIS run has gone in already
 let bankAtRunStart = bank; // what the bank held when this run began
 let gemsAtRunStart = gems(); // ...and how many gems, for the same reason
@@ -3747,6 +4055,7 @@ const BANK_STEP = 250;     // points the bank must grow by before it is written 
 // browser's store sixty times a second would be waste, and the most a shut
 // lid can cost you is 250 points out of a hundred thousand.
 function bankPoints() {
+  if (testDrive) return;  // a test drive pays nothing in
   if (score <= banked) return;
   bank += score - banked;
   banked = score;
@@ -3793,7 +4102,8 @@ function saveShop() {
 
 // The ship you're currently flying.
 function currentShip() {
-  const base = SHIPS.find((s) => s.id === shipId) || SHIPS[0];
+  const id = testDrive || shipId; // the ship on loan, if this is a test drive
+  const base = SHIPS.find((s) => s.id === id) || SHIPS[0];
   if (!upsOn(base)) return base;
   // The patched copy is KEPT rather than built again. currentShip() is asked
   // dozens of times a frame, and making a fresh object each time would leave
@@ -3931,6 +4241,8 @@ function onGameOver() {
   beamCooldown = 0;         // over the game-over screen
   bolts = [];               // and no lightning left forking over it either
   flameLit = false;         // and no flame still pouring out of the nose
+  // A test drive is not a run: nothing to bank, beat or put on the board.
+  if (testDrive) { justUnlocked = []; return; }
   // Ships this run just earned: ones the run reached but your old best hadn't.
   // Finishing the course counts as reaching the end of it — and is worth
   // remembering in its own right.
@@ -3999,6 +4311,7 @@ const BTN_STYLE = {
   gold:   { edge: "#ffd34d", fill: "rgba(255,211,77,0.15)",  text: "#ffd34d" },
   quiet:  { edge: "#888888", fill: null,                     text: "#aaaaaa" },
   locked: { edge: "#555555", fill: null,                     text: "#666666" },
+  minion: { edge: "#c99bff", fill: "rgba(201,155,255,0.15)", text: "#c99bff" }, // MINION_COLOR
 };
 
 function button(x, y, w, label, action, style) {
@@ -4038,6 +4351,14 @@ function screenButtons() {
       { label: "SHOP",    action: openShop, style: "quiet" },
     ]));
   }
+  if ((state === "lost" || state === "won") && testDrive) {
+    const ship = SHIPS.find((s) => s.id === testDrive);
+    return buttonRow(600, 210, [
+      { label: "DRIVE AGAIN", action: () => startTestDrive(ship) },
+      { label: "SHOP", action: openShop },
+      { label: "PLAY", action: () => newGame("playing"), style: "quiet" },
+    ]);
+  }
   if (state === "lost" || state === "won") {
     // In LEVELS, PLAY AGAIN starts the course from the top — so there is a
     // way back to the list as well, because dying on level 4 should not
@@ -4053,6 +4374,15 @@ function screenButtons() {
       { label: "PLAY AGAIN", action: () => newGame("playing") },
       { label: "SHOP", action: openShop },
     ]);
+  }
+  if (state === "shop" && shopView === "minions") {
+    // One button per minion, then BACK to the ships and the way into a game.
+    const rows = MINIONS.map((m, i) => minionButton(i));
+    return rows.concat(buttonRow(848, 240, [
+      { label: "BACK TO SHIPS", action: toggleMinions, style: "quiet" },
+      shopCameFrom === "playing" ? { label: "BACK TO GAME", action: () => { shopView = "ships"; closeShop(); } }
+                                 : { label: "PLAY", action: () => newGame("playing") },
+    ]));
   }
   if (state === "shop") {
     // One button per ship: fly the ones you've earned, and a dead LOCKED
@@ -4070,10 +4400,14 @@ function screenButtons() {
         return { x: card.x, y: card.y, w: card.w, h: card.h,
                  label: ship.name, style: "bare", action: action };
       }
-      const label = flying ? "FLYING THIS" : mine ? "FLY THIS" : "LOCKED";
-      const style = flying ? "gold" : mine ? "normal" : "locked";
+      // One column has a button to spare, so a locked ship's says TEST DRIVE
+      // — except from inside a game in progress, which a drive would throw
+      // away; there it stays LOCKED.
+      const drive = !mine && shopCameFrom !== "playing";
+      const label = flying ? "FLYING THIS" : mine ? "FLY THIS" : drive ? "TEST DRIVE" : "LOCKED";
+      const style = flying ? "gold" : mine ? "normal" : drive ? "quiet" : "locked";
       return button(card.x + card.w - 212, card.y + (SHOP_CARD_H - BTN_H) / 2,
-                    198, label, action, style);
+                    198, label, drive ? () => startTestDrive(ship) : action, style);
     });
     // The UPGRADE box on each card you own. It sits INSIDE the card, and in
     // two columns the whole card is itself a button — so these go in front
@@ -4087,15 +4421,29 @@ function screenButtons() {
                   w: CARD_UP_W, h: CARD_UP_H, label: upLabel(ship), style: "bare",
                   action: canUpgrade(ship) ? () => buyUpgrade(ship) : null });
     });
+    // The TEST DRIVE box on each card you do NOT own, in two columns. It
+    // goes in front of the cards for the same reason the UPGRADE box does.
+    // Not from inside a game in progress: that game would be thrown away.
+    if (SHOP_COLS > 1 && shopCameFrom !== "playing") {
+      SHIPS.forEach((ship, i) => {
+        if (unlocked(ship)) return;
+        const card = shopCard(i);
+        buys.push({ x: card.x + CARD_TD_X, y: card.y + CARD_TD_Y,
+                    w: CARD_TD_W, h: CARD_TD_H, label: "TEST DRIVE", style: "bare",
+                    action: () => startTestDrive(ship) });
+      });
+    }
     // If you stepped in from a game in progress, the only way out is back
     // into it — a "PLAY" that quietly threw your run away would be cruel.
     if (shopCameFrom === "playing") {
-      return buys.concat(rows, buttonRow(848, 260, [
+      return buys.concat(rows, buttonRow(848, 240, [
         { label: "BACK TO GAME", action: closeShop },
+        { label: "MINIONS", action: toggleMinions, style: "minion" },
       ]));
     }
     return buys.concat(rows, buttonRow(848, 210, [
       { label: "BACK", action: closeShop, style: "quiet" },
+      { label: "MINIONS", action: toggleMinions, style: "minion" },
       { label: "PLAY", action: () => newGame("playing") },
     ]));
   }
@@ -4490,6 +4838,13 @@ const CARD_UP_H = CARD_TIGHT ? 24 : 26;
 const CARD_UP_X = SHOP_CARD_W - CARD_UP_W - 12;
 const CARD_UP_Y = SHOP_CARD_H - CARD_UP_H - 5;
 const CARD_UP_PT = CARD_TIGHT ? 11 : 12;
+// The TEST DRIVE box sits top-right on a card you do NOT own: the room an
+// owned ship gives to its star. The bottom-right belongs to the progress
+// bar and the "LOCKED — ..." line, which runs long.
+const CARD_TD_W = 112;
+const CARD_TD_H = CARD_TIGHT ? 22 : 24;
+const CARD_TD_X = SHOP_CARD_W - CARD_TD_W - 10;
+const CARD_TD_Y = 7;
 // The ★★☆ go beside the ship's NAME, not beside "EARNED" on the line below:
 // that line already carries "★ FLYING THIS ONE" at its longest, and stars
 // landed on top of it. The longest name is fourteen letters, and Courier
@@ -4635,6 +4990,20 @@ function drawShop() {
       // best single run against the price; for the one that fills up it is
       // the bank against the price. It gets the bottom line of the card to
       // itself, clear of the writing above.
+      if (SHOP_COLS > 1 && shopCameFrom !== "playing") {
+        const bx = card.x + CARD_TD_X, by = y + CARD_TD_Y;
+        roundRectPath(bx, by, CARD_TD_W, CARD_TD_H, 7);
+        ctx.fillStyle = "rgba(126,249,255,0.10)";
+        ctx.fill();
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = "#7ef9ff";
+        ctx.stroke();
+        ctx.textAlign = "center";
+        ctx.fillStyle = "#7ef9ff";
+        ctx.font = CARD_UP_PT + "px 'Courier New', monospace";
+        ctx.fillText("TEST DRIVE", bx + CARD_TD_W / 2, by + CARD_TD_H / 2);
+        ctx.textAlign = "left";
+      }
       const barW = CARD_BAR_W;
       const got  = ship.gems ? gems() : ship.bank ? bank : bestRun;
       const want = ship.gems ? ship.gems : ship.bank ? ship.bank : ship.need;
@@ -4659,6 +5028,110 @@ function drawShop() {
   ctx.fillStyle = "#888";
   ctx.font = "17px 'Courier New', monospace";
   ctx.fillText("Tap a ship to fly it (" + shipKeys() + ")   •   tap UPGRADE, or U" +
+               "   •   Esc goes back", W / 2, 922);
+  ctx.fillText("TEST DRIVE a locked ship for " + TEST_STAGES +
+               " stages — it counts for nothing", W / 2, 944);
+}
+
+// ---------------------------------------------------------------------
+// drawMinions(): the shop's second page, where MINIONS are bought with dark
+// matter and one is chosen to fly with you. One wide card per minion, the
+// minion drawn big so you can see it, and a row at the bottom showing it
+// at its real size beside the ship you fly.
+// ---------------------------------------------------------------------
+// Six cards between the words at the top and the buttons at 848.
+const MINION_CARD_TOP = 178;
+const MINION_CARD_H   = 98;
+const MINION_CARD_GAP = 8;
+const MINION_SIDE     = 50;
+function minionCard(i) {
+  return { x: MINION_SIDE, y: MINION_CARD_TOP + i * (MINION_CARD_H + MINION_CARD_GAP),
+           w: W - 2 * MINION_SIDE, h: MINION_CARD_H };
+}
+// The button on a minion's card. Tap it and it does what it says: BUY one
+// you can afford, EQUIP one you own, or — on one flying with you — take it
+// off again. With MINION_MAX already along, the others say so and wait.
+function minionButton(i) {
+  const m = MINIONS[i];
+  const card = minionCard(i);
+  const mine = ownsMinion(m);
+  const along = minionAlong(m);
+  const full = mine && !along && minionsFull();
+  const label = along ? "EQUIPPED ✓" : full ? MINION_MAX + " ALREADY ON" : mine ? "EQUIP"
+              : darkMatter >= m.price ? "BUY: " + m.price
+              : "NEED " + (m.price - darkMatter) + " MORE";
+  const style = along ? "gold" : full ? "locked" : mine ? "normal"
+              : darkMatter >= m.price ? "minion" : "locked";
+  const action = full ? null : mine ? () => equipMinion(m)
+               : darkMatter >= m.price ? () => buyMinion(m) : null;
+  return button(card.x + card.w - 228, card.y + (MINION_CARD_H - BTN_H) / 2,
+                214, label, action, style);
+}
+function drawMinions() {
+  ctx.fillStyle = "rgba(0,0,0,0.82)";
+  ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = MINION_COLOR;
+  ctx.font = "42px 'Courier New', monospace";
+  ctx.fillText("MINIONS", W / 2, 62);
+  ctx.font = "26px 'Courier New', monospace";
+  ctx.fillText("DARK MATTER: " + darkMatter, W / 2, 102);
+  ctx.fillStyle = "#888";
+  ctx.font = "17px 'Courier New', monospace";
+  ctx.fillText("Win 1 dark matter for every stage you clear or level you beat",
+               W / 2, 136);
+  ctx.fillText("A minion flies beside your ship and fires by itself   •   take up to " + MINION_MAX,
+               W / 2, 160);
+
+  for (let i = 0; i < MINIONS.length; i++) {
+    const m = MINIONS[i];
+    const card = minionCard(i);
+    const mine = ownsMinion(m);
+    const along = minionAlong(m);
+    roundRectPath(card.x, card.y, card.w, card.h, 12);
+    ctx.fillStyle = along ? "rgba(255,211,77,0.08)" : "rgba(255,255,255,0.05)";
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = along ? "#ffd34d" : mine ? MINION_COLOR : "#444";
+    ctx.stroke();
+
+    ctx.fillStyle = "#666";
+    ctx.font = "19px 'Courier New', monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(String(i + 1), card.x + 24, card.y + card.h / 2);
+    // Drawn BIG here so you can see it. In the game it is MINION_SIZE.
+    drawThing(m.art, card.x + 92, card.y + card.h / 2, 60);
+
+    const tx = card.x + 150;
+    ctx.textAlign = "left";
+    ctx.fillStyle = mine ? "#fff" : "#bbb";
+    ctx.font = "22px 'Courier New', monospace";
+    ctx.fillText(m.name, tx, card.y + 20);
+    ctx.fillStyle = "#9aa6b2";
+    ctx.font = "14px 'Courier New', monospace";
+    for (let l = 0; l < m.blurb.length; l++) {
+      ctx.fillText(m.blurb[l], tx, card.y + 44 + l * 18);
+    }
+    ctx.fillStyle = along ? "#ffd34d" : mine ? "#5fd66f" : "#777";
+    ctx.fillText(along ? "★ FLYING WITH YOU" : mine ? "✓ YOURS"
+                 : "COSTS " + m.price + " DARK MATTER", tx, card.y + 83);
+  }
+
+  // How it really looks: the ship you fly, with its minions beside it, all
+  // at the size they are in the game. Top right, beside the title.
+  const showX = W - 110, showY = 84;
+  const minis = currentMinions();
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#888";
+  ctx.font = "14px 'Courier New', monospace";
+  ctx.fillText(minis.length ? "in the game" : "no minions", showX, showY - 36);
+  drawThing(currentShip().art, showX, showY, CELL);
+  minis.forEach((m, k) => drawThing(m.art, showX + MINION_SLOTS[k], showY, MINION_SIZE));
+
+  ctx.fillStyle = "#888";
+  ctx.font = "17px 'Courier New', monospace";
+  ctx.fillText("Tap BUY or EQUIP (1–" + MINIONS.length + ")   •   tap EQUIPPED to take it off" +
                "   •   Esc goes back", W / 2, 922);
 }
 
@@ -4692,6 +5165,30 @@ function drawBurning(inv, size) {
     ctx.lineTo(x + (Math.random() - 0.5) * wide, foot - tall);
     ctx.lineTo(x + wide, foot);
     ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+// drawPoisoned(): a green sickly cast over an animal the MINI VENOM has
+// poisoned, with bubbles rising off it. It fades as the poison runs out,
+// the same way a fire dies down.
+const POISON_BUBBLES = 3;
+function drawPoisoned(inv, size) {
+  ctx.save();
+  const half = size / 2;
+  const left = Math.max(0.35, inv.poison / POISON_TIME);
+  ctx.globalAlpha = 0.28 * left;
+  ctx.fillStyle = "#8dff5a";
+  ctx.beginPath();
+  ctx.arc(inv.x, inv.y, half * 0.8, 0, Math.PI * 2);
+  ctx.fill();
+  for (let i = 0; i < POISON_BUBBLES; i++) {
+    ctx.globalAlpha = (0.4 + Math.random() * 0.4) * left;
+    ctx.fillStyle = i % 2 ? "#8dff5a" : "#d6ffb8";
+    ctx.beginPath();
+    ctx.arc(inv.x + (Math.random() * 2 - 1) * half * 0.7,
+            inv.y - Math.random() * half, 1.5 + Math.random() * 2, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();
@@ -4982,7 +5479,7 @@ function drawIcons() {
   if (state === "playing") {
     drawIcon(paused ? PLAY_ART : PAUSE_ART, PAUSE_ICON);
     drawIcon(RESTART_ART, RESTART_ICON);
-    drawIcon(SHOP_ART, SHOP_ICON);
+    if (!testDrive) drawIcon(SHOP_ART, SHOP_ICON); // no shop mid-drive
   }
 }
 
@@ -4997,7 +5494,7 @@ function draw() {
   // The shop is a screen all of its own — no game board behind it. (The
   // speaker still comes along, so you can mute while you're browsing.)
   if (state === "shop") {
-    drawShop();
+    if (shopView === "minions") drawMinions(); else drawShop();
     drawIcons();
     ctx.globalAlpha = 1;
     drawButtons();
@@ -5013,8 +5510,9 @@ function draw() {
   ctx.textAlign = "center";
   // ENDLESS counts up for ever, so it just says which wave. LEVELS has a
   // finish, so it says how far along the course you are.
-  ctx.fillText(inLevels() ? "LEVEL " + stage + "/" + LEVELS.length + waveTag()
-                          : "STAGE " + stage, W / 2, 28);
+  ctx.fillText(testDrive ? "TEST DRIVE " + stage + "/" + TEST_STAGES
+             : inLevels() ? "LEVEL " + stage + "/" + LEVELS.length + waveTag()
+             : "STAGE " + stage, W / 2, 28);
   drawLives();
 
   // The BIG CHICK's health, so you can see you're getting somewhere. It's a
@@ -5060,6 +5558,7 @@ function draw() {
       // already burning down and what still needs the flame — which is the
       // whole skill of that gun.
       if (inv.fire > 0) drawBurning(inv, size);
+      if (inv.poison > 0) drawPoisoned(inv, size); // ...and the MINI VENOM's poison
       // ...and something the FROST THROWER has hold of carries its cold the
       // same way: a blue cast while it is merely slowed, a block of ice once
       // it is frozen solid. One look tells you which of the herd is still
@@ -5105,12 +5604,25 @@ function draw() {
   ctx.shadowColor = BULLET_COLOR;
   ctx.shadowBlur = 8;
   for (const b of bullets) {
-    if (b.bomb || b.seek) continue;       // both are drawn their own way below
+    if (b.bomb || b.seek || b.mini) continue; // each drawn its own way below
     ctx.beginPath();
     ctx.moveTo(b.x, b.y);
     ctx.lineTo(b.x, b.y + BULLET_LENGTH); // streak trails BELOW as it flies up
     ctx.stroke();
   }
+  // A MINION's shots: little streaks, half the length, in its own colour —
+  // ice, fire and poison each have theirs, so you can see which is which.
+  ctx.lineWidth = 2;
+  for (const b of bullets) {
+    if (!b.mini) continue;
+    ctx.strokeStyle = b.color || MINION_COLOR;
+    ctx.shadowColor = b.color || MINION_COLOR;
+    ctx.beginPath();
+    ctx.moveTo(b.x, b.y);
+    ctx.lineTo(b.x, b.y + BULLET_LENGTH / 2);
+    ctx.stroke();
+  }
+  ctx.lineWidth = 4;
   ctx.shadowBlur = 0;
 
   // A GUIDED MISSILE is not going straight up, so its streak cannot hang
@@ -5231,6 +5743,13 @@ function draw() {
   const shipArt = currentShip().art;
   const playerRot = (typeof shipArt === "string") ? -Math.PI / 4 : 0;
   if (!blinking) drawThing(shipArt, player.x, player.y, CELL, playerRot);
+  // ...and the MINIONS flying beside it, a fifth the size. They blink with
+  // you, so they read as one ship that has just been hit.
+  if (!blinking) {
+    const minis = currentMinions();
+    const mxs = minionXs(minis.length);
+    minis.forEach((m, k) => drawThing(m.art, mxs[k], player.y, MINION_SIZE));
+  }
   if (iced > 0) drawIce();
 
   // Draw the ELECTRIC ARC's jumps ON TOP of the animals, so you can see
@@ -5292,8 +5811,9 @@ function draw() {
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.font = "44px 'Courier New', monospace";
-    ctx.fillText(inLevels() ? "LEVEL " + stage + waveTag() : "STAGE " + stage,
-                 W / 2, H / 2);
+    ctx.fillText(inLevels() ? "LEVEL " + stage + waveTag()
+                 : testDrive ? "STAGE " + stage + " OF " + TEST_STAGES
+                 : "STAGE " + stage, W / 2, H / 2);
     // A level has a name, so say it. An endless wave has not, so the only
     // thing worth shouting about there is the BIG CHICK — which you deserve
     // the warning about either way.
@@ -5371,7 +5891,7 @@ function draw() {
   }
 
   // Game-over screen.
-  if (state === "lost") {
+  if (state === "lost" && !testDrive) {
     ctx.fillStyle = "rgba(0,0,0,0.7)";
     ctx.fillRect(0, 0, W, H);
     ctx.fillStyle = "#fff";
@@ -5462,7 +5982,7 @@ function draw() {
 
   // You finished the course. This screen only ever appears in LEVELS —
   // ENDLESS has no end to reach.
-  if (state === "won") {
+  if (state === "won" && !testDrive) {
     ctx.fillStyle = "rgba(0,0,0,0.7)";
     ctx.fillRect(0, 0, W, H);
     ctx.textAlign = "center";
@@ -5494,6 +6014,57 @@ function draw() {
       ctx.font = "17px 'Courier New', monospace";
       ctx.fillText("Enter plays again   •   S opens the shop", W / 2, 684);
     }
+  }
+
+  // The end of a TEST DRIVE — out of lives, or all its stages done. It says
+  // what the ship was, that the drive did not count, and how to earn it.
+  if ((state === "lost" || state === "won") && testDrive) {
+    const ship = SHIPS.find((s) => s.id === testDrive);
+    ctx.fillStyle = "rgba(0,0,0,0.7)";
+    ctx.fillRect(0, 0, W, H);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = state === "won" ? "#ffd34d" : "#fff";
+    ctx.font = "48px 'Courier New', monospace";
+    ctx.fillText(state === "won" ? "TEST DRIVE DONE!" : "TEST DRIVE OVER", W / 2, 150);
+    drawThing(ship.art, W / 2, 226, 64, typeof ship.art === "string" ? -Math.PI / 4 : 0);
+    ctx.fillStyle = "#7ef9ff";
+    ctx.font = "26px 'Courier New', monospace";
+    ctx.fillText(ship.name, W / 2, 292);
+    ctx.fillStyle = "#fff";
+    ctx.font = "22px 'Courier New', monospace";
+    ctx.fillText((state === "won" ? "All " + TEST_STAGES + " stages cleared"
+                  : "Reached stage " + stage + " of " + TEST_STAGES) +
+                 "   •   Score: " + score, W / 2, 336);
+    ctx.fillStyle = "#ffd34d";
+    ctx.font = "20px 'Courier New', monospace";
+    ctx.fillText(ship.gems ? "Win " + ship.gems + " gems to make it yours"
+                 : ship.bank ? "Fill the bank to " + ship.bank + " to make it yours"
+                 : "Score " + ship.need + " in one game to make it yours", W / 2, 386);
+    ctx.fillStyle = "#888";
+    ctx.font = "17px 'Courier New', monospace";
+    ctx.fillText("A test drive does not count towards the bank, best run or high scores",
+                 W / 2, 426);
+    ctx.fillText("Enter drives again   •   S opens the shop", W / 2, 684);
+  }
+
+  // "+1 DARK MATTER", for a couple of seconds after you win one. Painted
+  // over everything but the buttons, so it shows on WELL DONE as well.
+  const darkFor = nowMs() - darkAt;
+  if (darkFor < DARK_SHOW_MS) {
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, (DARK_SHOW_MS - darkFor) / 500);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = MINION_COLOR;
+    ctx.font = "22px 'Courier New', monospace";
+    // Mid-game, under the STAGE banner (and under the BIG CHICK's name, when
+    // there is one), in the empty middle of the board, clear of the herd.
+    // On WELL DONE and YOU WIN the middle is full of words, so it goes below
+    // them and their buttons instead.
+    ctx.fillText("+1 DARK MATTER   (" + darkMatter + ")", W / 2,
+                 state === "playing" ? H / 2 + 115 : 714);
+    ctx.restore();
   }
 
   // The tappable boxes for whichever screen we just painted. Always last,
