@@ -29,7 +29,7 @@ inPage() {
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 inPage "$here/unlock.js" > "$tmp/write.js"
-print -r -- "SHIPS.filter(s => unlocked(s)).length + ' of ' + SHIPS.length + ' ships earned, ' + SHIPS.filter(s => upsOn(s) >= UP_MAX).length + ' upgraded, gems ' + gems() + ' of ' + LEVELS.length + ', bank ' + bank + ', left to spend ' + purse()" > "$tmp/check.src"
+print -r -- "SHIPS.filter(s => unlocked(s)).length + ' of ' + SHIPS.length + ' ships earned, ' + SHIPS.filter(s => upsOn(s) >= UP_MAX).length + ' upgraded, gems ' + gems() + ' of ' + LEVELS.length + ', bank ' + bank + ', left to spend ' + purse() + ', ' + ownMinions.length + ' of ' + MINIONS.length + ' minions, dark matter ' + darkMatter" > "$tmp/check.src"
 inPage "$tmp/check.src" > "$tmp/check.js"
 
 osascript - "$game" "$tmp/write.js" "$tmp/check.js" <<'EOF'
